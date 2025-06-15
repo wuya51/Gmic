@@ -46,7 +46,7 @@ Below are some GraphQL queries and mutations that can be executed via GraphiQL o
 
 🔍 Query Total Messages
 
-graphql
+```graphql
 query {  
   getTotalMessages  
 }  
@@ -58,7 +58,8 @@ query GetGmRecord {
   }  
 }  
 Send a GM Message
-graphql
+
+```graphql
 mutation SendGM {  
   sendGm(  
     chainId: "25c75dc1458e61ab8e8be77395c1c570ef5b26ef4d6f34fb8d374caf45e3a6a7",  
@@ -69,8 +70,9 @@ mutation SendGM {
     timestamp  
   }  
 }  
-Send GM to Specific Recipient
-graphql
+Send GMicrochains to Specific Recipient
+
+```graphql
 mutation SendGMTo {  
   sendGmTo(  
     chainId: "9ffb30f691e24eda6d1de09f73e4e37bb33ff733c18fc088cface83471e0db08",  
@@ -82,4 +84,4 @@ mutation SendGMTo {
     timestamp  
   }  
 }  
-Notes
+

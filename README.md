@@ -61,7 +61,7 @@ query GetGmRecord {
   }  
 }
 ``` 
-## Send a GM Message
+## Send a GMicrochains Message
 
 graphql
 # 📨 mutation SendGM {  

@@ -30,7 +30,8 @@ OWNER_1="${INFO_1[1]}"
 
 # Build the Gmic contract (assuming project structure)
 cd Gmic && cargo build --release --target wasm32-unknown-unknown
-（```）
+
+```
 🚀 2. Contract Publishing and Application Creation
 📤 Publish the Smart Contract Module
 # Publish the contract module (adjust paths as needed)

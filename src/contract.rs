@@ -28,7 +28,7 @@ impl Contract for GmContract {
         let context = runtime.root_view_storage_context();
         let state = match GmState::load(context.clone()).await {
             Ok(state) => {
-                log::info!("加载成功后的 owner: {:?}", state.owner.get());  // 新增：验证加载的 owner
+                log::info!("Successfully loaded state, owner: {:?}", state.owner.get());
                 state
             }
             Err(e) => {
@@ -52,7 +52,7 @@ impl Contract for GmContract {
     async fn instantiate(&mut self, argument: Self::InstantiationArgument) {
         let mut state = self.state.lock().await;
         if state.owner.get().is_some() {
-            info!("合约已初始化，跳过重复初始化");
+            info!("Contract already initialized, skipping re-initialization");
             return;
         }
         info!("Initializing contract with argument: {:?}", argument);
@@ -60,22 +60,22 @@ impl Contract for GmContract {
             Some(owner_value) => {
                 match serde_json::from_value::<AccountOwner>(owner_value.clone()) {
                     Ok(owner) => {
-                        info!("成功解析 owner: {:?}", owner);
+                        info!("Successfully parsed owner: {:?}", owner);
                         match state.set_owner(owner).await {
-                            Ok(()) => info!("set_owner 执行成功"),
-                            Err(e) => error!("设置 owner 失败: {}", e),
+                            Ok(()) => info!("Owner set successfully"),
+                            Err(e) => error!("Failed to set owner: {}", e),
                         }
                     }
-                    Err(e) => error!("解析 AccountOwner 失败: {}", e),
+                    Err(e) => error!("Failed to parse AccountOwner: {}", e),
                 }
             }
-            None => error!("JSON 参数缺少 'owner' 字段"),
+            None => error!("JSON argument missing 'owner' field"),
         }        
     }
 
     async fn execute_operation(&mut self, operation: GmOperation) {
         info!("Starting execute_operation with operation: {:?}", operation);
-        /* 绕过签名验证，直接从操作参数中获取sender
+        /* Bypass signature verification, directly get sender from operation
         let sender = match self.runtime.authenticated_signer() {
             Some(signer) => {
                 info!("Authenticated signer: {:?}", signer);

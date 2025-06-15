@@ -52,7 +52,8 @@ graphql
 query {  
   getTotalMessages  
 }  
-Query GM Record by Owner
+🔍 Query GM Record by Owner
+（```）
 graphql
 query GetGmRecord {  
   getGmRecord(owner: "0x677c7eb04a63136df4711c323be1820058c00d97959a91a2c6e99e89d65ef434") {  
@@ -63,7 +64,7 @@ Send a GM Message
 
 ```
 graphql
-mutation SendGM {  
+📨 mutation SendGM {  
   sendGm(  
     chainId: "25c75dc1458e61ab8e8be77395c1c570ef5b26ef4d6f34fb8d374caf45e3a6a7",  
     sender: "0x6330caeec0b30dc0cb28e817aecd8ef21767bdd8777b085543bd9707b26e31a6"  
@@ -74,7 +75,7 @@ mutation SendGM {
   }  
 }  
 
-# Mutation: Send GMicrochains to Specific Recipient
+# 📬Mutation: Send GMicrochains to Specific Recipient
 
 ```
 graphql

@@ -64,7 +64,6 @@ query GetGmRecord {
     timestamp
   }
 }
-
 ```
 
 ## 📨 Send a GMicrochains Message
@@ -80,8 +79,6 @@ query GetGmRecord {
     timestamp
   }
 }
-
-
 ```
 
 # 📬Mutation: Send GMicrochains to Specific Recipient

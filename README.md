@@ -60,11 +60,11 @@ query GetGmRecord {
     timestamp  
   }  
 }  
-Send a GM Message
+## Send a GM Message
 
 ```
 graphql
-📨 mutation SendGM {  
+# 📨 mutation SendGM {  
   sendGm(  
     chainId: "25c75dc1458e61ab8e8be77395c1c570ef5b26ef4d6f34fb8d374caf45e3a6a7",  
     sender: "0x6330caeec0b30dc0cb28e817aecd8ef21767bdd8777b085543bd9707b26e31a6"  

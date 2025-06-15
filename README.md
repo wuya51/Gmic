@@ -70,18 +70,18 @@ mutation SendGM {
     timestamp  
   }  
 }  
-Send GMicrochains to Specific Recipient
+
+# Mutation: Send GMicrochains to Specific Recipient
 
 ```graphql
-mutation SendGMTo {  
-  sendGmTo(  
-    chainId: "9ffb30f691e24eda6d1de09f73e4e37bb33ff733c18fc088cface83471e0db08",  
-    sender: "0xa7be0bdc46321e467b60cbe58e979d60f3cf0e71ce465f72e3cd49c57727f80b",  
-    recipient: "0x4bcd86b2bfb5f42ae343f6859b6b113cec83504e2239b75b1af2668da04c519a"  
-  ) {  
-    success  
-    message  
-    timestamp  
-  }  
-}  
-
+mutation SendGMTo {
+  sendGmTo(
+    chainId: "9fffb30f691e24eda6d1de09f73e4e37bb33ff733c18fc088cface83471e0db08",
+    sender: "0xa7be0bdc46321e467b60cbe58e979d60f3cf0e71ce465f72e3cd49c57727f80b",
+    recipient: "0x4bcd86b2bfb5f42ae343f6859b6b113cec83504e2239b75b1af2668da04c519a"
+  ) {
+    success
+    message
+    timestamp
+  }
+}

@@ -1,46 +1,51 @@
-# Gmic
- Gmic
-Linera GMicrochains:[gmic.top](https://gmic.top/)
-Linera Smart Contract Development and Interaction Guide
-Environment Setup and Wallet Initialization
-First, configure the development environment and create a temporary wallet:
-bash
-# Add the debug binaries to the PATH  
-export PATH="$PWD/target/debug:$PATH"  
+# 🧩 Gmic — Linera GMicrochains
 
-# Create a temporary directory for wallet data  
-LINERA_TMP_DIR=$(mktemp -d)  
-export LINERA_WALLET="$LINERA_TMP_DIR/wallet.json"  
-export LINERA_STORAGE="$LINERA_TMP_DIR/wallet.db"  
+🔗 **Live Demo:** [gmic.top](https://gmic.top/)  
+📘 **Description:** A smart contract and dApp interaction guide for the Linera blockchain.
 
-# Set the faucet URL (testnet)  
-FAUCET_URL=https://faucet.testnet-babbage.linera.net  
+---
 
-# Request chain and account from the faucet  
-INFO_1=($(linera wallet request-chain --faucet $FAUCET_URL))  
-CHAIN_1="${INFO_1[0]}"  
-OWNER_1="${INFO_1[1]}"  
+## 📦 1. Environment Setup and Wallet Initialization
 
-# Build the Gmic contract (assuming project structure)  
-cd Gmic && cargo build --release --target wasm32-unknown-unknown  
+Before starting, set up your development environment and create a temporary wallet:
 
+### 🔧 Set Environment Variables
 
+```bash
+# Add current directory's debug binaries to PATH
+export PATH="$PWD/target/debug:$PATH"
 
+# Create a temporary directory for wallet data
+LINERA_TMP_DIR=$(mktemp -d)
+export LINERA_WALLET="$LINERA_TMP_DIR/wallet.json"
+export LINERA_STORAGE="$LINERA_TMP_DIR/wallet.db"
 
+# Set the faucet URL (testnet)
+FAUCET_URL=https://faucet.testnet-babbage.linera.net
 
-Contract Publishing and Application Creation
-Publish the Smart Contract Module
-bash
-# Publish the contract module (adjust paths as needed)  
-MODULE_ID=$(linera publish-module \  
-    examples/target/wasm32-unknown-unknown/release/gm_{contract,service}.wasm)  
-Create the Application Instance
-bash
-# Create the application with the published module  
-APP_ID=$(linera create-application "$MODULE_ID" "$CHAIN_1" --json-argument "{\"owner\":\"$OWNER_1\"}")  
-GraphQL Interaction Examples
-Below are GraphQL queries and mutations for interacting with the GM contract. These can be executed via a GraphiQL interface:
-Query Total Messages
+# Request chain and account from the faucet
+INFO_1=($(linera wallet request-chain --faucet $FAUCET_URL))
+CHAIN_1="${INFO_1[0]}"
+OWNER_1="${INFO_1[1]}"
+
+# Build the Gmic contract (assuming project structure)
+cd Gmic && cargo build --release --target wasm32-unknown-unknown
+
+🚀 2. Contract Publishing and Application Creation
+📤 Publish the Smart Contract Module
+# Publish the contract module (adjust paths as needed)
+MODULE_ID=$(linera publish-module \
+    examples/target/wasm32-unknown-unknown/release/gm_{contract,service}.wasm)
+
+💡 Create the Application Instance
+# Create the application with the published module
+APP_ID=$(linera create-application "$MODULE_ID" "$CHAIN_1" --json-argument "{\"owner\":\"$OWNER_1\"}")
+
+🌐 3. GraphQL Interaction Examples
+Below are some GraphQL queries and mutations that can be executed via GraphiQL or other GraphQL clients.
+
+🔍 Query Total Messages
+
 graphql
 query {  
   getTotalMessages  

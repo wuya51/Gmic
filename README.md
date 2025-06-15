@@ -38,7 +38,7 @@ cd Gmic && cargo build --release --target wasm32-unknown-unknown
 MODULE_ID=$(linera publish-module \
     examples/target/wasm32-unknown-unknown/release/gm_{contract,service}.wasm)
 
-💡 Create the Application Instance
+#💡 Create the Application Instance
 # Create the application with the published module
 APP_ID=$(linera create-application "$MODULE_ID" "$CHAIN_1" --json-argument "{\"owner\":\"$OWNER_1\"}")
 ```

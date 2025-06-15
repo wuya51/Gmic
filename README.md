@@ -31,9 +31,9 @@ OWNER_1="${INFO_1[1]}"
 # Build the Gmic contract (assuming project structure)
 cd Gmic && cargo build --release --target wasm32-unknown-unknown
 
----
+```
 ## 🚀 2. Contract Publishing and Application Creation
-## 📤 Publish the Smart Contract Module
+# 📤 Publish the Smart Contract Module
 # Publish the contract module (adjust paths as needed)
 MODULE_ID=$(linera publish-module \
     examples/target/wasm32-unknown-unknown/release/gm_{contract,service}.wasm)
@@ -42,7 +42,7 @@ MODULE_ID=$(linera publish-module \
 # Create the application with the published module
 APP_ID=$(linera create-application "$MODULE_ID" "$CHAIN_1" --json-argument "{\"owner\":\"$OWNER_1\"}")
 
----
+```
 ## 🌐 3. GraphQL Interaction Examples
 Below are some GraphQL queries and mutations that can be executed via GraphiQL or other GraphQL clients.
 

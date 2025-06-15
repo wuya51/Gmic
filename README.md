@@ -32,8 +32,8 @@ OWNER_1="${INFO_1[1]}"
 cd Gmic && cargo build --release --target wasm32-unknown-unknown
 
 ```
-🚀 2. Contract Publishing and Application Creation
-📤 Publish the Smart Contract Module
+## 🚀 2. Contract Publishing and Application Creation
+## 📤 Publish the Smart Contract Module
 # Publish the contract module (adjust paths as needed)
 MODULE_ID=$(linera publish-module \
     examples/target/wasm32-unknown-unknown/release/gm_{contract,service}.wasm)

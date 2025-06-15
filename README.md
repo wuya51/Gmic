@@ -41,8 +41,8 @@ MODULE_ID=$(linera publish-module \
 💡 Create the Application Instance
 # Create the application with the published module
 APP_ID=$(linera create-application "$MODULE_ID" "$CHAIN_1" --json-argument "{\"owner\":\"$OWNER_1\"}")
-
-🌐 3. GraphQL Interaction Examples
+```
+## 🌐 3. GraphQL Interaction Examples
 Below are some GraphQL queries and mutations that can be executed via GraphiQL or other GraphQL clients.
 
 🔍 Query Total Messages

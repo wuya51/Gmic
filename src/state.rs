@@ -40,16 +40,16 @@ impl GmState {
         self.events.insert(&(chain_id, sender, recipient), current_ts)?;
 
         let chain_count = self.chain_messages.get(&chain_id).await?.unwrap_or(0);
-        log::info!("更新前chain_messages: {}", chain_count);
+        log::info!("chain_messages before update: {}", chain_count);
         self.chain_messages.insert(&chain_id, chain_count + 1)?;
         let chain_count_updated = self.chain_messages.get(&chain_id).await?.unwrap_or(0);
-        log::info!("更新后chain_messages: {}", chain_count_updated);
+        log::info!("chain_messages after update: {}", chain_count_updated);
 
         let current = self.wallet_messages.get(&sender).await?.unwrap_or(0);
-        log::info!("更新前wallet_messages: {}", current);
+        log::info!("wallet_messages before update: {}", current);
         self.wallet_messages.insert(&sender.clone(), current + 1)?;
         let updated = self.wallet_messages.get(&sender).await?.unwrap_or(0);
-        log::info!("更新后wallet_messages: {}", updated);
+        log::info!("wallet_messages after update: {}", updated);
 
         let total = self.total_messages.get();
         let new_total = total + 1;
@@ -60,8 +60,8 @@ impl GmState {
     }
 
     pub async fn load(context: ViewStorageContext) -> Result<Self, ViewError> {
-        log::info!("开始加载 GmState 各个字段 调用来源: {:?}", std::panic::Location::caller());
-        // 为每个字段创建独立的上下文（避免存储键冲突）
+        log::info!("Starting to load GmState fields, caller: {:?}", std::panic::Location::caller());
+        // Create independent contexts for each field to avoid storage key conflicts
         let owner_context = context.clone_with_base_key(b"gm_owner".to_vec());
         log::info!("owner_context base_key: {:?}", owner_context.base_key());
         let last_gm_context = context.clone_with_base_key(b"gm_last_gm".to_vec());
@@ -70,9 +70,9 @@ impl GmState {
         let wallet_messages_context = context.clone_with_base_key(b"gm_wallet_messages".to_vec());
         let events_context = context.clone_with_base_key(b"gm_events".to_vec());
 
-        // 初始化并记录各字段加载日志
+        // Initialize and log each field loading
         let owner = RegisterView::load(owner_context).await?;
-        log::info!("owner 加载结果: {:?}", owner.get());  
+        log::info!("owner load result: {:?}", owner.get());  
 
         let last_gm = MapView::load(last_gm_context).await?;
         let mut has_last_gm = false;
@@ -82,32 +82,32 @@ impl GmState {
                 Ok(())
             })
             .await?;
-        log::info!("last_gm 加载完成，是否为空: {}", !has_last_gm);
+        log::info!("last_gm loading complete, is empty: {}", !has_last_gm);
 
         let total_messages = RegisterView::load(total_messages_context).await?;
-        log::info!("total_messages 加载完成，当前值: {}", total_messages.get());
+        log::info!("total_messages loading complete, current value: {}", total_messages.get());
 
         let chain_messages = MapView::load(chain_messages_context).await?;
         let mut has_chain_messages = false;
         chain_messages
             .for_each_index_value(|_, count| {
                 has_chain_messages = true;
-                log::info!("chain_messages 条目: 计数={}", count);
+                log::info!("chain_messages entry: count={}", count);
                 Ok(())
             })
             .await?;
-        log::info!("chain_messages 加载完成，包含数据: {}", has_chain_messages);
+        log::info!("chain_messages loading complete, contains data: {}", has_chain_messages);
 
         let wallet_messages = MapView::load(wallet_messages_context).await?;
         let mut has_wallet_messages = false;
         wallet_messages
             .for_each_index_value(|_, count| {
                 has_wallet_messages = true;
-                log::info!("wallet_messages 条目: 计数={}", count);
+                log::info!("wallet_messages entry: count={}", count);
                 Ok(())
             })
             .await?;
-        log::info!("wallet_messages 加载完成，包含数据: {}", has_wallet_messages);
+        log::info!("wallet_messages loading complete, contains data: {}", has_wallet_messages);
 
         let events = MapView::load(events_context).await?;
         let mut has_events = false;
@@ -117,7 +117,7 @@ impl GmState {
                 Ok(())
             })
             .await?;
-        log::info!("events 加载完成，是否为空: {}", !has_events);
+        log::info!("events loading complete, is empty: {}", !has_events);
 
         Ok(Self {
             owner,
@@ -130,22 +130,22 @@ impl GmState {
     }
 
     pub async fn set_owner(&mut self, owner: AccountOwner) -> Result<(), ViewError> {
-        log::info!("设置 owner: {:?}", owner);
+        log::info!("Setting owner: {:?}", owner);
         self.owner.set(Some(owner));
         let serialized = serde_json::to_string(&self.owner.get()).unwrap();
-        log::info!("序列化 owner: {}", serialized);
+        log::info!("Serialized owner: {}", serialized);
         match self.save().await {
-            Ok(()) => log::info!("set_owner 中状态保存成功"),
-            Err(e) => log::error!("set_owner 中状态保存失败: {}", e),
+            Ok(()) => log::info!("State saved successfully in set_owner"),
+            Err(e) => log::error!("Failed to save state in set_owner: {}", e),
         }
         let saved_owner = self.owner.get();
-        log::info!("Owner 状态保存成功 (保存后: {:?}, 验证: {:?})", 
+        log::info!("Owner state saved successfully (after save: {:?}, verification: {:?})", 
             self.owner.get(), saved_owner);
 
-        // 重新生成与load方法相同的base_key上下文
+        // Regenerate the same base_key context as the load method
         let reloaded_context = self.owner.context().clone_with_base_key(b"gm_owner".to_vec());
         let reloaded_state = GmState::load(reloaded_context).await?;
-        log::info!("重新加载后的owner: {:?}", reloaded_state.owner.get()); // 应显示Some(owner)
+        log::info!("Reloaded owner: {:?}", reloaded_state.owner.get()); // Should display Some(owner)
 
         Ok(())
     }
@@ -193,4 +193,3 @@ impl GmState {
         Ok(events)
     }
 }
-

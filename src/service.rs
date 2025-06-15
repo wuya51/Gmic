@@ -31,7 +31,7 @@ impl Service for GmService {
             Err(e) => {
                 log::error!("Failed to load state, initializing empty state: {}", e);
                 GmState {
-                    // 修复：使用 context.clone() 复用初始上下文
+                    // Fix: Use context.clone() to reuse the initial context
                     owner: RegisterView::new(context.clone()).expect("Failed to init owner"),
                     last_gm: MapView::new(context.clone()).expect("Failed to init last_gm"),
                     total_messages: RegisterView::new(context.clone()).expect("Failed to init total_messages"),
@@ -186,15 +186,15 @@ impl MutationRoot {
         sender: AccountOwner,
     ) -> Result<SendGmResponse, async_graphql::Error> {
         let current_chain_id = self.runtime.chain_id();
-        log::info!("处理 sendGm 查询, chain_id: {}, sender: {:?}", chain_id, sender);
+        log::info!("Processing sendGm query, chain_id: {}, sender: {:?}", chain_id, sender);
         let state = self.state.lock().await;
         let owner = {
-            log::info!("当前 owner: {:?}", state.owner.get()); 
-            // 修正：直接匹配 Option<AccountOwner>
+            log::info!("Current owner: {:?}", state.owner.get()); 
+            // Fix: Directly match Option<AccountOwner>
             match state.owner.get() {
                 Some(owner) => owner.clone(),
                 None => {
-                    log::error!("Contract owner 未初始化");
+                    log::error!("Contract owner not initialized");
                     return Ok(SendGmResponse {
                         success: false,
                         message: "Contract owner not initialized".to_string(),
@@ -203,10 +203,10 @@ impl MutationRoot {
                 }
             }
         };
-        // 新增：更新链计数和钱包计数
+        // New: Update chain and wallet message counts
         state.get_chain_count(chain_id).await?;
         state.get_wallet_count(&sender).await?;
-        drop(self.state.clone());  // 提前释放锁
+        drop(self.state.clone());  // Release lock early
 
         if chain_id != current_chain_id {
             let operation = GmOperation::Gm { sender: sender, recipient: owner };
@@ -235,11 +235,11 @@ impl MutationRoot {
     ) -> Result<SendGmResponse, async_graphql::Error> {
         let current_chain_id = self.runtime.chain_id();
         let state = self.state.lock().await; 
-        // 获取可变锁
-        // 新增：更新链计数和钱包计数（使用recipient作为钱包标识）
+        // Get mutable lock
+        // New: Update chain and wallet message counts (using recipient as wallet identifier)
         state.get_chain_count(chain_id).await?;
         state.get_wallet_count(&sender).await?;
-        drop(state);  // 提前释放锁
+        drop(state);  // Release lock early
 
         if chain_id != current_chain_id {
             let operation = GmOperation::GmTo { sender, recipient };

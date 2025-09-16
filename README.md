@@ -7,7 +7,7 @@
 
 ## 📦 1. Environment Setup and Wallet Initialization
 
-Before starting, set up your development environment and create a temporary wallet:
+Before starting, set up your development environment and create a temporary wallet: 
 
 ### 🔧 Set Environment Variables
 

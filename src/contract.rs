@@ -28,7 +28,7 @@ impl Contract for GmContract {
         let context = runtime.root_view_storage_context();
         let state = match GmState::load(context.clone()).await {
             Ok(state) => {
-                log::info!("Successfully loaded state, owner: {:?}", state.owner.get());
+                log::info!("加载成功后的 owner: {:?}", state.owner.get());  // 新增：验证加载的 owner
                 state
             }
             Err(e) => {
@@ -52,7 +52,7 @@ impl Contract for GmContract {
     async fn instantiate(&mut self, argument: Self::InstantiationArgument) {
         let mut state = self.state.lock().await;
         if state.owner.get().is_some() {
-            info!("Contract already initialized, skipping re-initialization");
+            info!("合约已初始化，跳过重复初始化");
             return;
         }
         info!("Initializing contract with argument: {:?}", argument);
@@ -60,37 +60,33 @@ impl Contract for GmContract {
             Some(owner_value) => {
                 match serde_json::from_value::<AccountOwner>(owner_value.clone()) {
                     Ok(owner) => {
-                        info!("Successfully parsed owner: {:?}", owner);
+                        info!("成功解析 owner: {:?}", owner);
                         match state.set_owner(owner).await {
-                            Ok(()) => info!("Owner set successfully"),
-                            Err(e) => error!("Failed to set owner: {}", e),
+                            Ok(()) => info!("set_owner 执行成功"),
+                            Err(e) => error!("设置 owner 失败: {}", e),
                         }
                     }
-                    Err(e) => error!("Failed to parse AccountOwner: {}", e),
+                    Err(e) => error!("解析 AccountOwner 失败: {}", e),
                 }
             }
-            None => error!("JSON argument missing 'owner' field"),
+            None => error!("JSON 参数缺少 'owner' 字段"),
         }        
     }
 
     async fn execute_operation(&mut self, operation: GmOperation) {
         info!("Starting execute_operation with operation: {:?}", operation);
-        /* Bypass signature verification, directly get sender from operation
+        // 使用authenticated_signer获取sender（Dynamic钱包验证）
         let sender = match self.runtime.authenticated_signer() {
             Some(signer) => {
-                info!("Authenticated signer: {:?}", signer);
+                info!("Authenticated signer (Dynamic Wallet): {:?}", signer);
                 signer
             }
             None => {
-                error!("No authenticated signer");
+                error!("No authenticated signer from Dynamic Wallet");
                 return;
             }
         };
-        */
-        let sender = match operation {
-            GmOperation::Gm { sender, .. } => sender,
-            GmOperation::GmTo { sender, .. } => sender,
-        };
+        // 移除从操作参数中直接获取sender的代码
         let chain_id = self.runtime.chain_id();
         let mut state = self.state.lock().await;
         let owner = match state.owner.get() {
@@ -103,7 +99,7 @@ impl Contract for GmContract {
         let timestamp = self.runtime.system_time();
         info!("Executing operation: chain_id={:?}, sender={:?}, timestamp={:?}, owner={:?}", chain_id, sender, timestamp, owner);
         match operation {
-            GmOperation::Gm { sender: _, recipient: _ } => {
+            GmOperation::Gm { recipient: _ } => {
                 info!("Recording Gm");
                 if let Err(e) = state.record_gm(chain_id, sender, Some(owner.clone()), timestamp).await {
                     error!("Failed to record Gm: {}", e);
@@ -115,7 +111,7 @@ impl Contract for GmContract {
                     &GmMessage::Gm { sender, recipient: Some(owner), timestamp },
                 );
             }
-            GmOperation::GmTo { sender, recipient } => {
+            GmOperation::GmTo { recipient } => {
                 info!("Recording GmTo");
                 if let Err(e) = state.record_gm(chain_id, sender, Some(recipient.clone()), timestamp).await {
                     error!("Failed to record GmTo: {}", e);

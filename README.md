@@ -73,6 +73,8 @@ query {
 }
 
 ###🔍 Query GM Record by Owner
+
+```
 query GetGmRecord {
   getGmRecord(owner: "0x677c7eb04a63136df4711c323be1820058c00d97959a91a2c6e99e89d65ef434") {
     timestamp

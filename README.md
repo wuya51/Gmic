@@ -5,6 +5,20 @@
 
 ---
 
+## Changelog
+
+### [Conway Update] - 2025-10-15
+
+#### Changed
+- Updated faucet URL from Babbage testnet (`https://faucet.testnet-babbage.linera.net`) to Conway testnet (`https://faucet.testnet-conway.linera.net`) for chain and account requests.
+- Adjusted chain IDs and RPC endpoints to align with Conway testnet configuration (e.g., `CHAIN_1` and `OWNER_1` now reference Conway chains).
+- Minor documentation tweaks for Conway compatibility, including improved GraphQL query examples for enhanced testnet stability.
+
+#### Added
+- Note on Conway-specific features, such as improved microchain performance and updated module publishing commands.
+
+---
+
 ## 📦 1. Environment Setup and Wallet Initialization
 
 Before starting, set up your development environment and create a temporary wallet: 
@@ -20,8 +34,8 @@ LINERA_TMP_DIR=$(mktemp -d)
 export LINERA_WALLET="$LINERA_TMP_DIR/wallet.json"
 export LINERA_STORAGE="$LINERA_TMP_DIR/wallet.db"
 
-# Set the faucet URL (testnet)
-FAUCET_URL=https://faucet.testnet-babbage.linera.net
+# Set the faucet URL (Conway testnet)
+FAUCET_URL=https://faucet.testnet-conway.linera.net
 
 # Request chain and account from the faucet
 INFO_1=($(linera wallet request-chain --faucet $FAUCET_URL))

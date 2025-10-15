@@ -4,17 +4,17 @@
 use serde::{Deserialize, Serialize};
 use linera_sdk::linera_base_types::{AccountOwner, Timestamp};
 
-// Define message types (also used for events)
+// 定义消息类型（同时用于事件）
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum GmMessage {
     Gm {
         sender: AccountOwner,
         recipient: Option<AccountOwner>,
-        timestamp: Timestamp, // Changed to use Timestamp type
+        timestamp: Timestamp, // 改为使用 Timestamp 类型
     },
 }
 
-// Define the ABI
+// 定义 ABI
 pub struct GmAbi;
 
 impl linera_sdk::abi::ContractAbi for GmAbi {
@@ -27,9 +27,10 @@ impl linera_sdk::abi::ServiceAbi for GmAbi {
     type QueryResponse = async_graphql::Response;
 }
 
-// Define operation types
+// 定义操作类型
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum GmOperation {
-    Gm { sender: AccountOwner, recipient: AccountOwner },
-    GmTo { sender: AccountOwner, recipient: AccountOwner },    
+    Gm { recipient: AccountOwner },
+    GmTo { recipient: AccountOwner },    
 }
+

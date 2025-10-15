@@ -67,14 +67,15 @@ Below are some GraphQL queries and mutations that can be executed via GraphiQL o
 
 ### 🔍 Query Total Messages
 
-```
+```graphql
 query {
   getTotalMessages
 }
-
-###🔍 Query GM Record by Owner
-
 ```
+
+### 🔍 Query GM Record by Owner
+
+```graphql
 query GetGmRecord {
   getGmRecord(owner: "0x677c7eb04a63136df4711c323be1820058c00d97959a91a2c6e99e89d65ef434") {
     timestamp

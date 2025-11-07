@@ -18,4 +18,6 @@ RUN curl https://raw.githubusercontent.com/creationix/nvm/v0.40.3/install.sh | b
 
 WORKDIR /build
 
+HEALTHCHECK CMD ["curl", "-s", "http://localhost:5173"]
+
 ENTRYPOINT bash /build/run.bash

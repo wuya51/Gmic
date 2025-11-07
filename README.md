@@ -21,17 +21,15 @@ the current directory at `/build` and exposes the following ports:
 - 9001: the localnet validator's proxy
 - 13001: the localnet validator itself
 
-Please keep this port structure.  Other internal structure is
-optional; feel free to change it.
+Please keep this port structure, and make sure the `Dockerfile` or the
+`compose.yaml` defines a reasonable healthcheck for your app (the
+default waits for your frontend to be served on `localhost:5173`).
+Other internal structure is optional; feel free to change it.
 
 ## Usage
 
-### Development
-
 To get started, fill in `run.bash` with instructions to build and run
 your backend and (if applicable) frontend.
-
-### Running
 
 To test that your submission works, run `docker compose up
 --force-recreate` and access your application frontend at

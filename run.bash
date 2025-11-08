@@ -78,9 +78,10 @@ CARGO_MANIFEST_DIR="$SCRIPT_DIR" cargo build --release --target wasm32-unknown-u
 
 # 切换回linera-protocol目录发布模块
 cd "$LINERA_DIR"
+echo "当前目录: $(pwd)"
+echo "发布模块..."
 MODULE_ID=$(linera publish-module \
-    "$SCRIPT_DIR/target/wasm32-unknown-unknown/release/gm_contract.wasm" \
-    "$SCRIPT_DIR/target/wasm32-unknown-unknown/release/gm_service.wasm")
+    examples/target/wasm32-unknown-unknown/release/gm_{contract,service}.wasm)
 
 # 在指定链上创建应用，使用 OWNER 作为初始所有者
 APP_ID=$(linera create-application "$MODULE_ID" "$CHAIN" --json-argument "{\"owner\":\"$OWNER\"}")

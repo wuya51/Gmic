@@ -2,6 +2,12 @@
 
 set -eu
 
+# 获取脚本所在目录和linera-protocol目录
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo "脚本目录: $SCRIPT_DIR"
+LINERA_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+echo "Linera协议目录: $LINERA_DIR"
+
 # 设置目录和环境变量
 DIR=$HOME/.config
 mkdir -p $DIR
@@ -9,8 +15,16 @@ export LINERA_WALLET="$DIR/wallet.json"
 export LINERA_KEYSTORE="$DIR/keystore.json"
 export LINERA_STORAGE="rocksdb:$DIR/wallet.db"
 
-# 初始化钱包并连接水龙头
-linera wallet init --faucet https://faucet.testnet-conway.linera.net
+# 切换到linera-protocol目录执行Linera命令
+cd "$LINERA_DIR"
+
+# 检查钱包是否已存在，如果不存在则初始化
+if [ ! -f "$LINERA_WALLET" ]; then
+    echo "钱包不存在，正在初始化..."
+    linera wallet init --faucet https://faucet.testnet-conway.linera.net
+else
+    echo "钱包已存在，跳过初始化"
+fi
 
 # 请求一个新链，并捕获输出（CHAIN 和 OWNER）
 CHAIN_OWNER=($(linera wallet request-chain --faucet https://faucet.testnet-conway.linera.net))
@@ -20,19 +34,33 @@ OWNER="${CHAIN_OWNER[1]}"
 # 验证（可选）：显示钱包中的链信息
 linera wallet show
 
-# 构建 WASM 模块
-cd /build
+# 切换回gmic-buildathon目录构建WASM模块
+cd "$SCRIPT_DIR"
 cargo build --release --target wasm32-unknown-unknown
 
-# 发布模块
+# 切换回linera-protocol目录发布模块
+cd "$LINERA_DIR"
 MODULE_ID=$(linera publish-module \
-    target/wasm32-unknown-unknown/release/gm_contract.wasm \
-    target/wasm32-unknown-unknown/release/gm_service.wasm)
+    "$SCRIPT_DIR/target/wasm32-unknown-unknown/release/gm_contract.wasm" \
+    "$SCRIPT_DIR/target/wasm32-unknown-unknown/release/gm_service.wasm")
 
 # 在指定链上创建应用，使用 OWNER 作为初始所有者
 APP_ID=$(linera create-application "$MODULE_ID" "$CHAIN" --json-argument "{\"owner\":\"$OWNER\"}")
 
+# 启动Linera服务
+echo "启动Linera服务在端口8080..."
+linera service --port 8080 &
+SERVICE_PID=$!
+echo "Linera服务已启动，PID: $SERVICE_PID"
+
 # 构建并运行前端
-cd web-frontend
+cd "$SCRIPT_DIR/web-frontend"
 npm install
 BROWSER=none npm run dev &
+FRONTEND_PID=$!
+echo "前端服务已启动，PID: $FRONTEND_PID"
+
+# 等待用户中断
+echo "按 Ctrl+C 停止所有服务"
+trap "echo '正在停止服务...'; kill $SERVICE_PID $FRONTEND_PID; exit" INT
+wait

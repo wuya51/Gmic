@@ -12,6 +12,9 @@ services:
     - LINERA_STORAGE=rocksdb:/root/.config/wallet.db
     command: |
       bash -c '
+      # 获取脚本目录
+      SCRIPT_DIR=/build
+      
       # 设置目录和环境变量
       DIR=/root/.config
       mkdir -p $DIR
@@ -36,25 +39,29 @@ services:
       linera wallet show
       
       # 构建 WASM 模块
-      cd /build
+      cd $SCRIPT_DIR
       cargo build --release --target wasm32-unknown-unknown
       
       # 发布模块
       MODULE_ID=$(linera publish-module \\
-          target/wasm32-unknown-unknown/release/gm_contract.wasm \\
-          target/wasm32-unknown-unknown/release/gm_service.wasm)
+          $SCRIPT_DIR/target/wasm32-unknown-unknown/release/gm_contract.wasm \\
+          $SCRIPT_DIR/target/wasm32-unknown-unknown/release/gm_service.wasm)
       
       # 在指定链上创建应用，使用 OWNER 作为初始所有者
       APP_ID=$(linera create-application "$MODULE_ID" "$CHAIN" --json-argument "{\\\"owner\\\":\\\"$OWNER\\\"}")
       
-      # 构建并运行前端
-      cd web-frontend
-      npm install
-      
       # 启动Linera服务
-      cd /build
+      cd $SCRIPT_DIR
       linera service --port 8080 &
+      SERVICE_PID=$!
       
-      # 返回前端目录并启动前端
-      cd web-frontend
-      BROWSER=none npm run dev &'
+      # 构建并运行前端
+      cd $SCRIPT_DIR/web-frontend
+      npm install
+      BROWSER=none npm run dev &
+      FRONTEND_PID=$!
+      
+      # 等待用户中断
+      echo "按 Ctrl+C 停止所有服务"
+      trap "echo '\''正在停止服务...'\''; kill $SERVICE_PID $FRONTEND_PID; exit" INT
+      wait'

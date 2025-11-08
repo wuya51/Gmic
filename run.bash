@@ -5,7 +5,7 @@ set -eu
 # 获取脚本所在目录和linera-protocol目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "脚本目录: $SCRIPT_DIR"
-LINERA_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+LINERA_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 echo "Linera协议目录: $LINERA_DIR"
 
 # 获取应用名称（当前目录名）
@@ -13,14 +13,20 @@ APP_NAME=$(basename "$SCRIPT_DIR")
 echo "应用名称: $APP_NAME"
 
 # 检查并添加应用到examples/Cargo.toml工作区
-EXAMPLES_CARGO_TOML="$LINERA_DIR/../examples/Cargo.toml"
+EXAMPLES_CARGO_TOML="$LINERA_DIR/examples/Cargo.toml"
 if [ -f "$EXAMPLES_CARGO_TOML" ]; then
     # 检查应用是否已在工作区成员列表中
     if ! grep -q "\"$APP_NAME\"" "$EXAMPLES_CARGO_TOML"; then
         echo "将应用 $APP_NAME 添加到工作区成员列表..."
-        # 在members列表中添加应用名
-        sed -i "/members = \[/,/\]/ s/\]/\n    \"$APP_NAME\",\n\]/" "$EXAMPLES_CARGO_TOML"
+        # 在members列表中添加应用名，在最后一个条目后添加
+        sed -i '/^members = \[/,/^]$/ s/^]$/    "'"$APP_NAME"'"\n]/' "$EXAMPLES_CARGO_TOML"
         echo "已添加 $APP_NAME 到工作区成员列表"
+        
+        # 在workspace.dependencies部分添加应用依赖
+        echo "添加 $APP_NAME 到工作区依赖项..."
+        sed -i '/^\[workspace.dependencies\]/a \
+'"$APP_NAME"' = { path = "./'"$APP_NAME"'" }' "$EXAMPLES_CARGO_TOML"
+        echo "已添加 $APP_NAME 到工作区依赖项"
     else
         echo "应用 $APP_NAME 已在工作区成员列表中"
     fi

@@ -10,7 +10,7 @@ services:
     - LINERA_WALLET=/root/.config/wallet.json
     - LINERA_KEYSTORE=/root/.config/keystore.json
     - LINERA_STORAGE=rocksdb:/root/.config/wallet.db
-    command: |
+    command: >
       bash -c '
       # 获取脚本目录
       SCRIPT_DIR=/build
@@ -20,14 +20,19 @@ services:
       echo "应用名称: $APP_NAME"
       
       # 检查并添加应用到examples/Cargo.toml工作区
-      EXAMPLES_CARGO_TOML=/build/../../../examples/Cargo.toml
+      EXAMPLES_CARGO_TOML=/build/../../examples/Cargo.toml
       if [ -f "$EXAMPLES_CARGO_TOML" ]; then
           # 检查应用是否已在工作区成员列表中
           if ! grep -q "\"$APP_NAME\"" "$EXAMPLES_CARGO_TOML"; then
               echo "将应用 $APP_NAME 添加到工作区成员列表..."
-              # 在members列表中添加应用名
-              sed -i "/members = \[/,/\]/ s/\]/\n    \"$APP_NAME\",\n\]/" "$EXAMPLES_CARGO_TOML"
+              # 在members列表中添加应用名，在最后一个条目后添加
+              sed -i "/^members = \[/,/^]$/ s/^]$/    \"$APP_NAME\"\n]/" "$EXAMPLES_CARGO_TOML"
               echo "已添加 $APP_NAME 到工作区成员列表"
+              
+              # 在workspace.dependencies部分添加应用依赖
+              echo "添加 $APP_NAME 到工作区依赖项..."
+              sed -i "/^\[workspace.dependencies\]/a \"$APP_NAME\" = { path = \"./$APP_NAME\" }" "$EXAMPLES_CARGO_TOML"
+              echo "已添加 $APP_NAME 到工作区依赖项"
           else
               echo "应用 $APP_NAME 已在工作区成员列表中"
           fi
@@ -60,15 +65,17 @@ services:
       
       # 构建 WASM 模块
       cd $SCRIPT_DIR
-      cargo build --release --target wasm32-unknown-unknown
+      # 使用独立的Cargo命令构建，避免工作区冲突
+      CARGO_MANIFEST_DIR=$SCRIPT_DIR cargo build --release --target wasm32-unknown-unknown --manifest-path $SCRIPT_DIR/Cargo.toml
       
       # 发布模块
-      MODULE_ID=$(linera publish-module \\
-          $SCRIPT_DIR/target/wasm32-unknown-unknown/release/gm_contract.wasm \\
+      cd /build/..
+      MODULE_ID=$(linera publish-module \
+          $SCRIPT_DIR/target/wasm32-unknown-unknown/release/gm_contract.wasm \
           $SCRIPT_DIR/target/wasm32-unknown-unknown/release/gm_service.wasm)
       
       # 在指定链上创建应用，使用 OWNER 作为初始所有者
-      APP_ID=$(linera create-application "$MODULE_ID" "$CHAIN" --json-argument "{\\\"owner\\\":\\\"$OWNER\\\"}")
+      APP_ID=$(linera create-application "$MODULE_ID" "$CHAIN" --json-argument "{\"owner\":\"$OWNER\"}")
       
       # 启动Linera服务
       cd $SCRIPT_DIR

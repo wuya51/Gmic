@@ -8,6 +8,26 @@ echo "脚本目录: $SCRIPT_DIR"
 LINERA_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 echo "Linera协议目录: $LINERA_DIR"
 
+# 获取应用名称（当前目录名）
+APP_NAME=$(basename "$SCRIPT_DIR")
+echo "应用名称: $APP_NAME"
+
+# 检查并添加应用到examples/Cargo.toml工作区
+EXAMPLES_CARGO_TOML="$LINERA_DIR/../examples/Cargo.toml"
+if [ -f "$EXAMPLES_CARGO_TOML" ]; then
+    # 检查应用是否已在工作区成员列表中
+    if ! grep -q "\"$APP_NAME\"" "$EXAMPLES_CARGO_TOML"; then
+        echo "将应用 $APP_NAME 添加到工作区成员列表..."
+        # 在members列表中添加应用名
+        sed -i "/members = \[/,/\]/ s/\]/\n    \"$APP_NAME\",\n\]/" "$EXAMPLES_CARGO_TOML"
+        echo "已添加 $APP_NAME 到工作区成员列表"
+    else
+        echo "应用 $APP_NAME 已在工作区成员列表中"
+    fi
+else
+    echo "警告: 找不到 examples/Cargo.toml 文件"
+fi
+
 # 设置目录和环境变量
 DIR=$HOME/.config
 mkdir -p $DIR

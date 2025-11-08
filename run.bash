@@ -23,20 +23,20 @@ if [ -f "$EXAMPLES_CARGO_TOML" ]; then
         echo "已添加 $APP_NAME 到工作区成员列表"
         
         # 检查应用是否已在workspace.dependencies中
-        if ! grep -q "$APP_NAME = { path" "$EXAMPLES_CARGO_TOML"; then
+        if ! grep -q "gm = { path" "$EXAMPLES_CARGO_TOML"; then
             # 在workspace.dependencies部分添加应用依赖
-            echo "添加 $APP_NAME 到工作区依赖项..."
+            echo "添加 gm 到工作区依赖项..."
             # 找到最后一个工作区依赖项并在其后添加
             LAST_DEP=$(grep -n "= { path = \"\.\/" "$EXAMPLES_CARGO_TOML" | tail -1 | cut -d: -f1)
             if [ -n "$LAST_DEP" ]; then
-                sed -i "${LAST_DEP}a ${APP_NAME} = { path = \"./${APP_NAME}\" }" "$EXAMPLES_CARGO_TOML"
+                sed -i "${LAST_DEP}a gm = { path = \"./${APP_NAME}\" }" "$EXAMPLES_CARGO_TOML"
             else
                 # 如果找不到其他依赖项，则在[workspace.dependencies]后添加
-                sed -i '/^\[workspace.dependencies\]/a '"$APP_NAME"' = { path = "./'"$APP_NAME"'" }' "$EXAMPLES_CARGO_TOML"
+                sed -i '/^\[workspace.dependencies\]/a gm = { path = "./'"$APP_NAME"'" }' "$EXAMPLES_CARGO_TOML"
             fi
-            echo "已添加 $APP_NAME 到工作区依赖项"
+            echo "已添加 gm 到工作区依赖项"
         else
-            echo "应用 $APP_NAME 已在工作区依赖项中，跳过添加"
+            echo "应用 gm 已在工作区依赖项中，跳过添加"
         fi
     else
         echo "应用 $APP_NAME 已在工作区成员列表中"

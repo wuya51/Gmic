@@ -254,4 +254,3 @@ impl GmContract {
 impl linera_sdk::abi::WithContractAbi for GmContract {
     type Abi = GmAbi;
 }
-```

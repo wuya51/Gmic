@@ -19,6 +19,7 @@ rand.workspace = true
 getrandom.workspace = true
 tokio = { version = "1.36.0", default-features = false, features = ["rt", "sync"] }
 
+
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 linera-sdk = { workspace = true, features = ["test", "wasmer"] }
 tokio = { version = "1.36.0", default-features = false, features = ["rt", "sync"] }

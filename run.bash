@@ -36,7 +36,8 @@ linera wallet show
 
 # 切换回gmic-buildathon目录构建WASM模块
 cd "$SCRIPT_DIR"
-cargo build --release --target wasm32-unknown-unknown
+# 使用独立的Cargo命令构建，避免工作区冲突
+CARGO_MANIFEST_DIR="$SCRIPT_DIR" cargo build --release --target wasm32-unknown-unknown --manifest-path "$SCRIPT_DIR/Cargo.toml"
 
 # 切换回linera-protocol目录发布模块
 cd "$LINERA_DIR"

@@ -26,12 +26,19 @@ services:
           if ! grep -q "\"$APP_NAME\"" "$EXAMPLES_CARGO_TOML"; then
               echo "将应用 $APP_NAME 添加到工作区成员列表..."
               # 在members列表中添加应用名，在最后一个条目后添加
-              sed -i "/^members = \[/,/^]$/ s/^]$/    \"$APP_NAME\"\n]/" "$EXAMPLES_CARGO_TOML"
+              sed -i "/^members = \[/,/^]$/ s/^]$/    \"$APP_NAME\",\n]/" "$EXAMPLES_CARGO_TOML"
               echo "已添加 $APP_NAME 到工作区成员列表"
               
               # 在workspace.dependencies部分添加应用依赖
               echo "添加 $APP_NAME 到工作区依赖项..."
-              sed -i "/^\[workspace.dependencies\]/a \"$APP_NAME\" = { path = \"./$APP_NAME\" }" "$EXAMPLES_CARGO_TOML"
+              # 找到最后一个工作区依赖项并在其后添加
+              LAST_DEP=$(grep -n "= { path = \"\.\/" "$EXAMPLES_CARGO_TOML" | tail -1 | cut -d: -f1)
+              if [ -n "$LAST_DEP" ]; then
+                  sed -i "${LAST_DEP}a ${APP_NAME} = { path = \"./${APP_NAME}\" }" "$EXAMPLES_CARGO_TOML"
+              else
+                  # 如果找不到其他依赖项，则在[workspace.dependencies]后添加
+                  sed -i "/^\[workspace.dependencies\]/a \"$APP_NAME\" = { path = \"./$APP_NAME\" }" "$EXAMPLES_CARGO_TOML"
+              fi
               echo "已添加 $APP_NAME 到工作区依赖项"
           else
               echo "应用 $APP_NAME 已在工作区成员列表中"

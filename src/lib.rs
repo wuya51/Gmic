@@ -1,4 +1,3 @@
-```rust
 #![cfg_attr(target_arch = "wasm32", no_main)]
 
 use serde::{Deserialize, Serialize};

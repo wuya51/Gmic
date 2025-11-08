@@ -1,0 +1,869 @@
+#![cfg_attr(target_arch = "wasm32", no_main)]
+
+mod state;
+use self::state::GmState;
+use gm::{GmAbi, GmOperation, InvitationRecord, InvitationStats};
+use async_graphql::{Object, Request, Response, Schema, SimpleObject, Subscription};
+use linera_sdk::{Service, ServiceRuntime};
+use linera_sdk::linera_base_types::{AccountOwner, ChainId};
+use linera_sdk::views::{View, MapView, RegisterView};
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use serde::{Deserialize, Serialize};
+
+linera_sdk::service!(GmService);
+impl linera_sdk::abi::WithServiceAbi for GmService {
+    type Abi = GmAbi;
+}
+
+pub struct GmService {
+    state: Arc<Mutex<GmState>>,
+    runtime: Arc<ServiceRuntime<Self>>,
+}
+
+impl Service for GmService {
+    type Parameters = ();
+
+    async fn new(runtime: ServiceRuntime<Self>) -> Self {
+        let context = runtime.root_view_storage_context();
+        let state = match GmState::load(context.clone()).await {
+            Ok(state) => state,
+            Err(e) => {
+                GmState {
+                    owner: RegisterView::new(context.clone()).expect("Failed to init owner"),
+                    last_gm: MapView::new(context.clone()).expect("Failed to init last_gm"),
+                    total_messages: RegisterView::new(context.clone()).expect("Failed to init total_messages"),
+                    chain_messages: MapView::new(context.clone()).expect("Failed to init chain_messages"),
+                    wallet_messages: MapView::new(context.clone()).expect("Failed to init wallet_messages"),
+                    events: MapView::new(context.clone()).expect("Failed to init events"),
+                    hourly_stats: MapView::new(context.clone()).expect("Failed to init hourly_stats"),
+                    daily_stats: MapView::new(context.clone()).expect("Failed to init daily_stats"),
+                    monthly_stats: MapView::new(context.clone()).expect("Failed to init monthly_stats"),
+                    top_users_cache: RegisterView::new(context.clone()).expect("Failed to init top_users_cache"),
+                    top_chains_cache: RegisterView::new(context.clone()).expect("Failed to init top_chains_cache"),
+                    cache_timestamp: RegisterView::new(context.clone()).expect("Failed to init cache_timestamp"),
+                    invitations: MapView::new(context.clone()).expect("Failed to init invitations"),
+                    invitation_stats: MapView::new(context.clone()).expect("Failed to init invitation_stats"),
+                    cooldown_enabled: RegisterView::new(context.clone()).expect("Failed to init cooldown_enabled"),
+                    cooldown_whitelist: MapView::new(context.clone()).expect("Failed to init cooldown_whitelist"),
+                    stream_events: MapView::new(context.clone()).expect("Failed to init stream_events"),
+                }
+            }
+        };
+        Self {
+            state: Arc::new(Mutex::new(state)),
+            runtime: Arc::new(runtime),
+        }
+    }
+
+    async fn handle_query(&self, request: Request) -> Response {
+        let schema = Schema::build(
+            QueryRoot {
+                state: Arc::clone(&self.state),
+                runtime: Arc::clone(&self.runtime),
+            },
+            MutationRoot {
+                runtime: Arc::clone(&self.runtime),
+                state: Arc::clone(&self.state),
+            },
+            SubscriptionRoot {
+                runtime: Arc::clone(&self.runtime),
+                state: Arc::clone(&self.state),
+            },
+        )
+        .finish();
+        schema.execute(request).await
+    }
+}
+
+#[derive(SimpleObject)]
+pub struct GmRecord {
+    owner: String,
+    timestamp: u64,
+}
+
+#[derive(SimpleObject, Serialize, Deserialize, Debug, async_graphql::InputObject)]
+pub struct SignatureData {
+    pub sender: String,
+    pub recipient: Option<String>,
+    pub chain_id: String,
+    pub timestamp: u64,
+    pub nonce: u64,
+    pub content: Option<String>,
+}
+
+#[derive(SimpleObject)]
+pub struct SignatureVerificationResult {
+    pub success: bool,
+    pub message: String,
+    pub verified_sender: Option<String>,
+}
+
+#[derive(SimpleObject, Serialize)]
+pub struct GmEvent {
+    sender: String,
+    recipient: Option<String>,
+    timestamp: u64,
+    content: Option<String>,
+}
+
+#[derive(SimpleObject)]
+struct SendGmResponse {
+    success: bool,
+    message: String,
+    timestamp: u64,
+}
+
+#[derive(SimpleObject)]
+struct CooldownStatus {
+    enabled: bool,
+}
+
+#[derive(SimpleObject)]
+struct CooldownCheckResult {
+    in_cooldown: bool,
+    remaining_time: Option<u64>,
+    enabled: bool,
+}
+
+#[derive(SimpleObject)]
+struct WhitelistOperationResult {
+    success: bool,
+    message: String,
+}
+
+
+
+#[derive(Serialize, Deserialize)]
+struct GmEventData {
+    sender: String,
+    recipient: Option<String>,
+    content: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct ChainStatusData {
+    message_count: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+struct PersonalMessageData {
+    sender: String,
+    recipient: String,
+    content: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct CooldownStatusData {
+    user: String,
+    enabled: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+struct InvitationEventData {
+    inviter: String,
+    invitee: String,
+    reward_claimed: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+struct LeaderboardUpdateData {
+    leaderboard_type: String,
+    top_users: Vec<LeaderboardUser>,
+    top_chains: Vec<LeaderboardChain>,
+}
+
+
+
+#[derive(SimpleObject)]
+struct TimeStat {
+    time: u64,
+    count: u64,
+}
+
+#[derive(SimpleObject, Serialize, Deserialize)]
+struct LeaderboardUser {
+    user: String,
+    count: u64,
+}
+
+#[derive(SimpleObject, Serialize, Deserialize)]
+struct LeaderboardChain {
+    chain: String,
+    count: u64,
+}
+
+impl GmService {
+    fn simple_verify_signature(
+        &self,
+        signature_data: &SignatureData,
+        signature: &str,
+    ) -> Result<SignatureVerificationResult, async_graphql::Error> {
+        if signature_data.sender.is_empty() {
+            return Ok(SignatureVerificationResult {
+                success: false,
+                message: "Sender address cannot be empty".to_string(),
+                verified_sender: None,
+            });
+        }
+        
+        if !signature_data.sender.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Ok(SignatureVerificationResult {
+                success: false,
+                message: "Sender address format invalid".to_string(),
+                verified_sender: None,
+            });
+        }
+        
+        if signature_data.sender.len() < 40 {
+            return Ok(SignatureVerificationResult {
+                success: false,
+                message: "Sender address too short".to_string(),
+                verified_sender: None,
+            });
+        }
+        
+        if signature.len() < 10 {
+            return Ok(SignatureVerificationResult {
+                success: false,
+                message: "Signature format invalid".to_string(),
+                verified_sender: None,
+            });
+        }
+        
+        if signature.chars().any(|c| !c.is_ascii_hexdigit()) {
+            return Ok(SignatureVerificationResult {
+                success: false,
+                message: "Signature contains non-hex characters".to_string(),
+                verified_sender: None,
+            });
+        }
+        
+        Ok(SignatureVerificationResult {
+            success: true,
+            message: "Signature format verification successful".to_string(),
+            verified_sender: Some(signature_data.sender.clone()),
+        })
+    }
+}
+
+struct QueryRoot {
+    state: Arc<Mutex<GmState>>,
+    runtime: Arc<ServiceRuntime<GmService>>,
+}
+
+struct MutationRoot {
+    runtime: Arc<ServiceRuntime<GmService>>,
+    state: Arc<Mutex<GmState>>,
+}
+
+struct SubscriptionRoot {
+    runtime: Arc<ServiceRuntime<GmService>>,
+    state: Arc<Mutex<GmState>>,
+}
+
+#[Object]
+impl QueryRoot {
+    async fn get_gm_record(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        owner: AccountOwner,
+    ) -> Result<Option<GmRecord>, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let chain_id = self.runtime.chain_id();        
+        let timestamp = state.get_last_gm(chain_id, &owner).await?;        
+        let record = match timestamp {
+            Some(ts) => {
+                Some(GmRecord {
+                    owner: owner.to_string(),
+                    timestamp: ts,
+                })
+            },
+            None => {
+                None
+            }
+        };
+        
+        Ok(record)
+    }
+
+    async fn get_gm_events(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        sender: AccountOwner,
+    ) -> Result<Vec<GmEvent>, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let chain_id = self.runtime.chain_id();
+        let events = state.get_events(chain_id, &sender).await?;
+        Ok(events
+            .into_iter()
+            .map(|(recipient, timestamp, content)| GmEvent {
+                sender: sender.to_string(),
+                recipient: recipient.map(|r| r.to_string()),
+                timestamp,
+                content,
+            })
+            .collect())
+    }
+
+    async fn get_stream_events(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        _chain_id: ChainId,
+    ) -> Result<Vec<GmEvent>, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let mut all_events = Vec::new();
+        
+        let all_index_values = state.events.index_values().await?;
+        
+        for ((_event_chain_id, sender, recipient), (timestamp, content)) in all_index_values {
+            all_events.push(GmEvent {
+                sender: sender.to_string(),
+                recipient: recipient.map(|r| r.to_string()),
+                timestamp,
+                content,
+            });
+        }       
+        all_events.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        
+        Ok(all_events)
+    }
+
+    async fn get_total_messages(&self, _ctx: &async_graphql::Context<'_>) -> Result<u64, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let total = state.get_total_messages().await;
+        Ok(total)
+    }
+
+    async fn get_chain_messages(&self, _ctx: &async_graphql::Context<'_>, chain_id: ChainId) -> Result<u64, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let count = state.chain_messages.get(&chain_id).await.unwrap().unwrap_or(0);
+        Ok(count)
+    }
+
+    async fn get_wallet_messages(&self, _ctx: &async_graphql::Context<'_>, owner: AccountOwner) -> Result<u64, async_graphql::Error> {
+        let state = self.state.lock().await;      
+        let has_user = state.wallet_messages.contains_key(&owner).await?;
+        
+        let count = state.wallet_messages.get(&owner).await.unwrap().unwrap_or(0);
+        
+        if !has_user {
+            let mut users = Vec::new();
+            state.wallet_messages.for_each_index(|user| {
+                users.push(user.clone());
+                Ok(())
+            }).await?;
+        }
+        
+        let final_count = if count == 0 && !has_user { 0 } else { count };
+        
+        Ok(final_count)
+    }
+    
+    async fn get_hourly_stats(&self, _ctx: &async_graphql::Context<'_>, chain_id: ChainId, start_hour: u64, end_hour: u64) -> Result<Vec<TimeStat>, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let stats = state.get_hourly_stats(chain_id, start_hour, end_hour).await?;
+        Ok(stats.into_iter().map(|(time, count)| TimeStat { time, count }).collect())
+    }
+    
+    async fn get_daily_stats(&self, _ctx: &async_graphql::Context<'_>, chain_id: ChainId, start_day: u64, end_day: u64) -> Result<Vec<TimeStat>, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let stats = state.get_daily_stats(chain_id, start_day, end_day).await?;
+        Ok(stats.into_iter().map(|(time, count)| TimeStat { time, count }).collect())
+    }
+    
+    async fn get_monthly_stats(&self, _ctx: &async_graphql::Context<'_>, chain_id: ChainId, start_month: u64, end_month: u64) -> Result<Vec<TimeStat>, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let stats = state.get_monthly_stats(chain_id, start_month, end_month).await?;
+        Ok(stats.into_iter().map(|(time, count)| TimeStat { time, count }).collect())
+    }
+    
+    async fn get_top_users(&self, _ctx: &async_graphql::Context<'_>, limit: u32) -> Result<Vec<LeaderboardUser>, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let current_time = self.runtime.system_time().micros();
+        let top_users = state.get_top_users(limit, current_time).await?;
+        Ok(top_users.into_iter().map(|(user, count)| LeaderboardUser { 
+            user: user.to_string(), 
+            count 
+        }).collect())
+    }
+    
+    async fn get_top_chains(&self, _ctx: &async_graphql::Context<'_>, limit: u32) -> Result<Vec<LeaderboardChain>, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let current_time = self.runtime.system_time().micros();
+        let top_chains = state.get_top_chains(limit, current_time).await?;
+        Ok(top_chains.into_iter().map(|(chain, count)| LeaderboardChain { 
+            chain: chain.to_string(), 
+            count 
+        }).collect())
+    }
+    
+    async fn get_user_rank(&self, _ctx: &async_graphql::Context<'_>, user: AccountOwner) -> Result<u32, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let rank = state.get_user_rank(&user).await?;
+        Ok(rank)
+    }
+    
+    async fn get_message_trend(&self, _ctx: &async_graphql::Context<'_>, chain_id: ChainId, period_days: u32) -> Result<Vec<TimeStat>, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let current_time = self.runtime.system_time().micros();
+        let trend = state.get_message_trend(chain_id, period_days, current_time).await?;
+        Ok(trend.into_iter().map(|(time, count)| TimeStat { time, count }).collect())
+    }
+    
+    async fn get_user_activity_trend(&self, _ctx: &async_graphql::Context<'_>, user: AccountOwner, period_days: u32) -> Result<Vec<TimeStat>, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let current_time = self.runtime.system_time().micros();
+        let trend = state.get_user_activity_trend(&user, period_days, current_time).await?;
+        Ok(trend.into_iter().map(|(time, count)| TimeStat { time, count }).collect())
+    }
+    
+    async fn get_next_nonce(&self, _ctx: &async_graphql::Context<'_>, owner: AccountOwner) -> Result<u64, async_graphql::Error> {
+        let nonce = self.runtime.system_time().micros();
+        Ok(nonce)
+    }
+    
+    async fn get_cooldown_status(&self, _ctx: &async_graphql::Context<'_>) -> Result<CooldownStatus, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let enabled = state.is_cooldown_enabled().await;
+        Ok(CooldownStatus { enabled })
+    }
+    
+    async fn is_user_whitelisted(&self, _ctx: &async_graphql::Context<'_>, user: AccountOwner) -> Result<bool, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let is_whitelisted = state.is_whitelisted(&user).await?;
+        Ok(is_whitelisted)
+    }
+    
+    async fn check_cooldown_status(&self, _ctx: &async_graphql::Context<'_>, user: AccountOwner) -> Result<CooldownCheckResult, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let chain_id = self.runtime.chain_id();
+        let current_time = self.runtime.system_time().micros();
+        let (in_cooldown, remaining) = state.is_in_cooldown(chain_id, &user, current_time).await?;
+        
+        Ok(CooldownCheckResult {
+            in_cooldown,
+            remaining_time: remaining,
+            enabled: state.is_cooldown_enabled().await,
+        })
+    }
+    
+    async fn generate_signature_message(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        sender: AccountOwner,
+        recipient: Option<AccountOwner>,
+        chain_id: ChainId,
+        content: Option<String>,
+    ) -> Result<String, async_graphql::Error> {
+        let nonce = self.get_next_nonce(_ctx, sender).await?;
+        let recipient_str = recipient.map_or("none".to_string(), |r| r.to_string());
+        let content_str = content.map_or("none".to_string(), |c| c.to_string());
+        
+        let message = format!(
+            "GM签名验证:发送者={},接收者={},链ID={},随机数={},内容={}",
+            sender.to_string(),
+            recipient_str,
+            chain_id.to_string(),
+            nonce,
+            content_str
+        );
+        Ok(message)
+    }
+    
+    async fn verify_gm_signature(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        signature_data: SignatureData,
+        signature: String,
+    ) -> Result<SignatureVerificationResult, async_graphql::Error> {
+        let service = GmService {
+            state: Arc::clone(&self.state),
+            runtime: Arc::clone(&self.runtime),
+        };
+        service.simple_verify_signature(&signature_data, &signature)
+    }
+    
+    async fn get_invitation_stats(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        user: AccountOwner,
+    ) -> Result<Option<InvitationStats>, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let stats = state.get_invitation_stats(user).await?;
+        Ok(stats)
+    }
+    
+    async fn get_invitation_record(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        invitee: AccountOwner,
+    ) -> Result<Option<InvitationRecord>, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let record = state.get_invitation_record(invitee).await?;
+        Ok(record)
+    }
+    
+    async fn has_received_invitation_reward(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        invitee: AccountOwner,
+    ) -> Result<bool, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let has_rewarded = state.has_received_invitation_reward(invitee).await?;
+        Ok(has_rewarded)
+    }
+
+
+}
+
+#[Subscription]
+impl SubscriptionRoot {
+    async fn notifications(
+        &self,
+        #[graphql(name = "chainId")] chain_id: ChainId,
+    ) -> impl futures::Stream<Item = async_graphql::Result<String>> {
+        use async_graphql::futures_util::stream;
+        
+        let state: Arc<Mutex<GmState>> = Arc::clone(&self.state);
+        
+        let (tx, rx) = tokio::sync::mpsc::channel(100);
+        
+        let state_clone = Arc::clone(&state);
+        let chain_id_clone = chain_id;
+        let runtime_clone: Arc<ServiceRuntime<GmService>> = Arc::clone(&self.runtime);
+        
+        tokio::spawn(async move {
+            let mut last_timestamp = None;
+            
+            loop {
+                if let Ok(events) = state_clone.lock().await.get_latest_events(chain_id_clone, last_timestamp).await {
+                    let has_events = !events.is_empty();
+                    
+                    for event_json in events {
+                        
+                        let notification = event_json;
+                        
+                        if tx.send(Ok(notification)).await.is_err() {
+                            return;
+                        }
+                        
+                        last_timestamp = Some(runtime_clone.system_time().micros());
+                    }
+                    
+                    if !has_events {
+                        let heartbeat_event = serde_json::json!({
+                            "type": "heartbeat",
+                            "timestamp": runtime_clone.system_time().micros(),
+                            "message": "Subscription connection normal, waiting for event data"
+                        });
+                        
+                        if let Ok(heartbeat_json) = serde_json::to_string(&heartbeat_event) {
+                            if tx.send(Ok(heartbeat_json)).await.is_err() {
+                                return;
+                            }
+                        }
+                    }
+                }
+                
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+            }
+        });
+        
+        stream::unfold(rx, |mut rx| async move {
+            match rx.recv().await {
+                Some(event) => Some((event, rx)),
+                None => None,
+            }
+        })
+    }
+}
+
+#[Object]
+impl MutationRoot {
+    async fn send_gm(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        chain_id: ChainId,
+        sender: AccountOwner,
+        content: Option<String>,
+    ) -> Result<SendGmResponse, async_graphql::Error> {
+        self.send_gm_with_signature(_ctx, chain_id, sender, None, "".to_string(), 0, content).await
+    }
+    
+    async fn send_gm_with_signature(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        chain_id: ChainId,
+        sender: AccountOwner,
+        recipient: Option<AccountOwner>,
+        signature: String,
+        nonce: u64,
+        content: Option<String>,
+    ) -> Result<SendGmResponse, async_graphql::Error> {
+        let current_chain_id = self.runtime.chain_id();
+        
+        if !signature.is_empty() {
+            let signature_data = SignatureData {
+                sender: sender.to_string(),
+                recipient: recipient.as_ref().map(|r| r.to_string()),
+                chain_id: chain_id.to_string(),
+                timestamp: self.runtime.system_time().micros(),
+                nonce,
+                content: content.clone(),
+            };
+            
+            let service = GmService {
+                state: Arc::clone(&self.state),
+                runtime: Arc::clone(&self.runtime),
+            };
+            let verification_result = service.simple_verify_signature(&signature_data, &signature)?;
+            
+            if !verification_result.success {
+                return Ok(SendGmResponse {
+                    success: false,
+                    message: format!("Signature verification failed: {}", verification_result.message),
+                    timestamp: 0,
+                });
+            }
+        }
+        
+        let state = self.state.lock().await;
+        let owner = match state.owner.get() {
+            Some(owner) => owner.clone(),
+            None => {
+                return Ok(SendGmResponse {
+                    success: false,
+                    message: "Contract owner not initialized".to_string(),
+                    timestamp: 0,
+                });
+            }
+        };
+        
+
+        let default_content = Some("Gmicrochains".to_string());
+        
+        if chain_id != current_chain_id {
+            let operation = if let Some(recipient) = recipient {
+                GmOperation::GmTo { sender, recipient, content: default_content.clone() }
+            } else {
+                GmOperation::Gm { sender, recipient: owner, content: default_content.clone() }
+            };
+            drop(state);
+            self.runtime.schedule_operation(&operation);
+            return Ok(SendGmResponse {
+                success: true,
+                message: format!("Cross-chain GM sent successfully, sender: {}, recipient: {}, chain ID: {}", 
+                    sender, 
+                    recipient.as_ref().map_or(owner.to_string(), |r| r.to_string()), 
+                    chain_id),
+                timestamp: self.runtime.system_time().micros(),
+            });
+        }
+        
+        let operation = if let Some(recipient) = recipient {
+            GmOperation::GmTo { sender, recipient, content: default_content.clone() }
+        } else {
+            GmOperation::Gm { sender, recipient: owner, content: default_content.clone() }
+        };
+        
+        drop(state);
+        self.runtime.schedule_operation(&operation);
+        let block_height = self.runtime.next_block_height();
+        Ok(SendGmResponse {
+            success: true,
+            message: format!("GM recorded successfully, sender: {}, recipient: {}, block height: {}", 
+                sender,
+                recipient.as_ref().map_or(owner.to_string(), |r| r.to_string()),
+                block_height),
+            timestamp: self.runtime.system_time().micros(),
+        })
+    }
+
+    async fn send_gm_to(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        chain_id: ChainId,
+        sender: AccountOwner,
+        recipient: AccountOwner,
+        content: Option<String>,
+    ) -> Result<SendGmResponse, async_graphql::Error> {
+        self.send_gm_with_signature(_ctx, chain_id, sender, Some(recipient), "".to_string(), 0, content).await
+    }
+    
+    async fn send_gm_to_with_signature(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        chain_id: ChainId,
+        sender: AccountOwner,
+        recipient: AccountOwner,
+        signature: String,
+        nonce: u64,
+        content: Option<String>,
+    ) -> Result<SendGmResponse, async_graphql::Error> {
+        
+        if !signature.is_empty() {
+            let signature_data = SignatureData {
+                sender: sender.to_string(),
+                recipient: Some(recipient.to_string()),
+                chain_id: chain_id.to_string(),
+                timestamp: self.runtime.system_time().micros(),
+                nonce,
+                content: content.clone(),
+            };
+            
+            let service = GmService {
+                state: Arc::clone(&self.state),
+                runtime: Arc::clone(&self.runtime),
+            };
+            let verification_result = service.simple_verify_signature(&signature_data, &signature)?;
+            
+            if !verification_result.success {
+                return Ok(SendGmResponse {
+                    success: false,
+                    message: format!("Signature verification failed: {}", verification_result.message),
+                    timestamp: 0,
+                });
+            }
+        }
+        
+        let current_chain_id = self.runtime.chain_id();
+        let state = self.state.lock().await; 
+
+        let default_content = Some("Gmicrochains".to_string());
+        
+        if chain_id != current_chain_id {
+            let operation = GmOperation::GmTo { sender, recipient, content: default_content.clone() };
+            drop(state);
+            self.runtime.schedule_operation(&operation);
+            return Ok(SendGmResponse {
+                success: true,
+                message: format!("Cross-chain GM sent successfully, sender: {}, recipient: {}, chain ID: {}", sender, recipient, chain_id),
+                timestamp: self.runtime.system_time().micros(),
+            });
+        }
+        
+        let operation = GmOperation::GmTo { sender, recipient, content: default_content.clone() };
+        drop(state);
+        self.runtime.schedule_operation(&operation);
+        Ok(SendGmResponse {
+            success: true,
+            message: format!("GM direct send successful, sender: {}, recipient: {}", sender, recipient),
+            timestamp: self.runtime.system_time().micros(),
+        })
+    }
+    
+    async fn send_gm_with_invitation(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        chain_id: ChainId,
+        sender: AccountOwner,
+        recipient: AccountOwner,
+        inviter: Option<AccountOwner>,
+        content: Option<String>,
+    ) -> Result<SendGmResponse, async_graphql::Error> {
+        
+        let operation = GmOperation::GmWithInvitation { 
+            sender,
+            recipient, 
+            content,
+            inviter 
+        };
+        self.runtime.schedule_operation(&operation);
+        
+        Ok(SendGmResponse {
+            success: true,
+            message: format!("GM with invitation sent successfully: sender={}, recipient={}", sender, recipient),
+            timestamp: self.runtime.system_time().micros(),
+        })
+    }
+    
+    async fn claim_invitation_rewards(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        user: AccountOwner,
+    ) -> Result<SendGmResponse, async_graphql::Error> {
+        
+        let operation = GmOperation::ClaimInvitationRewards { sender: user };
+        self.runtime.schedule_operation(&operation);
+        
+        Ok(SendGmResponse {
+            success: true,
+            message: format!("Invitation reward claimed successfully: user={}", user),
+            timestamp: self.runtime.system_time().micros(),
+        })
+    }
+    
+    async fn set_cooldown_enabled(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        caller: AccountOwner,
+        enabled: bool,
+    ) -> Result<WhitelistOperationResult, async_graphql::Error> {
+        
+        let mut state = self.state.lock().await;
+        let success = state.set_cooldown_enabled(&caller, enabled).await?;
+        
+        if success {
+            let operation = GmOperation::SetCooldownEnabled { enabled };
+            self.runtime.schedule_operation(&operation);
+            
+            Ok(WhitelistOperationResult {
+                success: true,
+                message: format!("24-hour limit {} for caller={}", if enabled { "enabled" } else { "disabled" }, caller),
+            })
+        } else {
+            Ok(WhitelistOperationResult {
+                success: false,
+                message: format!("Insufficient permissions: Only whitelisted addresses can set 24-hour limit, caller={}", caller),
+            })
+        }
+    }
+    
+    async fn add_whitelist_address(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        caller: AccountOwner,
+        address: AccountOwner,
+    ) -> Result<WhitelistOperationResult, async_graphql::Error> {
+        
+        let mut state = self.state.lock().await;
+        let success = state.add_whitelist(&caller, address).await?;
+        
+        if success {
+            Ok(WhitelistOperationResult {
+                success: true,
+                message: format!("Whitelist address added successfully, caller={}", caller),
+            })
+        } else {
+            Ok(WhitelistOperationResult {
+                success: false,
+                message: format!("Insufficient permissions: Only whitelisted addresses can add to whitelist, caller={}", caller),
+            })
+        }
+    }
+    
+    async fn remove_whitelist_address(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        caller: AccountOwner,
+        address: AccountOwner,
+    ) -> Result<WhitelistOperationResult, async_graphql::Error> {
+        
+        let mut state = self.state.lock().await;
+        let success = state.remove_whitelist(&caller, address).await?;
+        
+        if success {
+            Ok(WhitelistOperationResult {
+                success: true,
+                message: format!("Whitelist address removed successfully, caller={}", caller),
+            })
+        } else {
+            Ok(WhitelistOperationResult {
+                success: false,
+                message: format!("Insufficient permissions: Only whitelisted addresses can remove from whitelist, caller={}", caller),
+            })
+        }
+    }
+
+}

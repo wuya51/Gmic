@@ -39,6 +39,7 @@ impl Contract for GmContract {
                     chain_messages: MapView::new(context.clone()).expect("Failed to create chain_messages map"),
                     wallet_messages: MapView::new(context.clone()).expect("Failed to create wallet_messages map"),
                     events: MapView::new(context.clone()).expect("Failed to create events map"),
+                    user_events: MapView::new(context.clone()).expect("Failed to create user_events map"),
                     hourly_stats: MapView::new(context.clone()).expect("Failed to create hourly_stats map"),
                     daily_stats: MapView::new(context.clone()).expect("Failed to create daily_stats map"),
                     monthly_stats: MapView::new(context.clone()).expect("Failed to create monthly_stats map"),

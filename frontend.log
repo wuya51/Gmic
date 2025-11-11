@@ -3,50 +3,8 @@
 > vite
 
 
-  VITE v5.4.21  ready in 444 ms
+  VITE v5.4.21  ready in 537 ms
 
   ➜  Local:   http://localhost:3000/
   ➜  Network: http://194.60.87.30:3000/
   ➜  Network: http://172.24.0.1:3000/
-12:45:14 PM [vite] .env changed, restarting server...
-12:45:14 PM [vite] server restarted.
-1:01:10 PM [vite] page reload src/GraphQLProvider.js
-1:09:54 PM [vite] page reload src/GraphQLProvider.js
-1:11:03 PM [vite] page reload src/index.js
-1:11:03 PM [vite] vite.config.js changed, restarting server...
-Re-optimizing dependencies because vite config has changed
-1:11:03 PM [vite] server restarted.
-1:20:31 PM [vite] page reload src/GraphQLProvider.js
-1:20:38 PM [vite] page reload src/index.js
-1:21:18 PM [vite] vite.config.js changed, restarting server...
-1:21:18 PM [vite] server restarted.
-1:28:15 PM [vite] .env changed, restarting server...
-1:28:15 PM [vite] server restarted.
-1:29:42 PM [vite] page reload src/GraphQLProvider.js
-1:29:58 PM [vite] page reload src/GraphQLProvider.js
-1:30:06 PM [vite] page reload src/GraphQLProvider.js
-1:30:27 PM [vite] page reload src/index.js
-1:36:15 PM [vite] page reload src/index.js
-1:36:20 PM [vite] page reload src/index.js
-1:38:00 PM [vite] page reload src/GraphQLProvider.js
-1:38:25 PM [vite] page reload src/index.js
-1:39:50 PM [vite] page reload src/index.js
-1:41:17 PM [vite] page reload src/index.js
-1:45:03 PM [vite] page reload src/App.js
-1:45:04 PM [vite] page reload src/App.js
-1:45:04 PM [vite] page reload src/App.js
-1:45:05 PM [vite] hmr update /src/App.css
-1:45:06 PM [vite] hmr update /src/App.css
-1:45:06 PM [vite] hmr update /src/App.css
-1:47:12 PM [vite] vite.config.js changed, restarting server...
-1:47:12 PM [vite] server restarted.
-1:48:07 PM [vite] page reload src/GraphQLProvider.js
-1:51:06 PM [vite] page reload src/App.js
-1:53:14 PM [vite] hmr update /src/App.css
-1:53:15 PM [vite] hmr update /src/App.css
-1:55:41 PM [vite] hmr update /src/App.css
-2:07:14 PM [vite] .env changed, restarting server...
-Re-optimizing dependencies because vite config has changed
-2:07:14 PM [vite] server restarted.
-1:07:54 AM [vite] page reload src/App.js
-1:08:08 AM [vite] hmr update /src/App.css

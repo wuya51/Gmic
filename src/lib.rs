@@ -55,4 +55,3 @@ pub struct InvitationStats {
     pub total_rewards: u32,
     pub last_reward_time: Option<Timestamp>,
 }
-

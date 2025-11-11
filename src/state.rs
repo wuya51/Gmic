@@ -14,6 +14,7 @@ pub struct GmState {
     pub chain_messages: MapView<ChainId, u64>,
     pub wallet_messages: MapView<AccountOwner, u64>,
     pub events: MapView<(ChainId, AccountOwner, Option<AccountOwner>), (u64, Option<String>)>,
+    pub user_events: MapView<(ChainId, AccountOwner), Vec<(Option<AccountOwner>, u64, Option<String>)>>,
 
     // Time-based statistics
     pub hourly_stats: MapView<(ChainId, u64), u64>,
@@ -54,7 +55,15 @@ impl GmState {
         }
 
         self.last_gm.insert(&(chain_id, sender.clone()), current_ts)?;
-        self.events.insert(&(chain_id, sender.clone(), recipient), (current_ts, content))?;
+        self.events.insert(&(chain_id, sender.clone(), recipient), (current_ts, content.clone()))?;
+        
+        // Update user history
+        let mut user_events = self.user_events.get(&(chain_id, sender.clone())).await?.unwrap_or_default();
+        user_events.push((recipient.clone(), current_ts, content.clone()));
+        // Sort by timestamp in descending order (newest first)
+        user_events.sort_by(|a, b| b.1.cmp(&a.1));
+        self.user_events.insert(&(chain_id, sender.clone()), user_events)?;
+        
         log::info!(
             "Recorded GM event on chain {:?}: key={:?}, sender={:?}, recipient={:?}",
             chain_id,
@@ -89,6 +98,7 @@ impl GmState {
         let chain_messages_context = context.clone_with_base_key(b"gm_chain_messages".to_vec());
         let wallet_messages_context = context.clone_with_base_key(b"gm_wallet_messages".to_vec());
         let events_context = context.clone_with_base_key(b"gm_events".to_vec());
+        let user_events_context = context.clone_with_base_key(b"gm_user_events".to_vec());
         let hourly_stats_context = context.clone_with_base_key(b"gm_hourly_stats".to_vec());
         let daily_stats_context = context.clone_with_base_key(b"gm_daily_stats".to_vec());
         let monthly_stats_context = context.clone_with_base_key(b"gm_monthly_stats".to_vec());
@@ -101,6 +111,7 @@ impl GmState {
         let chain_messages = MapView::load(chain_messages_context).await?;
         let wallet_messages = MapView::load(wallet_messages_context).await?;
         let events = MapView::load(events_context).await?;
+        let user_events = MapView::load(user_events_context).await?;
         let hourly_stats = MapView::load(hourly_stats_context).await?;
         let daily_stats = MapView::load(daily_stats_context).await?;
         let monthly_stats = MapView::load(monthly_stats_context).await?;
@@ -128,6 +139,7 @@ impl GmState {
             chain_messages,
             wallet_messages,
             events,
+            user_events,
             hourly_stats,
             daily_stats,
             monthly_stats,
@@ -258,17 +270,8 @@ impl GmState {
         chain_id: ChainId,
         sender: &AccountOwner,
     ) -> Result<Vec<(Option<AccountOwner>, u64, Option<String>)>, ViewError> {
-        let mut events = Vec::new();
-        self.events
-            .for_each_index_value(|key, value| {
-                let (c, s, r) = key;
-                let (ts, content) = &*value;
-                if c == chain_id && s == *sender {
-                    events.push((r.clone(), *ts, content.clone()));
-                }
-                Ok(())
-            })
-            .await?;
+        // Get all events for the user from user_events field
+        let events = self.user_events.get(&(chain_id, *sender)).await?.unwrap_or_default();
         Ok(events)
     }
 
@@ -525,6 +528,12 @@ impl GmState {
         );
 
         self.stream_events.insert(&(chain_id, timestamp), event_json)?;
+
+        let mut user_events = self.user_events.get(&(chain_id, sender.clone())).await?.unwrap_or_default();
+        user_events.push((recipient.clone(), timestamp, content.clone()));
+        // Sort by timestamp in descending order (newest first)
+        user_events.sort_by(|a, b| b.1.cmp(&a.1));
+        self.user_events.insert(&(chain_id, sender.clone()), user_events)?;
 
         if let Some(stored_event) = self.stream_events.get(&(chain_id, timestamp)).await? {
             log::info!(

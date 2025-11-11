@@ -20,7 +20,20 @@ export default defineConfig({
       'gmic.top',
       'localhost',
       '127.0.0.1'
-    ]
+    ],
+    // 添加代理配置，将GraphQL请求代理到Linera服务
+    proxy: {
+      '/chains': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/ws': {
+        target: 'ws://localhost:8080',
+        ws: true,
+        changeOrigin: true,
+      }
+    }
   },
   build: {
     outDir: 'build',

@@ -39,6 +39,7 @@ impl Service for GmService {
                     chain_messages: MapView::new(context.clone()).expect("Failed to init chain_messages"),
                     wallet_messages: MapView::new(context.clone()).expect("Failed to init wallet_messages"),
                     events: MapView::new(context.clone()).expect("Failed to init events"),
+                    user_events: MapView::new(context.clone()).expect("Failed to init user_events"),
                     hourly_stats: MapView::new(context.clone()).expect("Failed to init hourly_stats"),
                     daily_stats: MapView::new(context.clone()).expect("Failed to init daily_stats"),
                     monthly_stats: MapView::new(context.clone()).expect("Failed to init monthly_stats"),

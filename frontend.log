@@ -48,3 +48,5 @@ Re-optimizing dependencies because vite config has changed
 2:07:14 PM [vite] .env changed, restarting server...
 Re-optimizing dependencies because vite config has changed
 2:07:14 PM [vite] server restarted.
+1:07:54 AM [vite] page reload src/App.js
+1:08:08 AM [vite] hmr update /src/App.css

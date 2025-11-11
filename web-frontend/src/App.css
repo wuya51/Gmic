@@ -12,7 +12,7 @@ body {
   line-height: 1.6;
 }
 
-/* 错误边界样式 */
+/* Error boundary styles */
 .error-fallback {
   display: flex;
   justify-content: center;
@@ -110,58 +110,15 @@ body {
   transform: translateY(0);
 }
 
-/* 基础动画定义 */
+/* Basic animation definitions */
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Responsive Styles */
-@media (max-width: 768px) {
-  .send-action-card {
-    padding: 1rem;
-    position: relative;
-  }
-  
-  .send-actions {
-    flex-direction: row !important;
-    width: 100% !important;
-    gap: 10px !important;
-  }
-  
-  .send-button {
-    flex: 7 !important;
-  }
-  
-  .history-button {
-    flex: 3 !important;
-  }
-  
-  .header h1 {
-    font-size: 2rem;
-  }
-  
-  .gm-templates {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.5rem;
-  }
-  
-  .template-card {
-    padding: 0.8rem 0.5rem;
-  }
-  
-  .template-emoji {
-    font-size: 1.2rem;
-  }
-  
-  .template-text {
-    font-size: 0.8rem;
-  }
+  0% { opacity: 0.8; }
+  100% { opacity: 1; }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes slideIn {
@@ -170,15 +127,9 @@ body {
 }
 
 @keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
-}
-
-@keyframes bounce {
-  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
-  40% { transform: translateY(-10px); }
-  60% { transform: translateY(-5px); }
+  0% { opacity: 1; }
+  50% { opacity: 0.6; }
+  100% { opacity: 1; }
 }
 
 .App {
@@ -205,10 +156,9 @@ body {
 /* Card Styles */
 .card {
   background-color: #fff;
-  border: 1px solid #ff2a00;
+  border: 1px solid rgba(255,42,0,0.15);
   border-radius: 12px;
   padding: 1.25rem;
-  box-shadow: 0 4px 8px rgba(255, 42, 0, 0.4);
   transition: box-shadow 0.2s ease;
 }
 
@@ -265,6 +215,8 @@ body {
   flex-shrink: 0;
   min-width: 240px;
   margin-left: auto;
+  position: static;
+  z-index: auto;
 }
 
 .wallet-button-container {
@@ -283,6 +235,12 @@ body {
   padding: 0.5rem;
   border-radius: 8px;
   min-width: 140px;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  will-change: auto;
+}
+
+.wallet-info-card.clickable {
+  cursor: pointer;
 }
 
 .wallet-info-card.linera {
@@ -290,15 +248,39 @@ body {
   border: 1px solid #ff2a00;
 }
 
+.wallet-info-card.linera:hover {
+  background-color: rgba(255, 42, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(255, 42, 0, 0.3);
+}
+
 .wallet-info-card.dynamic {
   background-color: rgba(0, 123, 255, 0.1);
   border: 1px solid #007bff;
+}
+
+.wallet-info-card.dynamic:hover {
+  background-color: rgba(0, 123, 255, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
 }
 
 .wallet-address {
   font-size: 0.85rem;
   font-weight: 600;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  color: white !important;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
 }
 
 .connect-btn {
@@ -312,14 +294,28 @@ body {
   min-width: 120px;
 }
 
-.connect-btn.linera {
-  background-color: #ff2a00;
-  color: white;
+/* Linera钱包按钮样式 */
+.wallet-button-container .connect-btn.linera,
+.wallet-connection-section .connect-btn.linera {
+  background: linear-gradient(135deg, #ff2a00, #cc2100) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 8px rgba(255, 42, 0, 0.3) !important;
+  transition: all 0.3s ease !important;
 }
 
-.connect-btn.linera:hover {
-  background-color: #e62400;
-  transform: translateY(-2px);
+.wallet-button-container .connect-btn.linera:hover,
+.wallet-connection-section .connect-btn.linera:hover {
+  background: linear-gradient(135deg, #cc2100, #ff2a00) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 12px rgba(255, 42, 0, 0.4) !important;
+}
+
+.wallet-button-container .connect-btn.linera:active,
+.wallet-connection-section .connect-btn.linera:active {
+  transform: translateY(0) !important;
+  transition: transform 0.1s ease !important;
 }
 
 .connect-btn.dynamic {
@@ -342,14 +338,7 @@ body {
   transition: all 0.2s ease;
 }
 
-.disconnect-btn.linera {
-  background-color: #ff2a00;
-  color: white;
-}
-
-.disconnect-btn.linera:hover {
-  background-color: #e62400;
-}
+/* Disconnect button styles moved to main definition */
 
 .disconnect-btn.dynamic {
   background-color: #007bff;
@@ -365,6 +354,24 @@ body {
   flex-direction: column;
   align-items: center;
   background-color: transparent;
+}
+
+/* 覆盖DynamicConnectButton组件的默认样式 */
+.wallet-connect-card > div,
+.wallet-connect-card button,
+.wallet-connect-card .dynamic-connect-button {
+  background: linear-gradient(135deg, #007bff, #0056b3) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3) !important;
+}
+
+.wallet-connect-card > div:hover,
+.wallet-connect-card button:hover,
+.wallet-connect-card .dynamic-connect-button:hover {
+  background: linear-gradient(135deg, #0056b3, #007bff) !important;
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4) !important;
 }
 
 /* 双钱包连接样式 */
@@ -412,13 +419,11 @@ body {
 }
 
 .dynamic-wallet-button:hover:not(:disabled) {
-  transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(255, 149, 0, 0.4);
   background: linear-gradient(135deg, #ffce54, #ff9500);
 }
 
 .dynamic-wallet-button:active {
-  transform: translateY(0);
   transition: transform 0.1s ease;
 }
 
@@ -451,70 +456,7 @@ body {
   text-overflow: ellipsis;
 }
 
-/* Linera钱包按钮样式 */
-.linera-wallet-section {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.linera-wallet-button {
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 0.6rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-}
-
-.linera-wallet-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-  background: linear-gradient(135deg, #764ba2, #667eea);
-}
-
-.linera-wallet-button:active {
-  transform: translateY(0);
-  transition: transform 0.1s ease;
-}
-
-.linera-wallet-button.active {
-  background: linear-gradient(135deg, #5a67d8, #4c51bf);
-  box-shadow: 0 4px 12px rgba(90, 103, 216, 0.5);
-  border: 2px solid #5a67d8;
-}
-
-.linera-wallet-button.active:hover:not(:disabled) {
-  background: linear-gradient(135deg, #4c51bf, #5a67d8);
-  box-shadow: 0 6px 16px rgba(90, 103, 216, 0.6);
-}
-
-.linera-wallet-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-  background: linear-gradient(135deg, #cccccc, #999999);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
-}
-
-.linera-wallet-text {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.3rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+/* Linera钱包按钮样式已在上文定义 */
 
 .wallet-disconnect {
   display: flex;
@@ -658,7 +600,6 @@ body {
   background-color: rgba(255, 255, 255, 0.9);
   border-color: rgba(255, 42, 0, 0.3);
   text-shadow: 0 0 3px rgba(255, 42, 0, 0.3);
-  transform: translateY(-1px);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
@@ -752,11 +693,10 @@ body {
 
 .refresh-btn:hover {
   background-color: rgba(255, 42, 0, 0.1);
-  transform: rotate(180deg);
 }
 
 .refresh-btn:active {
-  transform: rotate(360deg);
+  transform: scale(0.95);
 }
 
 .action-btn.primary {
@@ -766,7 +706,6 @@ body {
 
 .action-btn.primary:hover:not(:disabled) {
   background-color: #d42500;
-  transform: translateY(-1px);
   box-shadow: 0 3px 8px rgba(255, 42, 0, 0.25);
 }
 
@@ -784,10 +723,9 @@ body {
 
 .action-btn.secondary:hover {
   background-color: rgba(255, 42, 0, 0.08);
-  transform: translateY(-1px);
 }
 
-/* 紧凑按钮样式 - 专门用于Switch Account按钮 */
+/* Compact button style - specifically for Switch Account button */
 .compact-btn {
   padding: 0.2rem;
   border: none;
@@ -809,7 +747,6 @@ body {
   min-width: auto;
   position: relative;
   overflow: hidden;
-  animation: pulse 2s infinite ease-in-out;
 }
 
 .compact-btn::before {
@@ -825,7 +762,6 @@ body {
 
 .compact-btn:hover {
   background-color: rgba(255, 42, 0, 0.05);
-  transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(255, 42, 0, 0.15);
 }
 
@@ -834,7 +770,6 @@ body {
 }
 
 .compact-btn:active {
-  transform: translateY(0);
   transition: transform 0.1s ease;
 }
 
@@ -843,7 +778,6 @@ body {
   color: #a0a0a0;
   cursor: not-allowed;
   border-color: #e0e0e0;
-  transform: none;
   box-shadow: none;
 }
 
@@ -870,11 +804,10 @@ body {
 }
 
 /* Invitation System Styles */
-.invitation-content.send-actions {
+.invitation-content {
   display: flex;
-  flex-direction: row;
-  gap: 10px;
-  width: 100%;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .invitation-stats {
@@ -894,7 +827,7 @@ body {
   margin-top: 1rem;
 }
 
-/* 24小时限制控制卡片样式 */
+/* 24-hour limit control card styles */
 
 .cooldown-control-content {
   display: flex;
@@ -948,7 +881,6 @@ body {
 
 .action-btn.danger:hover:not(:disabled) {
   background-color: #d32f2f;
-  transform: translateY(-1px);
   box-shadow: 0 3px 8px rgba(244, 67, 54, 0.25);
 }
 
@@ -1067,7 +999,7 @@ body {
   left: 0;
   right: 0;
   background-color: #1a1a1a;
-  border: 1px solid #ff2a00;
+  border: 1px solid rgba(255,42,0,0.15);
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   z-index: 1000;
@@ -1115,9 +1047,9 @@ body {
 .status-dot {
   width: 6px;
   height: 6px;
-  background-color: #4ade80;
+  background-color: rgb(34 197 94);
   border-radius: 50%;
-  animation: pulse 2s infinite;
+  animation: breathe 2s infinite ease-in-out;
 }
 
 @keyframes pulse {
@@ -1132,6 +1064,21 @@ body {
   }
 }
 
+@keyframes breathe {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* Chain Warning */
 .chain-warning {
   font-size: 0.8rem;
@@ -1140,33 +1087,7 @@ body {
   margin-left: 0.5rem;
 }
 
-/* Mode Badge */
-.mode-badge {
-  padding: 0.2rem 0.4rem;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
 
-.mode-badge.local {
-  background-color: rgba(255, 193, 7, 0.2);
-  color: #ffc107;
-  border: 1px solid rgba(255, 193, 7, 0.3);
-}
-
-.mode-badge.linera {
-  background-color: rgba(0, 123, 255, 0.2);
-  color: #007bff;
-  border: 1px solid rgba(0, 123, 255, 0.3);
-}
-
-.mode-badge.connected {
-  background-color: rgba(40, 167, 69, 0.2);
-  color: #28a745;
-  border: 1px solid rgba(40, 167, 69, 0.3);
-}
 
 /* Wallet Connect Prompt */
 .wallet-connect-prompt {
@@ -1232,7 +1153,6 @@ body {
 }
 
 .gm-notification-ball:hover {
-  transform: scale(1.05);
   box-shadow: 0 6px 25px rgba(255, 42, 0, 0.6);
   animation-play-state: paused;
 }
@@ -1262,13 +1182,11 @@ body {
   font-size: 14px;
   font-weight: 800;
   color: #ff2a00;
-  animation: pulsePlus 1.5s infinite;
 }
 
 @keyframes floatUp {
   0% {
     opacity: 1;
-    transform: translateY(0) scale(1);
     box-shadow: 
       0 4px 15px rgba(255, 42, 0, 0.3),
       0 0 30px rgba(255, 42, 0, 0.4),
@@ -1276,7 +1194,6 @@ body {
   }
   30% {
     opacity: 0.9;
-    transform: translateY(-40px) scale(1.05);
     box-shadow: 
       0 6px 20px rgba(255, 42, 0, 0.4),
       0 0 35px rgba(255, 42, 0, 0.5),
@@ -1292,7 +1209,7 @@ body {
   }
   100% {
     opacity: 0;
-    transform: translateY(-150px) scale(0.9);
+    transform: translateY(-150px) scale(0.8);
     box-shadow: 
       0 2px 8px rgba(255, 42, 0, 0.2),
       0 0 15px rgba(255, 42, 0, 0.2),
@@ -1302,7 +1219,7 @@ body {
 
 @keyframes float {
   0%, 100% {
-    transform: translateY(0px);
+    transform: translateY(0);
   }
   50% {
     transform: translateY(-10px);
@@ -1311,21 +1228,19 @@ body {
 
 @keyframes pulse {
   0%, 100% {
-    transform: scale(1);
     box-shadow: 0 4px 20px rgba(255, 42, 0, 0.4);
   }
   50% {
-    transform: scale(1.05);
     box-shadow: 0 6px 25px rgba(255, 42, 0, 0.6);
   }
 }
 
 @keyframes pulsePlus {
   0%, 100% {
-    transform: scale(1);
+    opacity: 0.8;
   }
   50% {
-    transform: scale(1.2);
+    opacity: 1;
   }
 }
 
@@ -1462,11 +1377,11 @@ body {
 }
 
 .copy-btn:hover {
-  transform: scale(1.15);
+  opacity: 0.8;
 }
 
 .copy-btn:active {
-  transform: scale(0.9);
+  opacity: 0.6;
 }
 
 .copy-btn.copy-success {
@@ -1501,7 +1416,6 @@ body {
   background-color: rgba(231, 76, 60, 0.08);
   border-color: #e74c3c;
   color: #e74c3c;
-  animation: pulse 1.5s infinite;
   box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
   position: relative;
   z-index: 20;
@@ -1511,7 +1425,6 @@ body {
   background-color: rgba(241, 196, 15, 0.08);
   border-color: #f1c40f;
   color: #f1c40f;
-  animation: pulse 2s infinite;
 }
 
 /* Stats Panel */
@@ -1531,13 +1444,12 @@ body {
   padding: 0.6rem 1.5rem;
   background-color: rgba(255, 42, 0, 0.05);
   border-radius: 12px;
-  border: 1px solid rgba(255, 42, 0, 0.1);
+  border: 1px solid rgba(255,42,0,0.15);
   box-shadow: 0 4px 12px rgba(255, 42, 0, 0.4);
   transition: all 0.3s ease;
 }
 
 .stat-item:hover {
-  transform: translateY(-5px);
   box-shadow: 0 8px 16px rgba(255, 42, 0, 0.15);
   background-color: rgba(255, 42, 0, 0.08);
 }
@@ -1574,7 +1486,7 @@ body {
 
 .refresh-btn {
   background: transparent;
-  border: 1px solid #ff2a00;
+  border: 1px solid rgba(255,42,0,0.15);
   color: #ff2a00;
   border-radius: 6px;
   padding: 0.3rem 0.8rem;
@@ -1589,7 +1501,7 @@ body {
 
 .stats-panel {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: flex-start;
   gap: 1.5rem;
   flex-wrap: wrap;
@@ -1602,68 +1514,92 @@ body {
   gap: 0.7rem;
 }
 
-.stats-right {
+/* 24-hour cooldown timer styles */
+.cooldown-timer-container {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  padding: 0.8rem 1rem;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.cooldown-timer-header {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  flex: 1;
 }
 
-/* 下一个GM倒计时样式 */
-.next-gm-countdown {
-  text-align: center;
-  padding: 0.9rem 1.5rem 0.8rem 1.5rem;
-  border-radius: 12px;
-  color: #ff2a00;
-  box-shadow: 0 4px 12px rgba(255, 42, 0, 0.4);
-  min-width: 200px;
-}
-
-.countdown-title {
+.cooldown-timer-label {
   font-size: 0.9rem;
   font-weight: 600;
-  opacity: 0.9;
-  letter-spacing: 0.5px;
   color: #ff2a00;
 }
 
-.countdown-timer {
-  font-size: 1.4rem;
-  font-weight: 700;
-  font-family: 'Courier New', monospace;
-  letter-spacing: 1px;
-  color: #ff2a00;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 0.2rem;
-  flex-wrap: wrap;
+.cooldown-timer-bar {
+  width: 100%;
+  height: 6px;
+  position: relative;
+  border-radius: 4px;
+  overflow: hidden;
 }
 
-/* 下一个GM可用状态样式 */
-.next-gm-ready {
-  text-align: center;
-  padding: 0.9rem 1.5rem 0.8rem 1.5rem;
-  border-radius: 12px;
-  color: #4ade80;
-  box-shadow: 0 4px 12px rgba(74, 222, 128, 0.4);
-  min-width: 200px;
+.cooldown-timer-track {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 42, 0, 0.1);
+  border-radius: 8px;
 }
 
-.ready-title {
+.cooldown-timer-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #ff2a00, #ff6b6b);
+  border-radius: 8px;
+  transition: width 0.3s ease;
+}
+
+.cooldown-timer-fill.active {
+  background: linear-gradient(90deg, #ff2a00, #ff6b6b);
+}
+
+.cooldown-timer-fill.inactive {
+  width: 100%;
+  background-color: #4ade80;
+  animation: none;
+}
+
+@keyframes shimmer {
+  0% {
+    opacity: 0.8;
+    box-shadow: 0 0 5px rgba(255, 42, 0, 0.5);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 15px rgba(255, 42, 0, 0.8);
+  }
+  100% {
+    opacity: 0.8;
+    box-shadow: 0 0 5px rgba(255, 42, 0, 0.5);
+  }
+}
+
+.cooldown-timer-status {
   font-size: 0.9rem;
   font-weight: 600;
-  opacity: 0.9;
-  letter-spacing: 0.5px;
+}
+
+.cooldown-timer-status[data-status="disabled"] {
   color: #4ade80;
 }
 
-.ready-subtitle {
-  font-size: 1.4rem;
-  font-weight: 700;
-  font-family: 'Courier New', monospace;
-  letter-spacing: 1px;
-  color: #4ade80;
+.cooldown-timer-status[data-status="enabled"] {
+  color: #ff2a00;
 }
 
 /* 24小时限制状态样式 */
@@ -1832,22 +1768,7 @@ body {
 }
 
 .notification:hover {
-  transform: translateX(-5px);
-}
-
-@keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(100%) scale(0.8);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-}
-
-.notification:hover {
-  transform: translateY(-3px) scale(1.02);
+  transform: translateY(-2px);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
 }
 
@@ -1994,7 +1915,7 @@ body {
 /* Chain Selection Card */
 .chain-selection-card {
   background-color: #fff;
-  border: 1px solid #ff2a00;
+  border: 1px solid rgba(255,42,0,0.15);
   border-radius: 12px;
   padding: 1rem;
   box-shadow: 0 4px 8px rgba(255, 42, 0, 0.4);
@@ -2002,7 +1923,6 @@ body {
 }
 
 .chain-selection-card:hover {
-  transform: translateY(-2px);
   box-shadow: 0 6px 12px rgba(255, 42, 0, 0.15);
 }
 
@@ -2055,33 +1975,29 @@ body {
 /* Send Action Card */
 .send-action-card {
   background-color: #fff;
-  border: 1px solid #ff2a00;
+  border: 1px solid rgba(255,42,0,0.15);
   border-radius: 12px;
   padding: 1.25rem;
-  box-shadow: 0 4px 12px rgba(255, 42, 0, 0.15);
   transition: all 0.3s ease;
   width: 100%;
   position: relative;
 }
 
 .send-action-card:hover {
-  transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(255, 42, 0, 0.2);
 }
 
 /* Custom Message Card */
 .custom-message-card {
   background-color: #fff;
-  border: 1px solid #ff2a00;
+  border: 1px solid rgba(255,42,0,0.15);
   border-radius: 12px;
   padding: 1.25rem;
-  box-shadow: 0 4px 12px rgba(255, 42, 0, 0.15);
   transition: all 0.3s ease;
   width: 100%;
 }
 
 .custom-message-card:hover {
-  transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(255, 42, 0, 0.2);
 }
 
@@ -2112,7 +2028,6 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.8rem;
 }
 
 .custom-message-header label {
@@ -2124,7 +2039,7 @@ body {
   position: relative;
   width: 48px;
   height: 24px;
-  background-color: #ccc;
+  background-color: rgba(76, 175, 80, 0.3);
   border-radius: 12px;
   cursor: pointer;
   transition: background-color 0.2s ease;
@@ -2132,11 +2047,11 @@ body {
 }
 
 .toggle-switch:hover {
-  background-color: #b0b0b0;
+  background-color: rgba(76, 175, 80, 0.4);
 }
 
 .toggle-switch:active {
-  transform: scale(0.95);
+  background-color: rgba(76, 175, 80, 0.5);
 }
 
 .toggle-switch.active {
@@ -2149,7 +2064,7 @@ body {
 }
 
 .toggle-switch.active:active {
-  transform: scale(0.95);
+  background-color: #3d8b40;
 }
 
 .toggle-switch-thumb {
@@ -2249,6 +2164,7 @@ body {
   transition: all 0.3s;
   position: relative;
   overflow: hidden;
+  z-index: 0;
 }
 
 .send-button::before {
@@ -2258,14 +2174,14 @@ body {
   left: 50%;
   width: 0;
   height: 0;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.3);
   border-radius: 50%;
+  transition: width 0.6s, height 0.6s;
   transform: translate(-50%, -50%);
-  transition: width 0.8s, height 0.8s;
+  z-index: 1;
 }
 
 .send-button:hover:not(:disabled) {
-  transform: translateY(-3px);
   box-shadow: 0 10px 25px rgba(255, 107, 53, 0.4);
 }
 
@@ -2275,7 +2191,8 @@ body {
 }
 
 .send-button:active:not(:disabled) {
-  transform: translateY(0);
+  transform: translateY(2px);
+  box-shadow: 0 5px 15px rgba(255, 107, 53, 0.3);
 }
 
 .send-button:disabled {
@@ -2288,7 +2205,7 @@ body {
 .history-button {
   flex: 3; /* 30% width */
   padding: 0.8rem;
-  background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+  background: linear-gradient(135deg, #ff9a76 0%, #ff8a65 100%);
   color: white;
   border: none;
   border-radius: 6px;
@@ -2302,14 +2219,17 @@ body {
 }
 
 .history-button:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 25px rgba(108, 117, 125, 0.4);
-  background: linear-gradient(135deg, #5a6268 0%, #3d4142 100%);
+  box-shadow: 0 10px 25px rgba(255, 154, 118, 0.4);
+  background: linear-gradient(135deg, #ff8a65 0%, #ff7a54 100%);
+  transform: translateY(-2px);
 }
 
 .history-button:active {
   transform: translateY(0);
+  box-shadow: 0 5px 15px rgba(255, 154, 118, 0.3);
 }
+
+
 
 /* History Dropdown */
 .history-dropdown {
@@ -2325,7 +2245,6 @@ body {
   margin-top: 0.5rem;
   max-height: 300px;
   overflow-y: auto;
-  transform: translateZ(0);
 }
 
 .history-loading {
@@ -2378,84 +2297,7 @@ body {
   font-size: 0.8rem;
 }
 
-/* History Dropdown */
-.history-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background-color: white;
-  border: 1px solid #ff8c00;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(255, 140, 0, 0.2);
-  z-index: 99999;
-  margin-top: 0.5rem;
-  max-height: 300px;
-  overflow-y: auto;
-  transform: translateZ(0);
-}
 
-.history-loading {
-  padding: 1rem;
-  text-align: center;
-  color: #666;
-}
-
-.history-empty {
-  padding: 1rem;
-  text-align: center;
-  color: #666;
-  font-style: italic;
-}
-
-.history-list {
-  padding: 0.5rem 0;
-}
-
-.history-item {
-  padding: 0.8rem 1rem;
-  border-bottom: 1px solid #eee;
-  font-size: 0.9rem;
-}
-
-.history-item:last-child {
-  border-bottom: none;
-}
-
-.history-sender, .history-recipient, .history-content, .history-timestamp {
-  margin-bottom: 0.3rem;
-  word-break: break-word;
-}
-
-.history-sender {
-  font-weight: 600;
-  color: #ff2a00;
-}
-
-.history-recipient {
-  color: #555;
-}
-
-.history-content {
-  color: #333;
-}
-
-.history-timestamp {
-  color: #888;
-  font-size: 0.8rem;
-}
-
-/* Address Validation Error */
-.address-validation-error {
-  color: #e74c3c;
-  font-size: 0.8rem;
-  font-weight: 500;
-  margin-top: 0.5rem;
-  padding: 0.3rem 0.5rem;
-  background-color: rgba(231, 76, 60, 0.08);
-  border: 1px solid rgba(231, 76, 60, 0.3);
-  border-radius: 4px;
-}
 
 /* Button Loading */
 .button-loading {
@@ -2466,10 +2308,10 @@ body {
 
 .spinner {
   margin-right: 0.5rem;
-  animation: spin 1s linear infinite;
+  animation: spinRotate 1s linear infinite;
 }
 
-@keyframes spin {
+@keyframes spinRotate {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
@@ -2495,7 +2337,7 @@ body {
 
 .chain-selector select {
   padding: 0.7rem;
-  border: 1.5px solid #ff2a00;
+  border: 1.5px solid rgba(255,42,0,0.15);
   border-radius: 6px;
   background-color: #fff;
   font-size: 0.9rem;
@@ -2525,7 +2367,7 @@ body {
 .recipient-input {
   flex: 0 0 40%;
   padding: 0.7rem;
-  border: 1.5px solid #ff2a00;
+  border: 1.5px solid rgba(255,42,0,0.15);
   border-radius: 6px 0 0 6px;
   font-size: 0.9rem;
   transition: all 0.2s ease;
@@ -2573,7 +2415,7 @@ body {
 }
 
 .loading-spinner {
-  animation: spin 1s linear infinite;
+  animation: spinRotate 1s linear infinite;
 }
 
 /* Error Fallback */
@@ -2586,7 +2428,7 @@ body {
   animation: pulse 1.5s infinite;
 }
 
-/* +1 动画样式 */
+/* +1 animation styles */
 .stats-item {
   position: relative;
   display: flex;
@@ -2617,21 +2459,18 @@ body {
 @keyframes plusOneBounce {
   0% {
     opacity: 0;
-    transform: scale(0.3);
   }
   30% {
     opacity: 1;
-    transform: scale(1.2);
   }
   50% {
-    transform: scale(1.1);
+    opacity: 1;
   }
   70% {
-    transform: scale(1.05);
+    opacity: 1;
   }
   100% {
     opacity: 1;
-    transform: scale(1);
   }
 }
 
@@ -2647,7 +2486,7 @@ body {
 
 /* Top Navbar Styles */
 .top-navbar {
-  background-color: #0a1428;
+  background-color: #122345;
   color: white;
   padding: 0.6rem 1rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
@@ -2666,6 +2505,8 @@ body {
   gap: 1rem;
   position: relative;
   flex-wrap: wrap;
+  overflow: visible;
+  z-index: 1;
 }
 
 .logo {
@@ -2694,6 +2535,8 @@ body {
   justify-content: flex-start;
   flex: 1;
   min-width: 240px;
+  position: static;
+  z-index: auto;
 }
 
 .nav-link {
@@ -2774,7 +2617,7 @@ body {
 
 /* App Content - 下方内容区域 */
 .App-content {
-  margin-top: 1rem 1.2rem 1.2rem 1.2rem;
+  margin: 0.5rem 1.2rem;
 }
 
 /* Error Message */
@@ -2796,6 +2639,7 @@ body {
     justify-content: flex-start;
     align-items: center;
     position: relative;
+    overflow: visible;
   }
   
   .logo {
@@ -2816,6 +2660,7 @@ body {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    position: static;
   }
   
   .nav-links::-webkit-scrollbar {
@@ -2828,9 +2673,10 @@ body {
     flex-wrap: wrap;
     justify-content: flex-end;
     flex-shrink: 0;
-    position: relative;
+    position: static;
     min-width: 200px;
     margin-left: auto;
+    z-index: auto;
   }
   
   .wallet-button-container {
@@ -2936,7 +2782,7 @@ body {
   }
   
   .send-button {
-    flex: 1;
+    flex: 7;
     border-radius: 6px;
     min-width: auto;
   }
@@ -2954,31 +2800,10 @@ body {
     justify-content: center;
   }
   
-  .stats-right {
-    min-height: auto;
-    width: 100%;
-    display: none;
-  }
-  
   .stats-grid {
     grid-template-columns: 1fr 1fr;
     width: 100%;
     max-width: 500px;
-  }
-  
-  .next-gm-countdown,
-  .next-gm-ready {
-    min-width: auto;
-    width: 100%;
-    padding: 1.2rem;
-  }
-  
-  .countdown-timer {
-    font-size: 1.2rem;
-  }
-  
-  .ready-title {
-    font-size: 1rem;
   }
 }
 
@@ -3010,7 +2835,6 @@ body {
   
   .plus-one-animation {
     position: static;
-    transform: none;
     margin-left: auto;
   }
   
@@ -3070,9 +2894,10 @@ body {
     flex-wrap: wrap;
     justify-content: flex-end;
     flex-shrink: 0;
-    position: relative;
+    position: static;
     min-width: 150px;
     margin-left: auto;
+    z-index: auto;
   }
   
   .wallet-button-container {
@@ -3134,7 +2959,7 @@ body {
   }
   
   .send-button {
-    flex: 1;
+    flex: 7;
     border-radius: 6px;
     padding: 0.6rem;
     font-size: 0.85rem;
@@ -3264,7 +3089,6 @@ body {
 }
 
 .view-btn:hover {
-  transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(255, 42, 0, 0.4);
 }
 
@@ -3301,7 +3125,6 @@ body {
 .notification-close:hover {
   background: rgba(255, 42, 0, 0.8);
   color: white;
-  transform: scale(1.1);
 }
 
 @keyframes progressBar {
@@ -3324,38 +3147,33 @@ body {
 
 @keyframes slideInUp {
   from {
-    transform: translateY(50px);
     opacity: 0;
+    transform: translateY(20px);
   }
   to {
-    transform: translateY(0);
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
 @keyframes pulse {
   0% {
-    transform: scale(1);
     opacity: 1;
     text-shadow: 0 0 8px rgba(255, 42, 0, 0.5);
   }
   25% {
-    transform: scale(1.08);
     opacity: 1;
     text-shadow: 0 0 15px rgba(255, 42, 0, 0.8);
   }
   50% {
-    transform: scale(1.05);
     opacity: 1;
     text-shadow: 0 0 12px rgba(255, 42, 0, 0.7);
   }
   75% {
-    transform: scale(1.12);
     opacity: 1;
     text-shadow: 0 0 20px rgba(255, 42, 0, 0.9);
   }
   100% {
-    transform: scale(1);
     opacity: 1;
     text-shadow: 0 0 8px rgba(255, 42, 0, 0.5);
   }
@@ -3385,13 +3203,11 @@ body {
 }
 
 .dynamic-wallet-connect button:hover {
-  transform: translateY(-2px) !important;
   box-shadow: 0 6px 20px rgba(255, 42, 0, 0.4) !important;
   background: linear-gradient(135deg, #d42500, #e05a2b) !important;
 }
 
 .dynamic-wallet-connect button:active {
-  transform: translateY(0) !important;
   box-shadow: 0 2px 8px rgba(255, 42, 0, 0.3) !important;
 }
 
@@ -3547,7 +3363,7 @@ body {
   accent-color: #ff2a00;
 }
 
-/* 深色模式设置卡片样式 */
+/* Dark mode settings card styles */
 .theme-settings-card {
   background-color: #f8f9fa;
   border-radius: 12px;
@@ -3558,8 +3374,8 @@ body {
 }
 
 .theme-settings-card:hover {
-  transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
 }
 
 .theme-settings-content {
@@ -3633,6 +3449,7 @@ body {
 
 .theme-toggle-btn.active .toggle-slider {
   transform: translateX(30px);
+  background-color: #ff2a00;
 }
 
 .toggle-icon {
@@ -3652,7 +3469,7 @@ body {
   text-align: center;
 }
 
-/* 响应式设计 */
+/* Responsive design */
 @media (max-width: 768px) {
   .function-content {
     padding: 0 0.5rem;
@@ -3688,15 +3505,6 @@ body {
   
   .stat-value {
     font-size: 1.5rem;
-  }
-  
-  .stats-right {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 120px;
-    width: 100%;
-    display: none;
   }
 }
 
@@ -3772,6 +3580,7 @@ body {
     justify-content: flex-start;
     align-items: flex-start;
     position: relative;
+    z-index: 1;
   }
   
   .logo {
@@ -3795,10 +3604,8 @@ body {
     justify-content: center;
     gap: 0.4rem;
     width: 100%;
-    position: absolute;
-    right: 0;
-    top: 0;
-    z-index: 10;
+    position: static;
+    z-index: auto;
   }
   
   .wallet-button-container {
@@ -4115,7 +3922,7 @@ body:not(.dark-mode) .theme-toggle:hover {
   background-color: rgba(0, 0, 0, 0.1);
 }
 
-/* 中间通知栏深色模式 */
+/* Center notification dark mode */
 body.dark-mode .center-notification-overlay {
   background-color: rgba(0, 0, 0, 0.7);
 }
@@ -4147,7 +3954,7 @@ body.dark-mode .center-notification-reply:hover {
   background-color: #e62600;
 }
 
-/* GM通知气泡深色模式 */
+/* GM notification bubble dark mode */
 body.dark-mode .gm-notification-ball {
   background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9), rgba(255, 182, 193, 0.7));
   box-shadow: 0 4px 15px rgba(255, 42, 0, 0.4);
@@ -4193,21 +4000,21 @@ body.dark-mode .gm-notification-ball::after {
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* 错误消息深色模式 */
+/* Error message dark mode */
 body.dark-mode .error-message {
   background-color: rgba(211, 47, 47, 0.2);
   color: #e57373;
   border: 1px solid rgba(211, 47, 47, 0.5);
 }
 
-/* 成功消息深色模式 */
+/* Success message dark mode */
 body.dark-mode .success-message {
   background-color: rgba(46, 125, 50, 0.2);
   color: #81c784;
   border: 1px solid rgba(46, 125, 50, 0.5);
 }
 
-/* 警告消息深色模式 */
+/* Warning message dark mode */
 body.dark-mode .warning-message {
   background-color: rgba(245, 124, 0, 0.2);
   color: #ffb74d;
@@ -4252,14 +4059,14 @@ body.dark-mode .toggle-label {
   color: #ccc;
 }
 
-/* 信息消息深色模式 */
+/* Info message dark mode */
 body.dark-mode .info-message {
   background-color: rgba(2, 119, 189, 0.2);
   color: #64b5f6;
   border: 1px solid rgba(2, 119, 189, 0.5);
 }
 
-/* 自定义消息相关深色模式 */
+/* Custom message related dark mode */
 body.dark-mode .custom-message-header label {
   color: #e0e0e0;
 }
@@ -4279,12 +4086,12 @@ body.dark-mode .message-preview {
   color: #e0e0e0;
 }
 
-/* Input Group 深色模式 */
+/* Input Group dark mode */
 body.dark-mode .input-group label {
   color: #e0e0e0;
 }
 
-/* 历史记录相关深色模式 */
+/* History related dark mode */
 body.dark-mode .history-dropdown {
   background-color: #2d2d2d;
   border-color: #ff6b4a;
@@ -4317,4 +4124,39 @@ body.dark-mode .history-content {
 
 body.dark-mode .history-timestamp {
   color: #888;
+}
+
+/* Target Chain dark mode */
+body.dark-mode .chain-selection-card {
+  background-color: #2d2d2d;
+  border-color: #444;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+body.dark-mode .chain-selection-card h3 {
+  color: #e0e0e0;
+}
+
+body.dark-mode .chain-option {
+  background-color: #252525;
+  border-color: #444;
+}
+
+body.dark-mode .chain-option:hover {
+  background-color: #333;
+  border-color: #ff2a00;
+}
+
+body.dark-mode .chain-option.selected {
+  background-color: rgba(255, 42, 0, 0.15);
+  border-color: #ff2a00;
+  box-shadow: 0 0 0 2px rgba(255, 42, 0, 0.2);
+}
+
+body.dark-mode .chain-name {
+  color: #e0e0e0;
+}
+
+body.dark-mode .chain-address {
+  color: #aaa;
 }

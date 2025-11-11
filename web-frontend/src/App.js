@@ -122,7 +122,7 @@ function App({ chainId, appId, ownerId }) {
   const currentIsConnected = isConnected;
   
   const { primaryWallet, handleLogOut } = useDynamicContext();
-  const isDynamicConnected = primaryWallet && primaryWallet.address;
+  const isDynamicConnected = primaryWallet && primaryWallet.address && walletType === 'dynamic';
   const dynamicAccount = isDynamicConnected ? primaryWallet.address : null;
   const isActiveDynamicWallet = isConnected && walletType === 'dynamic' && currentAccount;
   
@@ -148,11 +148,19 @@ function App({ chainId, appId, ownerId }) {
   
   const disconnectDynamicWallet = async () => {
     try {
+      // 先调用Dynamic钱包的登出方法
       if (handleLogOut) {
         await handleLogOut();
-        disconnectWallet();
       }
+      
+      // 确保调用通用的断开连接函数清理状态
+      await disconnectWallet();
+      
+      // 添加额外的延迟，确保所有状态都完全清理
+      await new Promise(resolve => setTimeout(resolve, 500));
     } catch (error) {
+      console.error('Error disconnecting Dynamic wallet:', error);
+      throw error; // 重新抛出错误，以便调用者能够处理
     }
   };
   
@@ -190,7 +198,7 @@ function App({ chainId, appId, ownerId }) {
     walletType,
     isLoading
   }) => {
-    const isLineraConnected = currentIsConnected && walletType === 'linera' && currentAccount;
+    const isLineraConnected = currentIsConnected && walletType === 'linera';
     const lineraAccount = isLineraConnected ? currentAccount : null;
     
     const handleConnectLineraWallet = async () => {
@@ -201,7 +209,16 @@ function App({ chainId, appId, ownerId }) {
         }
         
         if (currentIsConnected && walletType && walletType !== 'linera') {
-          await disconnectWallet();
+          // 如果当前连接的是Dynamic钱包，需要先断开Dynamic钱包
+          if (walletType === 'dynamic') {
+            await disconnectDynamicWallet();
+            setMessage('Dynamic wallet disconnected', 'info');
+            
+            // 添加延迟，确保Dynamic钱包状态完全清理
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          } else {
+            await disconnectWallet();
+          }
         }
         
         await connectWallet('linera');
@@ -222,9 +239,17 @@ function App({ chainId, appId, ownerId }) {
     
     const handleConnectDynamicWallet = async () => {
       try {
-        if (currentIsConnected && walletType && walletType !== 'dynamic') {
+        // 如果已连接Linera钱包，先断开
+        if (isLineraConnected) {
           await disconnectWallet();
+          setMessage('Linera wallet disconnected', 'info');
+          
+          // 添加延迟，确保Linera钱包状态完全清理
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
+        
+        // DynamicConnectButton会处理连接逻辑
+        // 这里不需要额外的连接代码
       } catch (error) {
         setMessage(`Failed to connect Dynamic wallet: ${error.message}`, 'error');
       }
@@ -243,17 +268,15 @@ function App({ chainId, appId, ownerId }) {
       <div className="wallet-connection-section">
         <div className="wallet-button-container">
           {isLineraConnected ? (
-            <div className="wallet-info-card linera">
+            <div 
+              className="wallet-info-card linera clickable"
+              onClick={handleDisconnectLineraWallet}
+              title="Click to disconnect Linera wallet"
+            >
               <div className="wallet-address">
+                <span className="status-dot"></span>
                 {lineraAccount ? `${lineraAccount.slice(0, 6)}...${lineraAccount.slice(-4)}` : 'Connected'}
               </div>
-              <button 
-                className="disconnect-btn linera"
-                onClick={handleDisconnectLineraWallet}
-                disabled={isLoading && walletType === 'linera'}
-              >
-                Disconnect
-              </button>
             </div>
           ) : (
             <button 
@@ -268,22 +291,23 @@ function App({ chainId, appId, ownerId }) {
         
         <div className="wallet-button-container">
           {isDynamicConnected ? (
-            <div className="wallet-info-card dynamic">
+            <div 
+              className="wallet-info-card dynamic clickable"
+              onClick={handleDisconnectDynamicWallet}
+              title="Click to disconnect Dynamic wallet"
+            >
               <div className="wallet-address">
+                <span className="status-dot"></span>
                 {dynamicAccount ? `${dynamicAccount.slice(0, 6)}...${dynamicAccount.slice(-4)}` : 'Connected'}
               </div>
-              <button 
-                className="disconnect-btn dynamic"
-                onClick={handleDisconnectDynamicWallet}
-                disabled={isDynamicLoading}
-              >
-                Disconnect
-              </button>
             </div>
           ) : (
             <div className="wallet-connect-card">
               <DynamicConnectButton>
-                <button className="connect-btn dynamic">
+                <button 
+                  className="connect-btn dynamic"
+                  onClick={handleConnectDynamicWallet}
+                >
                   Dynamic Wallet
                 </button>
               </DynamicConnectButton>
@@ -967,67 +991,29 @@ function App({ chainId, appId, ownerId }) {
                         </div>
                       </div>
                     </div>
-                    <div className="stats-right">
-                      {currentIsConnected && gmOps.isValidAccountOwner(currentAccount) ? (
-                        
-                        <>
-                          
-                          {gmOps.cooldownCheckData?.checkCooldown ? (
-                            <div className="cooldown-status">
-                              <div className="cooldown-title">24-HOUR LIMIT</div>
-                              
-                              {localCooldownEnabled && gmOps.cooldownCheckData.checkCooldown.inCooldown ? (
-                                <div className="cooldown-active">
-                                  <div className="cooldown-timer">
-                                    <span className="cooldown-label">NEXT GMIC IN:</span>
-                                    <span className="cooldown-time">
-                                      {gmOps.formatCooldown(gmOps.cooldownCheckData.checkCooldown.remainingTime)}
-                                    </span>
-                                  </div>
-                                  <div className="cooldown-note">24-hour cooldown active</div>
-                                </div>
-                              ) : (
-                                <div className="cooldown-ready">
-                                  <div className="ready-icon">✓</div>
-                                  <div className="ready-text">Ready to send</div>
-                                  <div className="cooldown-note">
-                                    {localCooldownEnabled ? 'Cooldown Disabled' : 'Cooldown Enabled'}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            
-                            <>
-                              {localCooldownEnabled && cooldownRemaining > 0 ? (
-                                <div className="next-gm-countdown">
-                                  <div className="countdown-title">NEXT GMIC IN</div>
-                                  <div className="countdown-timer">
-                                    <span className="countdown-hours">{countdown.hours}</span>h
-                                    <span className="countdown-minutes"> {countdown.minutes}</span>m
-                                    <span className="countdown-seconds"> {countdown.seconds}</span>s
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="next-gm-ready">
-                                  <div className="ready-title">READY TO SEND</div>
-                                  <div className="ready-subtitle">Next GMIC Available</div>
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </>
-                      ) : (
-                        
-                        <div className="next-gm-ready">
-                          <div className="connect-wallet-title">24-HOUR LIMIT</div>
-                          <div className="connect-wallet-prompt-box">
-                          </div>
-                          <div className="connect-note">
-                            {localCooldownEnabled ? 'Cooldown Disabled' : 'Cooldown Enabled'}
-                          </div>
-                        </div>
-                      )}
+                  </div>
+                  
+                  {/* 24-hour cooldown timer */}
+                  <div className="cooldown-timer-container">
+                    <div className="cooldown-timer-header">
+                      <div className="cooldown-timer-label">Cooldown Timer</div>
+                      <div className="cooldown-timer-status" data-status={gmOps.cooldownStatusData?.getCooldownStatus?.enabled ? 'enabled' : 'disabled'}>
+                        {gmOps.cooldownStatusData?.getCooldownStatus?.enabled ? 'Enabled' : 'Disabled'}
+                      </div>
+                    </div>
+                    <div className="cooldown-timer-bar">
+                      <div className="cooldown-timer-track"></div>
+                      <div 
+                        className={`cooldown-timer-fill ${gmOps.cooldownStatusData?.getCooldownStatus?.enabled ? 'active' : 'inactive'}`}
+                        style={{
+                          width: gmOps.cooldownStatusData?.getCooldownStatus?.enabled 
+                            ? `${Math.max(0, Math.min(100, (cooldownRemaining / 86_400_000_000) * 100))}%`
+                            : '100%',
+                          background: gmOps.cooldownStatusData?.getCooldownStatus?.enabled 
+                            ? 'linear-gradient(90deg, #ff2a00, #ff6b6b)'
+                            : '#4ade80'
+                        }}
+                      ></div>
                     </div>
                   </div>
                 </div>
@@ -1167,7 +1153,7 @@ function App({ chainId, appId, ownerId }) {
                       onChange={handleCustomMessageChange}
                     ></textarea>
                     <div className="message-preview" id="messagePreview">
-                    Preview: {customMessageEnabled && customMessage ? selectedMessage : 'Custom message feature is not available'}
+                    Preview: {customMessageEnabled && customMessage ? selectedMessage : 'Custom message unavailable.'}
                   </div>
                   </div>
                 </div>

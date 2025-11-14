@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { useQuery, useMutation, useSubscription } from '@apollo/client';
 import { 
   GET_GM_STATS, 
@@ -30,6 +30,20 @@ const isValidAccountOwner = (owner) => {
     return true;
   }
   return false;
+};
+
+const isValidChainId = (chainId) => {
+  if (!chainId) return false;
+  return /^[0-9a-fA-F]{64}$/.test(chainId);
+};
+
+const isLineraChainId = (chainId) => {
+  if (!chainId) return false;
+  return /^[0-9a-fA-F]{64}$/.test(chainId);
+};
+
+const getQueryChainId = (currentChainId, contractChainId) => {
+  return isLineraChainId(currentChainId) ? currentChainId : contractChainId;
 };
 
 const formatAccountOwner = (address) => {
@@ -77,8 +91,11 @@ const GMOperations = ({
   recipientAddress,
   onMutationComplete,
   onMutationError,
+  customMessage,
+  customMessageEnabled,
   cooldownStatus
 }) => {
+  const queryChainId = getQueryChainId(currentChainId, chainId);
   const [subscriptionData, setSubscriptionData] = useState({
     gmEvents: []
   });
@@ -87,10 +104,60 @@ const GMOperations = ({
     gmEvents: { active: false, lastUpdate: null, error: null }
   });
 
+  const [subscriptionConnectionStatus, setSubscriptionConnectionStatus] = useState({
+    connected: false,
+    lastConnectionCheck: null,
+    retryCount: 0
+  });
+
+  const [processedEventIds, setProcessedEventIds] = useState(new Set());
+  const [lastProcessedTime, setLastProcessedTime] = useState(0);
+  
+  const [pageLoadTime, setPageLoadTime] = useState(0);
+
+  useEffect(() => {
+    if (pageLoadTime === 0) {
+      setPageLoadTime(Date.now());
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!chainId) return;
+
+    const checkSubscriptionStatus = () => {
+      const now = new Date().toISOString();
+      
+      const isActive = !subscriptionStatus.gmEvents.error && 
+                      subscriptionStatus.gmEvents.lastUpdate && 
+                      (Date.now() - new Date(subscriptionStatus.gmEvents.lastUpdate).getTime()) < 60000;
+      
+      setSubscriptionConnectionStatus(prev => {
+        const newRetryCount = isActive ? 0 : prev.retryCount + 1;
+        
+        if (!isActive && newRetryCount < 3) {
+        }
+        
+        return {
+          connected: isActive,
+          lastConnectionCheck: now,
+          retryCount: newRetryCount
+        };
+      });
+    };
+
+    const intervalId = setInterval(checkSubscriptionStatus, 10000);
+    
+    checkSubscriptionStatus();
+
+    return () => clearInterval(intervalId);
+  }, [chainId, subscriptionStatus.gmEvents.error, subscriptionStatus.gmEvents.lastUpdate]);
+
   const { data: gmEventsSubscriptionData, loading: gmEventsLoading, error: gmEventsError } = useSubscription(SUBSCRIBE_GM_EVENTS, {
-    variables: { chainId: chainId },
-    skip: !chainId,
+    variables: { chainId: queryChainId },
+    skip: !isValidChainId(queryChainId),
+    shouldResubscribe: false,
     onData: ({ data }) => {
+      
       if (data) {
         setSubscriptionStatus(prev => ({
           ...prev,
@@ -102,100 +169,76 @@ const GMOperations = ({
         }));
         
         try {
-          if (data.data && data.data.notifications) {
-            const notifications = data.data.notifications;
-            
-            if (notifications.reason && notifications.reason.NewBlock) {
-              // 新区块时，更新所有相关数据
-              refetch();
-              refetchStreamEvents();
-              refetchLeaderboard && refetchLeaderboard();
-              
-              if (currentAccount) {
-                refetchWalletMessages && refetchWalletMessages();
-                refetchGmRecord && refetchGmRecord();
-                refetchCooldownCheck && refetchCooldownCheck();
-              }
-            }
-          } else if (typeof data === 'string') {
-            const parsedData = JSON.parse(data);
-            
-            if (parsedData.sender && parsedData.recipient) {
-              let timestamp = parsedData.timestamp || Date.now() * 1000;
-              
-              if (timestamp < Date.now()) {
-                timestamp = timestamp * 1000;
-              }
-              
-              setSubscriptionData(prev => {
-                const newEvent = {
-                  type: 'gm_event',
-                  sender: parsedData.sender,
-                  recipient: parsedData.recipient,
-                  timestamp: timestamp,
-                  content: parsedData.content || 'Gmicrochains'
-                };
-                
-                const updatedData = {
-                  ...prev,
-                  gmEvents: [...prev.gmEvents, newEvent]
-                };
-                return updatedData;
-              });
-              
-              // 新事件时，更新所有相关数据
-              refetch();
-              refetchStreamEvents();
-              refetchLeaderboard && refetchLeaderboard();
-              
-              if (currentAccount) {
-                refetchWalletMessages && refetchWalletMessages();
-                refetchGmRecord && refetchGmRecord();
-                refetchCooldownCheck && refetchCooldownCheck();
-              }
-            }
-          } else if (data.sender && data.recipient) {
-            let timestamp = data.timestamp || Date.now() * 1000;
-            
-            if (timestamp < Date.now()) {
-              timestamp = timestamp * 1000;
-            }
-            
-            setSubscriptionData(prev => {
-              const newEvent = {
-                type: 'gm_event',
-                sender: data.sender,
-                recipient: data.recipient,
-                timestamp: timestamp,
-                content: data.content || 'Gmicrochains'
-              };
-              
-              const updatedData = {
-              ...prev,
-              gmEvents: [...prev.gmEvents, newEvent]
-            };
-              return updatedData;
-            });
-            
-            // 新事件时，更新所有相关数据
-            refetch();
-            refetchStreamEvents();
-            refetchLeaderboard && refetchLeaderboard();
-            
-            if (currentAccount) {
-              refetchWalletMessages && refetchWalletMessages();
-              refetchGmRecord && refetchGmRecord();
-              refetchCooldownCheck && refetchCooldownCheck();
-            }
-          } else {
-            refetch();
-            refetchStreamEvents();
-            refetchLeaderboard && refetchLeaderboard();
+          const notificationData = data?.data?.notifications || data?.notifications;
+          
+          if (!notificationData) {
+            return;
           }
+          
+          const blockInfo = notificationData?.reason?.NewBlock;
+          const blockHeight = blockInfo?.height;
+          const blockHash = blockInfo?.hash;
+          
+          if (!blockHeight || !blockHash) {
+            return;
+          }
+          
+          const eventId = `block-${blockHeight}-${blockHash.substring(0, 16)}`;
+          
+          if (processedEventIds.has(eventId)) {
+            console.log('Skipping duplicate subscription event:', eventId);
+            return;
+          }
+          
+          setProcessedEventIds(prev => {
+            const newSet = new Set([...prev, eventId]);
+            if (newSet.size > 100) {
+              const array = Array.from(newSet);
+              return new Set(array.slice(-50));
+            }
+            return newSet;
+          });
+          
+          const currentTime = Date.now();
+          
+          setSubscriptionData(prev => ({
+            ...prev,
+            gmEvents: [...prev.gmEvents, {
+              blockHeight,
+              blockHash,
+              timestamp: Date.now(),
+              type: 'new_block'
+            }]
+          }));
+          
+          setSubscriptionStatus(prev => ({
+            ...prev,
+            gmEvents: {
+              ...prev.gmEvents,
+              internalRefresh: true,
+              lastUpdate: new Date().toISOString()
+            }
+          }));
+          
+          console.log('New subscription event:', eventId);
+
+          if (refetchGmEvents) refetchGmEvents();
+          if (refetchStreamEvents) refetchStreamEvents();
+          if (refetchWalletMessages) refetchWalletMessages();
+          if (refetch) refetch(); 
+          
+          setTimeout(() => {
+            setSubscriptionStatus(prev => ({
+              ...prev,
+              gmEvents: {
+                ...prev.gmEvents,
+                internalRefresh: false
+              }
+            }));
+          }, 100);
+          
         } catch (error) {
-          refetch();
-          refetchStreamEvents();
-          refetchLeaderboard && refetchLeaderboard();
+          console.error('Subscription event processing failed:', error);
         }
       }
     },
@@ -208,21 +251,34 @@ const GMOperations = ({
           error: error.message
         }
       }));
-      setTimeout(() => {
-        refetch();
-        refetchStreamEvents();
-        refetchLeaderboard && refetchLeaderboard();
-      }, 5000);
     }
   });
 
+  useEffect(() => {
+    if (gmEventsError) {
+      const retryTimeout = setTimeout(() => {
+        if (chainId && subscriptionConnectionStatus.retryCount < 5) {
+        }
+      }, 5000);
+
+      return () => clearTimeout(retryTimeout);
+    }
+  }, [gmEventsError, chainId, subscriptionConnectionStatus.retryCount]);
+
   const { data, refetch, error: queryError, loading } = useQuery(GET_GM_STATS, {
-    variables: { chainId: currentChainId || chainId, owner: currentAccount ? formatAccountOwner(currentAccount) : null },
+    variables: { chainId: queryChainId, owner: currentAccount ? formatAccountOwner(currentAccount) : null },
     fetchPolicy: "no-cache",
-    skip: !currentChainId,
+    skip: !isValidChainId(queryChainId),
+
     onCompleted: (data) => {
     },
+    
     onError: (err) => {
+      if (err.message && err.message.includes('Failed to parse')) {
+        console.warn('ChainId parsing error, skipping retry:', err.message);
+        return;
+      }
+      
       if (err.networkError?.statusCode === 500 && queryRetryCount < 3) {
         setTimeout(() => {
           setQueryRetryCount((prev) => prev + 1);
@@ -252,11 +308,11 @@ const GMOperations = ({
 
   const { data: leaderboardData, refetch: refetchLeaderboard } = useQuery(GET_LEADERBOARD, {
     variables: { limit: 15 },
-    fetchPolicy: "cache-first",
+    fetchPolicy: "cache-only",
   });
 
   const { data: cooldownStatusData, refetch: refetchCooldownStatus } = useQuery(GET_COOLDOWN_STATUS, {
-    fetchPolicy: "no-cache",
+    fetchPolicy: "cache-first", 
   });
 
   const { data: whitelistData, refetch: refetchWhitelist } = useQuery(IS_USER_WHITELISTED, {
@@ -281,27 +337,79 @@ const GMOperations = ({
     fetchPolicy: "no-cache",
   });
 
-  const { data: streamEventsData, refetch: refetchStreamEvents } = useQuery(GET_STREAM_EVENTS, {
+  const { data: streamEventsData, refetch: refetchStreamEvents, error: streamEventsError } = useQuery(GET_STREAM_EVENTS, {
     variables: { 
-      chainId: chainId
+      chainId: queryChainId,
+      limit: 100
     },
-    skip: !chainId,
-    fetchPolicy: "no-cache",
+    skip: !isValidChainId(queryChainId),
+    fetchPolicy: "cache-first",
+
   });
 
+  const filterNewEvents = useCallback((events) => {
+    if (!events || !Array.isArray(events) || pageLoadTime === 0) {
+      return [];
+    }
+    
+    return events.filter(event => {
+      if (!event || !event.timestamp) return false;
+      
+      const eventTime = event.timestamp > 1000000000000 ? event.timestamp : event.timestamp * 1000;
+      return eventTime > pageLoadTime;
+    });
+  }, [pageLoadTime]);
+
+  const filteredGmEvents = useMemo(() => {
+    if (!gmEventsData?.getGmEvents) return [];
+    return filterNewEvents(gmEventsData.getGmEvents);
+  }, [gmEventsData, filterNewEvents]);
+
+  const filteredStreamEvents = useMemo(() => {
+    if (!streamEventsData?.getStreamEvents) return [];
+    return filterNewEvents(streamEventsData.getStreamEvents);
+  }, [streamEventsData, filterNewEvents]);
+
   const [sendGm] = useMutation(SEND_GM, {
-    onCompleted: (data) => onMutationComplete(data, 'sendGM'),
+    onCompleted: (data) => {
+      const result = typeof data === 'string' ? { hash: data } : data;
+      onMutationComplete(result, 'sendGM');
+    },
     onError: onMutationError,
+    update: () => {},
+    errorPolicy: 'ignore',
+    fetchPolicy: 'no-cache',
+    context: {
+      fetchOptions: {
+        useGETForQueries: false,
+      },
+    },
   });
 
   const [sendGmTo] = useMutation(SEND_GM_TO, {
-    onCompleted: (data) => onMutationComplete(data, 'sendGM'),
+    onCompleted: (data) => {
+      const result = typeof data === 'string' ? { hash: data } : data;
+      onMutationComplete(result, 'sendGM');
+    },
     onError: onMutationError,
+    update: () => {},
+    errorPolicy: 'ignore',
+    fetchPolicy: 'no-cache',
+    context: {
+      fetchOptions: {
+        useGETForQueries: false,
+      },
+    },
   });
 
   const [sendGmWithInvitation] = useMutation(SEND_GM_WITH_INVITATION, {
-    onCompleted: (data) => onMutationComplete(data, 'sendGM'),
+    onCompleted: (data) => {
+      const result = typeof data === 'string' ? { hash: data } : data;
+      onMutationComplete(result, 'sendGM');
+    },
     onError: onMutationError,
+    update: () => {},
+    errorPolicy: 'ignore',
   });
 
   const [claimInvitationRewards] = useMutation(CLAIM_INVITATION_REWARDS, {
@@ -315,14 +423,16 @@ const GMOperations = ({
       setClaimStatus("error");
       setTimeout(() => setClaimStatus(null), 5000);
     },
+    update: () => {},
   });
 
   const [setCooldownEnabled] = useMutation(SET_COOLDOWN_ENABLED, {
     onCompleted: (data) => onMutationComplete(data, 'setCooldown'),
     onError: onMutationError,
+    update: () => {},
   });
 
-  const handleSendGM = useCallback(async () => {
+  const handleSendGM = useCallback(async (content = "Gmicrochains") => {
     if (!isValidAccountOwner(currentAccount)) {
       setMessage("Invalid wallet account", "error");
       setOperationStatus("error");
@@ -343,7 +453,7 @@ const GMOperations = ({
         variables: {
           chainId: targetChainId || currentChainId,
           sender: formatAccountOwner(currentAccount),
-          content: "Gmicrochains",
+          content: content,
         },
       });
     } catch (error) {
@@ -351,7 +461,7 @@ const GMOperations = ({
     }
   }, [currentAccount, currentChainId, targetChainId, sendGm, onMutationError, cooldownCheckData, setMessage]);
 
-  const handleSendGMTo = useCallback(async () => {
+  const handleSendGMTo = useCallback(async (content = "Gmicrochains") => {
     const formattedAddress = formatAccountOwner(recipientAddress);
     const formattedSender = formatAccountOwner(currentAccount);
     
@@ -382,7 +492,7 @@ const GMOperations = ({
           chainId: targetChainId || currentChainId,
           sender: formattedSender,
           recipient: formattedAddress,
-          content: "Gmicrochains",
+          content: content,
         },
       });
     } catch (error) {
@@ -390,7 +500,7 @@ const GMOperations = ({
     }
   }, [currentAccount, currentChainId, targetChainId, recipientAddress, sendGmTo, onMutationError, cooldownCheckData, setMessage]);
 
-  const handleSendGMToWithAddress = useCallback(async (address) => {
+  const handleSendGMToWithAddress = useCallback(async (address, content = "Gmicrochains") => {
     const formattedAddress = formatAccountOwner(address);
     const formattedSender = formatAccountOwner(currentAccount);
     
@@ -421,7 +531,7 @@ const GMOperations = ({
           chainId: targetChainId || currentChainId,
           sender: formattedSender,
           recipient: formattedAddress,
-          content: "Gmicrochains",
+          content: content,
         },
       });
     } catch (error) {
@@ -429,7 +539,7 @@ const GMOperations = ({
     }
   }, [currentAccount, currentChainId, targetChainId, sendGmTo, onMutationError, cooldownCheckData, setMessage]);
 
-  const handleSendGMWithInvitation = useCallback(async () => {
+  const handleSendGMWithInvitation = useCallback(async (content = "Gmicrochains") => {
     const formattedAddress = formatAccountOwner(recipientAddress);
     if (!isValidAccountOwner(formattedAddress)) {
       setMessage("Invalid recipient address (must be 0x followed by 64 or 40 hex characters)", "error");
@@ -457,7 +567,7 @@ const GMOperations = ({
           chainId: targetChainId || currentChainId,
           sender: currentAccount,
           recipient: formattedAddress,
-          content: "Gmicrochains",
+          content: content,
         },
       });
     } catch (error) {
@@ -487,18 +597,27 @@ const GMOperations = ({
     
     try {
       setOperationStatus("processing");
-      await setCooldownEnabled({
+      const result = await setCooldownEnabled({
         variables: {
           caller: formatAccountOwner(currentAccount),
           enabled: enabled,
         },
       });
       
-      refetchCooldownStatus && refetchCooldownStatus();
-      refetchCooldownCheck && refetchCooldownCheck();
+      if (result && result.data) {
+        refetchCooldownStatus && refetchCooldownStatus();
+        refetchCooldownCheck && refetchCooldownCheck();
+        setOperationStatus("success");
+      }
       
     } catch (error) {
-      onMutationError(error);
+      if (error && error.message && !error.message.includes('Mutation completed')) {
+        onMutationError(error);
+      } else {
+        refetchCooldownStatus && refetchCooldownStatus();
+        refetchCooldownCheck && refetchCooldownCheck();
+        setOperationStatus("success");
+      }
     }
   }, [currentAccount, setCooldownEnabled, onMutationError, setMessage, refetchCooldownStatus, refetchCooldownCheck]);
 
@@ -525,37 +644,16 @@ const GMOperations = ({
     return { isValid: true, error: "" };
   }, [currentAccount]);
 
-useEffect(() => {
-  const statusInterval = setInterval(() => {
-  }, 30000);
-  
-  return () => {
-    clearInterval(statusInterval);
-  };
-}, [subscriptionStatus, currentChainId, chainId, currentAccount, gmEventsLoading, gmEventsError]);
+
 
   return {
     data,
-    gmRecordData,
     walletMessagesData,
-    invitationStatsData,
-    leaderboardData,
-    cooldownStatusData,
-    cooldownCheckData,
-    whitelistData,
-    gmEventsData,
-    streamEventsData,
+    gmEventsData: filteredGmEvents,
+    streamEventsData: filteredStreamEvents,
     loading,
     queryError,    
-    subscriptionData,
-    subscriptionStatus,    
     refetch,
-    refetchGmRecord,
-    refetchWalletMessages,
-    refetchInvitationStats,
-    refetchLeaderboard,
-    refetchCooldownStatus,
-    refetchCooldownCheck,
     refetchGmEvents,
     refetchStreamEvents,    
     handleSendGM,
@@ -568,6 +666,147 @@ useEffect(() => {
     formatCooldown,
     isValidAccountOwner,
     formatAccountOwner
+  };
+};
+
+export const useGMAdditionalData = ({
+  chainId,
+  currentAccount,
+  currentChainId,
+  walletMode,
+  queryRetryCount,
+  setQueryRetryCount
+}) => {
+  const { data: gmRecordData, loading: gmRecordLoading, error: gmRecordError, refetch: refetchGmRecord } = useQuery(GET_GM_RECORD, {
+    variables: { 
+      owner: currentAccount,
+      chainId: chainId 
+    },
+    skip: !currentAccount || !chainId,
+    fetchPolicy: 'cache-and-network',
+    notifyOnNetworkStatusChange: true,
+    onError: (error) => {
+      console.error('Error fetching GM record:', error);
+      if (queryRetryCount < 3) {
+        setTimeout(() => {
+          setQueryRetryCount(prev => prev + 1);
+          refetchGmRecord();
+        }, 1000);
+      }
+    }
+  });
+
+  const { data: invitationStatsData, loading: invitationStatsLoading, error: invitationStatsError, refetch: refetchInvitationStats } = useQuery(GET_INVITATION_STATS, {
+    variables: { 
+      user: currentAccount,
+      chainId: chainId 
+    },
+    skip: !currentAccount || !chainId,
+    fetchPolicy: 'cache-and-network',
+    notifyOnNetworkStatusChange: true,
+    onError: (error) => {
+      console.error('Error fetching invitation stats:', error);
+      if (queryRetryCount < 3) {
+        setTimeout(() => {
+          setQueryRetryCount(prev => prev + 1);
+          refetchInvitationStats();
+        }, 1000);
+      }
+    }
+  });
+
+  const { data: leaderboardData, loading: leaderboardLoading, error: leaderboardError, refetch: refetchLeaderboard } = useQuery(GET_LEADERBOARD, {
+    variables: { 
+      limit: 15 
+    },
+    skip: false,
+    fetchPolicy: 'cache-and-network',
+    notifyOnNetworkStatusChange: true,
+    onError: (error) => {
+      console.error('Error fetching leaderboard:', error);
+      if (queryRetryCount < 3) {
+        setTimeout(() => {
+          setQueryRetryCount(prev => prev + 1);
+          refetchLeaderboard();
+        }, 1000);
+      }
+    }
+  });
+
+  const { data: cooldownStatusData, loading: cooldownStatusLoading, error: cooldownStatusError, refetch: refetchCooldownStatus } = useQuery(GET_COOLDOWN_STATUS, {
+    variables: { 
+      caller: currentAccount,
+      chainId: chainId 
+    },
+    skip: !currentAccount || !chainId,
+    fetchPolicy: 'cache-and-network',
+    notifyOnNetworkStatusChange: true,
+    onError: (error) => {
+      console.error('Error fetching cooldown status:', error);
+      if (queryRetryCount < 3) {
+        setTimeout(() => {
+          setQueryRetryCount(prev => prev + 1);
+          refetchCooldownStatus();
+        }, 1000);
+      }
+    }
+  });
+
+  const { data: cooldownCheckData, loading: cooldownCheckLoading, error: cooldownCheckError, refetch: refetchCooldownCheck } = useQuery(CHECK_COOLDOWN, {
+    variables: { 
+      user: currentAccount ? formatAccountOwner(currentAccount) : null 
+    },
+    skip: !currentAccount,
+    fetchPolicy: 'cache-and-network',
+    notifyOnNetworkStatusChange: true,
+    onError: (error) => {
+      console.error('Error checking cooldown:', error);
+      if (queryRetryCount < 3) {
+        setTimeout(() => {
+          setQueryRetryCount(prev => prev + 1);
+          refetchCooldownCheck();
+        }, 1000);
+      }
+    }
+  });
+
+  const { data: whitelistData, loading: whitelistLoading, error: whitelistError, refetch: refetchWhitelist } = useQuery(IS_USER_WHITELISTED, {
+    variables: { 
+      user: currentAccount,
+      chainId: chainId 
+    },
+    skip: !currentAccount || !chainId,
+    fetchPolicy: 'cache-and-network',
+    notifyOnNetworkStatusChange: true,
+    onError: (error) => {
+      console.error('Error checking whitelist:', error);
+      if (queryRetryCount < 3) {
+        setTimeout(() => {
+          setQueryRetryCount(prev => prev + 1);
+          refetchWhitelist();
+        }, 1000);
+      }
+    }
+  });
+
+  const loading = gmRecordLoading || invitationStatsLoading || leaderboardLoading || cooldownStatusLoading || cooldownCheckLoading || whitelistLoading;
+  const queryError = gmRecordError || invitationStatsError || leaderboardError || cooldownStatusError || cooldownCheckError || whitelistError;
+
+  return {
+    gmRecordData,
+    invitationStatsData,
+    leaderboardData,
+    cooldownStatusData,
+    cooldownCheckData,
+    whitelistData,
+    loading,
+    queryError,
+    refetchGmRecord,
+    refetchInvitationStats,
+    refetchLeaderboard,
+    refetchCooldownStatus,
+    refetchCooldownCheck,
+    refetchWhitelist
   };
 };
 

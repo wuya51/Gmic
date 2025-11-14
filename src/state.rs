@@ -1,4 +1,3 @@
-// state.rs
 use linera_sdk::views::{linera_views, MapView, RegisterView, RootView, View, ViewError};
 use linera_sdk::ViewStorageContext;
 use linera_sdk::linera_base_types::{AccountOwner, ChainId, Timestamp};
@@ -16,25 +15,20 @@ pub struct GmState {
     pub events: MapView<(ChainId, AccountOwner, Option<AccountOwner>), (u64, Option<String>)>,
     pub user_events: MapView<(ChainId, AccountOwner), Vec<(Option<AccountOwner>, u64, Option<String>)>>,
 
-    // Time-based statistics
     pub hourly_stats: MapView<(ChainId, u64), u64>,
     pub daily_stats: MapView<(ChainId, u64), u64>,
     pub monthly_stats: MapView<(ChainId, u64), u64>,
 
-    // Leaderboard caches
     pub top_users_cache: RegisterView<Vec<(AccountOwner, u64)>>,
     pub top_chains_cache: RegisterView<Vec<(ChainId, u64)>>,
     pub cache_timestamp: RegisterView<u64>,
 
-    // Invitation system fields
     pub invitations: MapView<AccountOwner, InvitationRecord>,
     pub invitation_stats: MapView<AccountOwner, InvitationStats>,
 
-    // 24-hour cooldown system
     pub cooldown_enabled: RegisterView<bool>,
     pub cooldown_whitelist: MapView<AccountOwner, bool>,
 
-    // Event streaming system
     pub stream_events: MapView<(ChainId, u64), String>,
 }
 
@@ -50,27 +44,16 @@ impl GmState {
     ) -> Result<(), ViewError> {
         let current_ts = timestamp.micros();
         if current_ts == 0 {
-            log::error!("Invalid timestamp (0)");
             return Err(ViewError::NotFound("Invalid timestamp value".to_string()));
         }
 
         self.last_gm.insert(&(chain_id, sender.clone()), current_ts)?;
         self.events.insert(&(chain_id, sender.clone(), recipient), (current_ts, content.clone()))?;
         
-        // Update user history
         let mut user_events = self.user_events.get(&(chain_id, sender.clone())).await?.unwrap_or_default();
         user_events.push((recipient.clone(), current_ts, content.clone()));
-        // Sort by timestamp in descending order (newest first)
         user_events.sort_by(|a, b| b.1.cmp(&a.1));
         self.user_events.insert(&(chain_id, sender.clone()), user_events)?;
-        
-        log::info!(
-            "Recorded GM event on chain {:?}: key={:?}, sender={:?}, recipient={:?}",
-            chain_id,
-            (chain_id, sender.clone(), recipient),
-            sender,
-            recipient
-        );
 
         let chain_count = self.chain_messages.get(&chain_id).await?.unwrap_or(0);
         self.chain_messages.insert(&chain_id, chain_count + 1)?;
@@ -80,13 +63,11 @@ impl GmState {
 
         let total = self.total_messages.get();
         let new_total = total + 1;
-        log::info!("Updated total messages from {} to {}", total, new_total);
         self.total_messages.set(new_total);
 
         self.update_time_statistics(chain_id, current_ts).await?;
 
         self.save().await?;
-        log::info!("GM state saved successfully");
 
         Ok(())
     }
@@ -270,7 +251,6 @@ impl GmState {
         chain_id: ChainId,
         sender: &AccountOwner,
     ) -> Result<Vec<(Option<AccountOwner>, u64, Option<String>)>, ViewError> {
-        // Get all events for the user from user_events field
         let events = self.user_events.get(&(chain_id, *sender)).await?.unwrap_or_default();
         Ok(events)
     }
@@ -519,32 +499,12 @@ impl GmState {
 
         let event_json = event_data.to_string();
 
-        log::info!(
-            "🎯 Storing event to stream_events - chain_id={:?}, timestamp={}, sender={:?}, recipient={:?}",
-            chain_id,
-            timestamp,
-            sender,
-            recipient
-        );
-
         self.stream_events.insert(&(chain_id, timestamp), event_json)?;
 
         let mut user_events = self.user_events.get(&(chain_id, sender.clone())).await?.unwrap_or_default();
         user_events.push((recipient.clone(), timestamp, content.clone()));
-        // Sort by timestamp in descending order (newest first)
         user_events.sort_by(|a, b| b.1.cmp(&a.1));
         self.user_events.insert(&(chain_id, sender.clone()), user_events)?;
-
-        if let Some(stored_event) = self.stream_events.get(&(chain_id, timestamp)).await? {
-            log::info!(
-                "✅ Event stored successfully in stream_events: chain_id={:?}, timestamp={}, content: {}",
-                chain_id,
-                timestamp,
-                stored_event
-            );
-        } else {
-            log::error!("❌ Failed to read back the event just stored");
-        }
 
         Ok(())
     }

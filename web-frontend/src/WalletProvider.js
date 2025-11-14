@@ -121,7 +121,6 @@ export const useWallet = () => {
 };
 
 export const WalletProvider = ({ children, appChainId }) => {
-  // 钱包状态缓存
   const WALLET_CACHE_KEY = 'gm_wallet_cache';
   
   const getCachedWalletState = () => {
@@ -165,8 +164,21 @@ export const WalletProvider = ({ children, appChainId }) => {
   const [error, setError] = useState(null);
   const [walletType, setWalletType] = useState(cachedState?.walletType || null);
   
-  // Dynamic钱包相关状态
+  useEffect(() => {
+    const checkInitialConnection = async () => {
+      if (cachedState && cachedState.isConnected) {
+        return;
+      }
+      await checkConnection();
+    };
+    
+    checkInitialConnection();
+  }, []);
+  
   const { primaryWallet, handleLogOut } = useDynamicContext();
+  
+  const isDynamicConnected = (primaryWallet && primaryWallet.address) || (walletType === 'dynamic' && isConnected);
+  const isActiveDynamicWallet = isConnected && walletType === 'dynamic' && account;
   const reconnectTimeoutRef = useRef(null);
   const lastConnectionCheckRef = useRef(0);
 
@@ -209,7 +221,6 @@ export const WalletProvider = ({ children, appChainId }) => {
         throw new Error('User rejected the request or no accounts available');
       }
 
-      // 处理多个账户 - 使用第一个账户
       const selectedAccount = accounts[0];
       const formattedAccount = getFormattedAccount(selectedAccount);
       
@@ -225,7 +236,6 @@ export const WalletProvider = ({ children, appChainId }) => {
   let walletChainIdValue;
   try {
     if (walletTypeToConnect === 'linera') {
-      // 使用更新后的getLineraChainId函数获取Linera钱包的chainId
       const lineraProvider = window.linera || provider;
       walletChainIdValue = await getLineraChainId(lineraProvider);
     } else if (walletTypeToConnect === 'dynamic') {
@@ -235,22 +245,14 @@ export const WalletProvider = ({ children, appChainId }) => {
     }
     setWalletChainId(walletChainIdValue);
   } catch (chainError) {
-    console.warn('Failed to get chainId, using default:', chainError);
     walletChainIdValue = '1';
     setWalletChainId(walletChainIdValue);
   }
 
-      // 设置最终链ID
       if (shouldUseAppChainId(walletTypeToConnect, appChainId)) {
     setChainId(appChainId);
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`${walletTypeToConnect} wallet connected: ${formattedAccount}, Using app chain ID: ${appChainId} instead of wallet chain ID: ${walletChainIdValue}`);
-    }
   } else {
     setChainId(walletChainIdValue);
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`${walletTypeToConnect} wallet connected: ${formattedAccount}, Chain ID: ${walletChainIdValue}`);
-    }
   }
 
       // 缓存钱包状态
@@ -261,6 +263,9 @@ export const WalletProvider = ({ children, appChainId }) => {
         walletChainId: walletChainIdValue,
         walletType: walletTypeToConnect
       });
+
+      // 输出钱包连接日志
+      console.log(`Wallet connected: ${walletTypeToConnect} wallet, Address: ${formattedAccount}, Chain ID: ${walletChainIdValue}`);
 
       return { account: formattedAccount, chainId: walletChainIdValue };
     } catch (error) {
@@ -274,7 +279,7 @@ export const WalletProvider = ({ children, appChainId }) => {
 
   useEffect(() => {
     const now = Date.now();
-    if (now - lastConnectionCheckRef.current < 1000) {
+    if (now - lastConnectionCheckRef.current < 5000) {
       return;
     }
     lastConnectionCheckRef.current = now;
@@ -325,17 +330,20 @@ export const WalletProvider = ({ children, appChainId }) => {
   const checkConnection = useCallback(async () => {
     // 检查缓存状态
     const now = Date.now();
-    if (now - lastConnectionCheckRef.current < 2000) {
+    if (now - lastConnectionCheckRef.current < 5000) {
       return;
     }
     lastConnectionCheckRef.current = now;
     
-    if (cachedState && cachedState.isConnected) {
-      setAccount(cachedState.account);
+    // 重新获取缓存状态，确保获取最新状态
+    const currentCachedState = getCachedWalletState();
+    if (currentCachedState && currentCachedState.isConnected) {
+      setAccount(currentCachedState.account);
       setIsConnected(true);
-      setChainId(cachedState.chainId);
-      setWalletChainId(cachedState.walletChainId);
-      setWalletType(cachedState.walletType);
+      setChainId(currentCachedState.chainId);
+      setWalletChainId(currentCachedState.walletChainId);
+      setWalletType(currentCachedState.walletType);
+      console.log('Wallet state restored from cache:', currentCachedState);
       return;
     }
     
@@ -477,14 +485,12 @@ export const WalletProvider = ({ children, appChainId }) => {
     }
   };
 
-  // 断开钱包连接
   const disconnectWallet = useCallback(() => {
     setAccount(null);
     setIsConnected(false);
-    setChainId(appChainId || null); // 恢复为应用链ID
+    setChainId(appChainId || null);
     setWalletChainId(null);
     setError(null);
-    console.log('Wallet disconnected');
   }, [appChainId]);
 
   // 切换账户处理
@@ -563,7 +569,10 @@ export const WalletProvider = ({ children, appChainId }) => {
     setError,
     connectWallet,
     disconnectWallet,
-    checkConnection
+    checkConnection,
+    // Dynamic钱包状态
+    isDynamicConnected: primaryWallet && primaryWallet.address,
+    isActiveDynamicWallet: isConnected && walletType === 'dynamic' && account
   };
 
   return (

@@ -1,6 +1,5 @@
 import { gql } from '@apollo/client';
 
-// Queries
 export const GET_GM_STATS = gql`
   query GetGmStats($chainId: ChainId!) {
     totalMessages: getTotalMessages
@@ -88,7 +87,6 @@ export const GET_STREAM_EVENTS = gql`
   }
 `;
 
-// 订阅查询 - 应用服务使用智能轮询策略
 export const SUBSCRIBE_GM_EVENTS = gql`
   subscription SubscribeGmEvents($chainId: ChainId!) {
     notifications(chainId: $chainId)

@@ -9,7 +9,6 @@ import { WalletProvider } from './WalletProvider';
 import { DynamicContextProvider } from '@dynamic-labs/sdk-react-core';
 import { EthereumWalletConnectors } from '@dynamic-labs/ethereum';
 
-// 错误边界组件
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -64,7 +63,6 @@ root.render(
   </React.StrictMode>
 );
 
-// 默认应用组件，使用默认参数加载应用
 function DefaultGraphQLApp() {
   // 使用默认参数，与nginx配置中的参数保持一致
   const CHAIN_ID = "5babbf494cbc90185102b731daa36a117dec5565497b0d80dd8bae0cb10ddaaa";
@@ -74,13 +72,6 @@ function DefaultGraphQLApp() {
   const HOST = "gmic.top";
   
   try {
-    console.log('🔧 应用配置 (默认):', {
-      chainId: CHAIN_ID,
-      applicationId: APP_ID,
-      ownerId: OWNER_ID,
-      port: PORT,
-      host: HOST
-    });
     
     return (
       <ErrorBoundary>
@@ -150,14 +141,6 @@ function GraphQLApp() {
     const OWNER_ID = searchParams.get("owner") || import.meta.env.VITE_OWNER_ID;
     const PORT = searchParams.get("port") || import.meta.env.VITE_PORT || "8080";
     const HOST = searchParams.get("host") || import.meta.env.VITE_HOST || "localhost";
-    
-    console.log('🔧 应用配置:', {
-      chainId: CHAIN_ID,
-      applicationId: APP_ID,
-      ownerId: OWNER_ID,
-      port: PORT,
-      host: HOST
-    });
     
     return (
       <ErrorBoundary>

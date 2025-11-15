@@ -378,42 +378,7 @@ body {
   animation: pulse 1.5s infinite;
 }
 
-.message-preview {
-  padding: 1rem;
-  background: linear-gradient(135deg, #f8f9fa, #f1f3f4);
-  border-radius: 12px;
-  border-left: 4px solid #ff2a00;
-  font-style: italic;
-  color: #555;
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s ease;
-}
 
-.message-preview::before {
-  content: '"';
-  position: absolute;
-  top: 0;
-  left: 8px;
-  font-size: 2rem;
-  color: rgba(255, 42, 0, 0.2);
-  font-family: Georgia, serif;
-}
-
-.message-preview::after {
-  content: '"';
-  position: absolute;
-  bottom: -10px;
-  right: 8px;
-  font-size: 2rem;
-  color: rgba(255, 42, 0, 0.2);
-  font-family: Georgia, serif;
-}
-
-.message-editor:focus-within .message-preview {
-  background: linear-gradient(135deg, #fff, #f8f9fa);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
 
 /* Toggle Switch Styles */
 .toggle-switch {
@@ -2509,15 +2474,6 @@ body {
   font-family: inherit;
   font-size: 0.9rem;
   resize: none;
-}
-
-.message-preview {
-  margin-top: 0.5rem;
-  padding: 0.5rem;
-  background-color: #f5f5f5;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  color: #666;
 }
 
 /* Input Group */

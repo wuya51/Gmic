@@ -215,6 +215,10 @@ function App({ chainId, appId, ownerId }) {
       const timer = setTimeout(() => {
         if (primaryWallet && primaryWallet.address && !isActiveDynamicWallet) {
           connectWallet('dynamic');
+          setTimeout(() => {
+            setForceUpdate(prev => prev + 1);
+            setForceUpdate(prev => prev + 1);
+          }, 300);
         }
       }, 500);
       
@@ -268,7 +272,8 @@ function App({ chainId, appId, ownerId }) {
       connectWallet,
       disconnectWallet,
       walletType,
-      isLoading
+      isLoading,
+      primaryWallet
     } = props;
     
     const isLineraConnected = currentIsConnected && walletType === 'linera';
@@ -320,6 +325,12 @@ function App({ chainId, appId, ownerId }) {
           addNotification('Linera wallet disconnected', 'info');
           await new Promise(resolve => setTimeout(resolve, 500));
         }
+        if (!isDynamicConnected && !isActiveDynamicWallet) {
+          await props.connectWallet('dynamic');
+          setTimeout(() => {
+            setForceUpdate(prev => prev + 1);
+          }, 200);
+        }
 
         setTimeout(() => {
           setForceUpdate(prev => prev + 1);
@@ -358,7 +369,8 @@ function App({ chainId, appId, ownerId }) {
             >
               <div className="wallet-address">
                 <span className="status-dot"></span>
-                {lineraAccount ? `${lineraAccount.slice(0, 6)}...${lineraAccount.slice(-4)}` : 'Connected'}
+                {lineraAccount ? `${lineraAccount.slice(0, 6)}...${lineraAccount.slice(-4)}` : 
+                 currentAccount ? `${currentAccount.slice(0, 6)}...${currentAccount.slice(-4)}` : 'Connected'}
               </div>
             </div>
           ) : (
@@ -373,7 +385,7 @@ function App({ chainId, appId, ownerId }) {
         </div>
         
         <div className="wallet-button-container">
-          {(currentIsConnected && walletType === 'dynamic') || (primaryWallet && primaryWallet.address) ? (
+          {(currentIsConnected && walletType === 'dynamic') || (primaryWallet && primaryWallet.address) || isDynamicConnected || isActiveDynamicWallet ? (
             <div 
               className="wallet-info-card dynamic clickable"
               onClick={handleDisconnectDynamicWalletClick}
@@ -382,7 +394,8 @@ function App({ chainId, appId, ownerId }) {
               <div className="wallet-address">
                 <span className="status-dot"></span>
                 {primaryWallet?.address ? `${formatAccountOwner(primaryWallet.address).slice(0, 6)}...${formatAccountOwner(primaryWallet.address).slice(-4)}` : 
-                 (currentAccount && (walletType === 'dynamic' || isDynamicConnected)) ? `${currentAccount.slice(0, 6)}...${currentAccount.slice(-4)}` : 'Connected'}
+                 (currentAccount && (walletType === 'dynamic' || isDynamicConnected || isActiveDynamicWallet)) ? `${currentAccount.slice(0, 6)}...${currentAccount.slice(-4)}` : 
+                 'Connected'}
               </div>
             </div>
           ) : (
@@ -411,14 +424,17 @@ function App({ chainId, appId, ownerId }) {
     refetchLeaderboard,
     onTabChange
   }) => {
+    const hasFetchedRef = useRef(false);
+    
     useEffect(() => {
-      if (showLeaderboard && (!leaderboardData?.getTopUsers || leaderboardData.getTopUsers.length === 0)) {
+      if (showLeaderboard && (!leaderboardData?.getTopUsers || leaderboardData.getTopUsers.length === 0) && !hasFetchedRef.current) {
         refetchLeaderboard && refetchLeaderboard();
+        hasFetchedRef.current = true;
       }
       if (onTabChange) {
         onTabChange();
       }
-    }, [showLeaderboard, leaderboardData, refetchLeaderboard, onTabChange]);
+    }, [showLeaderboard, refetchLeaderboard, onTabChange]); // 移除leaderboardData依赖
 
     const leaderboardItems = useMemo(() => {
       if (!leaderboardData?.getTopUsers || leaderboardData.getTopUsers.length === 0) {
@@ -495,12 +511,21 @@ function App({ chainId, appId, ownerId }) {
       </div>
     );
   }, (prevProps, nextProps) => {
-    return (
-      prevProps.showLeaderboard === nextProps.showLeaderboard &&
-      prevProps.leaderboardData === nextProps.leaderboardData &&
-      prevProps.currentAccount === nextProps.currentAccount &&
-      prevProps.isMobile === nextProps.isMobile
-    );
+    // 只有当实际数据内容变化时才重新渲染
+    const leaderboardDataChanged = 
+      prevProps.leaderboardData?.getTopUsers?.length !== nextProps.leaderboardData?.getTopUsers?.length ||
+      JSON.stringify(prevProps.leaderboardData?.getTopUsers) !== JSON.stringify(nextProps.leaderboardData?.getTopUsers);
+    
+    const showLeaderboardChanged = prevProps.showLeaderboard !== nextProps.showLeaderboard;
+    const currentAccountChanged = prevProps.currentAccount !== nextProps.currentAccount;
+    const isMobileChanged = prevProps.isMobile !== nextProps.isMobile;
+    
+    // 只有当关键props发生实质性变化时才重新渲染
+    if (leaderboardDataChanged || showLeaderboardChanged || currentAccountChanged || isMobileChanged) {
+      return false; // 返回false表示需要重新渲染
+    }
+    
+    return true; // 返回true表示不需要重新渲染
   });
   
   const handleConnectWallet = useCallback(async (newWalletType) => {
@@ -605,13 +630,16 @@ function App({ chainId, appId, ownerId }) {
     setTimeout(() => {
       if (gmOps) {
         gmOps.refetchWalletMessages && gmOps.refetchWalletMessages();
-        gmOps.refetchGmRecord && gmOps.refetchGmRecord();
         gmOps.refetchInvitationStats && gmOps.refetchInvitationStats();
         
         if (mutationType === 'sendGM') {
           previousEventCountRef.current = 0;
           gmOps.refetchStreamEvents && gmOps.refetchStreamEvents();
         }
+      }
+      
+      if (additionalData) {
+        additionalData.refetchGmRecord && additionalData.refetchGmRecord();
       }
     }, 1000);
   }, [addNotification]);
@@ -707,28 +735,30 @@ function App({ chainId, appId, ownerId }) {
       setMessage("Invalid account address", "error");
       return;
     }
+    console.log('Setting 24-hour limit status:', enabled ? 'enabled' : 'disabled');
 
     setOperationStatus("processing");
     
     try {
-      setLocalCooldownEnabled(enabled);
-      
       await gmOps.handleSetCooldownEnabled(enabled);
-      
-      gmOps.refetchCooldownStatus && gmOps.refetchCooldownStatus();
-      gmOps.refetchCooldownCheck && gmOps.refetchCooldownCheck();
-      
+      const statusResult = await (additionalData?.refetchCooldownStatus && additionalData.refetchCooldownStatus());
+      const remoteEnabled = statusResult?.data?.getCooldownStatus?.enabled;
+      if (typeof remoteEnabled === 'boolean') {
+        setLocalCooldownEnabled(remoteEnabled);
+      } else {
+        setLocalCooldownEnabled(enabled);
+      }
+      await (additionalData?.refetchCooldownCheck && additionalData.refetchCooldownCheck());
       setOperationStatus("success");
       setTimeout(() => setOperationStatus(null), 3000);
     } catch (error) {
-      setLocalCooldownEnabled(!enabled);
       addNotification(
         `Failed to ${enabled ? 'enable' : 'disable'} 24-hour limit: ${error.message}`,
         "error"
       );
       setOperationStatus("error");
     }
-  }, [currentAccount, setMessage, gmOps, additionalData, addNotification]);
+  }, [currentAccount, setMessage, addNotification]);
 
 
 
@@ -751,21 +781,23 @@ function App({ chainId, appId, ownerId }) {
           gmOps.refetchInvitationStats && gmOps.refetchInvitationStats();
         }, 100);
       }
-      
-      if (!gmOps.cooldownStatusData) {
-        setTimeout(() => {
-          if (gmOps.refetchCooldownStatus) {
-            gmOps.refetchCooldownStatus().then(() => {
-              const currentCooldownStatus = gmOps.cooldownStatusData?.getCooldownStatus?.enabled;
-              if (currentCooldownStatus !== undefined) {
-                setLocalCooldownEnabled(currentCooldownStatus);
+      const syncCooldownStatus = () => {
+        if (additionalData?.refetchCooldownStatus) {
+          additionalData.refetchCooldownStatus().then((res) => {
+            const currentCooldownStatus = res?.data?.getCooldownStatus?.enabled ?? additionalData.cooldownStatusData?.getCooldownStatus?.enabled;
+            if (typeof currentCooldownStatus === 'boolean') {
+              setLocalCooldownEnabled(currentCooldownStatus);
+              console.log('Syncing 24-hour limit status:', currentCooldownStatus ? 'ENABLED' : 'DISABLED');
             }
-            });
-          }
-        }, 200);
-      }
+          }).catch(error => {
+            console.error('Failed to sync 24-hour limit status:', error);
+          });
+        }
+      };
+
+      syncCooldownStatus();
     }
-  }, [currentAccount, currentChainId, gmOps]);
+  }, [currentAccount, currentChainId]);
 
   const processedEventsRef = useRef(new Set());
   const isFirstLoadRef = useRef(true);
@@ -845,12 +877,25 @@ function App({ chainId, appId, ownerId }) {
 
   const [lastProcessedSubscriptionTime, setLastProcessedSubscriptionTime] = useState(null);
   useEffect(() => {
-    const COOLDOWN_MS = 86_400_000_000;
+    const COOLDOWN_MS = 86_400_000;
     let intervalId;
-    if (localCooldownEnabled && gmOps.gmRecordData?.getGmRecord?.timestamp) {
-      const lastGm = Number(gmOps.gmRecordData?.getGmRecord?.timestamp);
+    
+    const isCooldownEnabled = additionalData.cooldownStatusData?.getCooldownStatus?.enabled;
+    const hasValidTimestamp = additionalData.gmRecordData?.getGmRecord?.timestamp;
+    
+    if (isCooldownEnabled && hasValidTimestamp) {
+      const timestamp = Number(additionalData.gmRecordData.getGmRecord.timestamp);
+      let lastGm;
+      if (timestamp > 1e12) {
+        lastGm = timestamp / 1000;
+      } else if (timestamp > 1e9) {
+        lastGm = timestamp * 1000;
+      } else {
+        lastGm = timestamp;
+      }
+      
       const updateCooldown = () => {
-        const currentTs = Date.now() * 1000;
+        const currentTs = Date.now();
         if (currentTs < lastGm + COOLDOWN_MS) {
           setCooldownRemaining(lastGm + COOLDOWN_MS - currentTs);
         } else {
@@ -866,7 +911,7 @@ function App({ chainId, appId, ownerId }) {
     }
 
     return () => clearInterval(intervalId);
-  }, [gmOps.gmRecordData, localCooldownEnabled]);
+  }, [additionalData.gmRecordData, additionalData.cooldownStatusData]);
 
   const isManualTargetChainChange = useRef(false);
   
@@ -900,7 +945,7 @@ function App({ chainId, appId, ownerId }) {
     gmOps.handleClaimInvitationRewards();
   }, [gmOps]);
 
-  const handleSendGM = useCallback(() => {
+  const handleSendGM = useCallback(async () => {
     if (!currentIsConnected) {
       if (window.linera) {
         connectWallet('linera');
@@ -916,14 +961,42 @@ function App({ chainId, appId, ownerId }) {
     }
     
     const messageContent = customMessageEnabled ? customMessage : null;
-    gmOps.handleSendGM(messageContent);
-  }, [currentIsConnected, connectWallet, gmOps, addNotification, customMessageEnabled, customMessage]);
+    await gmOps.handleSendGM(messageContent);
+    setTimeout(() => {
+      if (additionalData.refetchCooldownStatus) {
+        additionalData.refetchCooldownStatus();
+      }
+      if (additionalData.refetchGmRecord) {
+        additionalData.refetchGmRecord();
+      }
+      if (additionalData.refetchCooldownCheck) {
+        additionalData.refetchCooldownCheck();
+      }
+      if (gmOps.refetchWalletMessages) {
+        gmOps.refetchWalletMessages();
+      }
+    }, 1000);
+  }, [currentIsConnected, connectWallet, gmOps, addNotification, customMessageEnabled, customMessage, additionalData]);
 
   const handleSendGMTo = useCallback(async () => {
     const messageContent = customMessageEnabled ? customMessage : null;
     const formattedAddress = gmOps.formatAccountOwner(recipientAddress);
     await gmOps.handleSendGMToWithAddress(formattedAddress, messageContent);
-  }, [gmOps, customMessageEnabled, customMessage, recipientAddress]);
+    setTimeout(() => {
+      if (additionalData.refetchCooldownStatus) {
+        additionalData.refetchCooldownStatus();
+      }
+      if (additionalData.refetchGmRecord) {
+        additionalData.refetchGmRecord();
+      }
+      if (additionalData.refetchCooldownCheck) {
+        additionalData.refetchCooldownCheck();
+      }
+      if (gmOps.refetchWalletMessages) {
+        gmOps.refetchWalletMessages();
+      }
+    }, 1000);
+  }, [gmOps, customMessageEnabled, customMessage, recipientAddress, additionalData]);
 
   return (
     <ErrorBoundary>
@@ -971,6 +1044,7 @@ function App({ chainId, appId, ownerId }) {
             disconnectWallet={disconnectWallet}
             walletType={walletType}
             isLoading={walletLoading}
+            primaryWallet={primaryWallet}
           />
         </div>
       </header>
@@ -1057,19 +1131,19 @@ function App({ chainId, appId, ownerId }) {
                   <div className="cooldown-timer-container">
                     <div className="cooldown-timer-header">
                       <div className="cooldown-timer-label">Cooldown Timer</div>
-                      <div className="cooldown-timer-status" data-status={gmOps.cooldownStatusData?.getCooldownStatus?.enabled ? 'enabled' : 'disabled'}>
-                        {gmOps.cooldownStatusData?.getCooldownStatus?.enabled ? 'Enabled' : 'Disabled'}
+                      <div className="cooldown-timer-status" data-status={localCooldownEnabled ? 'enabled' : 'disabled'}>
+                        {localCooldownEnabled ? 'Enabled' : 'Disabled'}
                       </div>
                     </div>
                     <div className="cooldown-timer-bar">
                       <div className="cooldown-timer-track"></div>
                       <div 
-                        className={`cooldown-timer-fill ${gmOps.cooldownStatusData?.getCooldownStatus?.enabled ? 'active' : 'inactive'}`}
+                        className={`cooldown-timer-fill ${localCooldownEnabled ? 'active' : 'inactive'}`}
                         style={{
-                          width: gmOps.cooldownStatusData?.getCooldownStatus?.enabled 
-                            ? `${Math.max(0, Math.min(100, (cooldownRemaining / 86_400_000_000) * 100))}%`
+                          width: localCooldownEnabled 
+                            ? `${Math.max(0, Math.min(100, (cooldownRemaining / 86_400_000) * 100))}%`
                             : '100%',
-                          background: gmOps.cooldownStatusData?.getCooldownStatus?.enabled 
+                          background: localCooldownEnabled 
                             ? 'linear-gradient(90deg, #ff2a00, #ff6b6b)'
                             : '#4ade80'
                         }}
@@ -1080,7 +1154,7 @@ function App({ chainId, appId, ownerId }) {
               </>
             )}
         
-            {additionalData.whitelistData?.isUserWhitelisted && activeTab === 'settings' && (
+            {(additionalData.whitelistData?.isUserWhitelisted === true) && activeTab === 'settings' && (
               <div className="card cooldown-control-card">
                 <div className="section-header">
                   <h3>24-Hour Limit Control</h3>
@@ -1245,7 +1319,7 @@ function App({ chainId, appId, ownerId }) {
                     <div className="message-input-container">
                       <textarea 
                         id="customMessage" 
-                        placeholder="Enter your custom GMicrochains message..."
+                        placeholder="● Default: GMicrochains"
                         value={customMessage}
                         onChange={handleCustomMessageChange}
                         maxLength={MAX_MESSAGE_LENGTH}
@@ -1318,9 +1392,7 @@ function App({ chainId, appId, ownerId }) {
                         </div>
                       )}
                     </div>
-                    <div className="message-preview" id="messagePreview">
-                      Preview: {customMessageEnabled && customMessage ? customMessage : 'Gmicrochains'}
-                    </div>
+
                   </div>
                 </div>
 
@@ -1331,7 +1403,7 @@ function App({ chainId, appId, ownerId }) {
                       <input 
                         type="text" 
                         id="recipientAddress" 
-                        placeholder="0x..., leave empty to interact with Contract Owner"
+                        placeholder="0x..., Default to Contract Owner"
                         value={formatAccountOwner(recipientAddress)}
                         onChange={(e) => {
                           setRecipientAddress(e.target.value);
@@ -1368,7 +1440,7 @@ function App({ chainId, appId, ownerId }) {
                       ) : !gmOps.isValidAccountOwner(currentAccount) ? (
                         "🔒 Invalid account"
                       ) : localCooldownEnabled && cooldownRemaining > 0 ? (
-                        `⏳ ${gmOps.formatCooldown(cooldownRemaining)}`
+                        `🔓 ${gmOps.formatCooldown(cooldownRemaining)}`
                       ) : (
                         "Send GMicrochains ✨"
                       )}
@@ -1454,11 +1526,6 @@ function App({ chainId, appId, ownerId }) {
               isMobile={isMobile}
               copyToClipboard={copyToClipboard}
               refetchLeaderboard={additionalData.refetchLeaderboard}
-              onTabChange={() => {
-                if (!additionalData.leaderboardData?.getTopUsers || additionalData.leaderboardData.getTopUsers.length === 0) {
-                  additionalData.refetchLeaderboard && additionalData.refetchLeaderboard();
-                }
-              }}
             />
             <div className="card invitation-card">
               <div className="section-header">
@@ -1526,8 +1593,6 @@ function App({ chainId, appId, ownerId }) {
             </div>
           </>
         )}
-
-
 
       </header>
     </div>

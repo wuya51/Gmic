@@ -304,6 +304,7 @@ export const WalletProvider = ({ children, appChainId }) => {
           }, 500);
         } else if (account !== formattedAccount && account !== '已连接') {
           setAccount(formattedAccount);
+          setWalletType('dynamic'); // 确保设置正确的walletType
           cacheWalletState({
             account: formattedAccount,
             isConnected: true,
@@ -351,13 +352,7 @@ export const WalletProvider = ({ children, appChainId }) => {
     if (primaryWallet && primaryWallet.address) {
       try {
         await connectToWallet('dynamic', null, 'eth_requestAccounts');
-        cacheWalletState({
-          account: getFormattedAccount(primaryWallet.address),
-          isConnected: true,
-          chainId: appChainId || '1',
-          walletChainId: appChainId || '1',
-          walletType: 'dynamic'
-        });
+        // connectToWallet内部已经正确缓存了walletType，这里不需要重复缓存
         return;
       } catch (err) {
         if (process.env.NODE_ENV === 'development') {
@@ -375,13 +370,7 @@ export const WalletProvider = ({ children, appChainId }) => {
           // 获取Linera钱包的实际chainId
           const lineraChainId = await getLineraChainId(window.linera);
           await connectToWallet('linera', window.linera, 'eth_requestAccounts');
-          cacheWalletState({
-            account: getFormattedAccount(accounts[0]),
-            isConnected: true,
-            chainId: lineraChainId,
-            walletChainId: lineraChainId,
-            walletType: 'linera'
-          });
+          // connectToWallet内部已经正确缓存了walletType，这里不需要重复缓存
         }
       } catch (err) {
         if (process.env.NODE_ENV === 'development') {
@@ -406,6 +395,7 @@ export const WalletProvider = ({ children, appChainId }) => {
       if (primaryWallet && primaryWallet.address) {
         const formattedAccount = getFormattedAccount(primaryWallet.address);
         setAccount(formattedAccount);
+        setWalletType('dynamic'); // 确保设置正确的walletType
         cacheWalletState({
           account: formattedAccount,
           isConnected: true,
@@ -420,6 +410,7 @@ export const WalletProvider = ({ children, appChainId }) => {
           if (accounts.length > 0) {
             const formattedAccount = getFormattedAccount(accounts[0]);
             setAccount(formattedAccount);
+            setWalletType('linera'); // 确保设置正确的walletType
             cacheWalletState({
               account: formattedAccount,
               isConnected: true,

@@ -55,11 +55,10 @@ const formatAccountOwner = (address) => {
   return `0x${cleanAddress.toLowerCase()}`;
 };
 
-const formatCooldown = (remainingMicroseconds, returnObject = false) => {
-  if (!remainingMicroseconds || remainingMicroseconds <= 0) {
+const formatCooldown = (remainingMs, returnObject = false) => {
+  if (!remainingMs || remainingMs <= 0) {
     return returnObject ? { hours: 0, minutes: 0, seconds: 0 } : "Ready";
   }
-  const remainingMs = remainingMicroseconds / 1000;
   const hours = Math.floor(remainingMs / (1000 * 60 * 60));
   const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
   const seconds = Math.floor((remainingMs % (1000 * 60)) / 1000);
@@ -312,7 +311,7 @@ const GMOperations = ({
   });
 
   const { data: cooldownStatusData, refetch: refetchCooldownStatus } = useQuery(GET_COOLDOWN_STATUS, {
-    fetchPolicy: "cache-first", 
+    fetchPolicy: "network-only",
   });
 
   const { data: whitelistData, refetch: refetchWhitelist } = useQuery(IS_USER_WHITELISTED, {
@@ -604,18 +603,22 @@ const GMOperations = ({
         },
       });
       
-      if (result && result.data) {
-        refetchCooldownStatus && refetchCooldownStatus();
-        refetchCooldownCheck && refetchCooldownCheck();
-        setOperationStatus("success");
+      const success = result?.data?.setCooldownEnabled?.success === true;
+      if (!success) {
+        setMessage("Insufficient permissions: only whitelist addresses can set the 24-hour limit switch", "warning");
+        setOperationStatus("error");
+        return;
       }
+      await (refetchCooldownStatus && refetchCooldownStatus());
+      await (refetchCooldownCheck && refetchCooldownCheck());
+      setOperationStatus("success");
       
     } catch (error) {
       if (error && error.message && !error.message.includes('Mutation completed')) {
         onMutationError(error);
       } else {
-        refetchCooldownStatus && refetchCooldownStatus();
-        refetchCooldownCheck && refetchCooldownCheck();
+        await (refetchCooldownStatus && refetchCooldownStatus());
+        await (refetchCooldownCheck && refetchCooldownCheck());
         setOperationStatus("success");
       }
     }
@@ -679,7 +682,7 @@ export const useGMAdditionalData = ({
 }) => {
   const { data: gmRecordData, loading: gmRecordLoading, error: gmRecordError, refetch: refetchGmRecord } = useQuery(GET_GM_RECORD, {
     variables: { 
-      owner: currentAccount,
+      owner: currentAccount ? formatAccountOwner(currentAccount) : null,
       chainId: chainId 
     },
     skip: !currentAccount || !chainId,
@@ -698,7 +701,7 @@ export const useGMAdditionalData = ({
 
   const { data: invitationStatsData, loading: invitationStatsLoading, error: invitationStatsError, refetch: refetchInvitationStats } = useQuery(GET_INVITATION_STATS, {
     variables: { 
-      user: currentAccount,
+      user: currentAccount ? formatAccountOwner(currentAccount) : null,
       chainId: chainId 
     },
     skip: !currentAccount || !chainId,
@@ -719,36 +722,24 @@ export const useGMAdditionalData = ({
     variables: { 
       limit: 15 
     },
-    skip: false,
-    fetchPolicy: 'cache-and-network',
-    notifyOnNetworkStatusChange: true,
+    skip: false, // 默认启用查询，确保数据可用
+    fetchPolicy: 'cache-first',
+    notifyOnNetworkStatusChange: false,
+    pollInterval: 0,
+    nextFetchPolicy: 'cache-first',
     onError: (error) => {
       console.error('Error fetching leaderboard:', error);
-      if (queryRetryCount < 3) {
-        setTimeout(() => {
-          setQueryRetryCount(prev => prev + 1);
-          refetchLeaderboard();
-        }, 1000);
-      }
+      // 移除自动重试逻辑，避免持续轮询
     }
   });
 
   const { data: cooldownStatusData, loading: cooldownStatusLoading, error: cooldownStatusError, refetch: refetchCooldownStatus } = useQuery(GET_COOLDOWN_STATUS, {
-    variables: { 
-      caller: currentAccount,
-      chainId: chainId 
-    },
-    skip: !currentAccount || !chainId,
-    fetchPolicy: 'cache-and-network',
-    notifyOnNetworkStatusChange: true,
+    fetchPolicy: 'cache-first',
+    notifyOnNetworkStatusChange: false,
+    skip: false, // 始终查询，但使用缓存策略
     onError: (error) => {
       console.error('Error fetching cooldown status:', error);
-      if (queryRetryCount < 3) {
-        setTimeout(() => {
-          setQueryRetryCount(prev => prev + 1);
-          refetchCooldownStatus();
-        }, 1000);
-      }
+      // 移除自动重试逻辑，避免轮询
     }
   });
 
@@ -757,26 +748,22 @@ export const useGMAdditionalData = ({
       user: currentAccount ? formatAccountOwner(currentAccount) : null 
     },
     skip: !currentAccount,
-    fetchPolicy: 'cache-and-network',
-    notifyOnNetworkStatusChange: true,
+    fetchPolicy: 'cache-first',
+    notifyOnNetworkStatusChange: false,
+    pollInterval: 0,
+    nextFetchPolicy: 'cache-first',
     onError: (error) => {
       console.error('Error checking cooldown:', error);
-      if (queryRetryCount < 3) {
-        setTimeout(() => {
-          setQueryRetryCount(prev => prev + 1);
-          refetchCooldownCheck();
-        }, 1000);
-      }
+      // 移除自动重试逻辑，避免持续轮询
     }
   });
 
   const { data: whitelistData, loading: whitelistLoading, error: whitelistError, refetch: refetchWhitelist } = useQuery(IS_USER_WHITELISTED, {
     variables: { 
-      user: currentAccount,
-      chainId: chainId 
+      user: currentAccount ? formatAccountOwner(currentAccount) : null
     },
-    skip: !currentAccount || !chainId,
-    fetchPolicy: 'cache-and-network',
+    skip: !currentAccount,
+    fetchPolicy: 'network-only',
     notifyOnNetworkStatusChange: true,
     onError: (error) => {
       console.error('Error checking whitelist:', error);

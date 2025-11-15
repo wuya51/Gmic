@@ -479,3 +479,515 @@ Refer to docs https://vite.dev/config/server-options.html#server-fs-allow for co
 11:24:26 AM [vite] page reload src/App.js
 11:25:12 AM [vite] page reload src/App.js
 11:26:41 AM [vite] page reload src/App.js
+11:38:02 AM [vite] page reload src/App.js
+11:38:11 AM [vite] page reload src/App.js
+11:44:17 AM [vite] page reload src/App.js
+11:46:01 AM [vite] hmr update /src/App.css
+11:49:50 AM [vite] hmr update /src/App.css
+11:53:54 AM [vite] hmr update /src/App.css
+11:55:24 AM [vite] page reload src/App.js
+11:59:32 AM [vite] page reload src/App.js
+12:02:52 PM [vite] page reload src/App.js
+12:08:42 PM [vite] page reload src/App.js
+12:08:49 PM [vite] page reload src/App.js
+12:17:16 PM [vite] page reload src/WalletProvider.js
+12:20:20 PM [vite] page reload src/WalletProvider.js
+12:45:47 PM [vite] page reload src/WalletProvider.js
+12:46:08 PM [vite] page reload src/WalletProvider.js
+12:46:28 PM [vite] page reload src/WalletProvider.js
+12:55:51 PM [vite] page reload src/NotificationCenter.js
+12:59:15 PM [vite] page reload src/NotificationCenter.js
+12:59:40 PM [vite] page reload src/NotificationCenter.js
+1:03:09 PM [vite] page reload src/NotificationCenter.js
+1:03:10 PM [vite] Pre-transform error: Transform failed with 1 error:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:521:3: ERROR: Expected ")" but found ";"
+1:03:14 PM [vite] Internal server error: Transform failed with 1 error:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:521:3: ERROR: Expected ")" but found ";"
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:521:3
+  
+  Expected ")" but found ";"
+  519|      });
+  520|      startAutoHideTimer();
+  521|    };
+     |     ^
+  522|  
+  523|    const formatTimestamp = (timestamp) => {
+  
+      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
+      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
+      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
+      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
+      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
+      at Socket.emit (node:events:524:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
+1:03:15 PM [vite] Internal server error: Transform failed with 1 error:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:521:3: ERROR: Expected ")" but found ";"
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:521:3
+  
+  Expected ")" but found ";"
+  519|      });
+  520|      startAutoHideTimer();
+  521|    };
+     |     ^
+  522|  
+  523|    const formatTimestamp = (timestamp) => {
+  
+      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
+      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
+      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
+      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
+      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
+      at Socket.emit (node:events:524:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
+1:03:19 PM [vite] page reload src/NotificationCenter.js
+1:04:15 PM [vite] page reload src/NotificationCenter.js
+1:08:59 PM [vite] page reload src/NotificationCenter.js
+1:12:56 PM [vite] page reload src/NotificationCenter.js
+1:12:57 PM [vite] Pre-transform error: Transform failed with 1 error:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:324:8: ERROR: The symbol "showNotification" has already been declared
+1:13:02 PM [vite] Internal server error: Transform failed with 1 error:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:324:8: ERROR: The symbol "showNotification" has already been declared
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:324:8
+  
+  The symbol "showNotification" has already been declared
+  322|    };
+  323|  
+  324|    const showNotification = (recipientRecord, notificationId) => {
+     |          ^
+  325|      // 将新通知添加到队列
+  326|      setNotificationQueue(prevQueue => {
+  
+      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
+      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
+      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
+      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
+      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
+      at Socket.emit (node:events:524:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
+1:13:03 PM [vite] page reload src/NotificationCenter.js
+1:13:04 PM [vite] Pre-transform error: Transform failed with 2 errors:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:324:8: ERROR: The symbol "showNotification" has already been declared
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:844:0: ERROR: Unexpected "}"
+1:13:08 PM [vite] Internal server error: Transform failed with 2 errors:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:324:8: ERROR: The symbol "showNotification" has already been declared
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:844:0: ERROR: Unexpected "}"
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:324:8
+  
+  The symbol "showNotification" has already been declared
+  322|    };
+  323|  
+  324|    const showNotification = (recipientRecord, notificationId) => {
+     |          ^
+  325|      // 将新通知添加到队列
+  326|      setNotificationQueue(prevQueue => {
+  
+  Unexpected "}"
+  842|      </>
+  843|    );
+  844|  };
+     |  ^
+  845|  
+  846|  export default NotificationCenter;
+  
+      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
+      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
+      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
+      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
+      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
+      at Socket.emit (node:events:524:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
+1:13:09 PM [vite] Internal server error: Transform failed with 2 errors:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:324:8: ERROR: The symbol "showNotification" has already been declared
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:844:0: ERROR: Unexpected "}"
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:324:8
+  
+  The symbol "showNotification" has already been declared
+  322|    };
+  323|  
+  324|    const showNotification = (recipientRecord, notificationId) => {
+     |          ^
+  325|      // 将新通知添加到队列
+  326|      setNotificationQueue(prevQueue => {
+  
+  Unexpected "}"
+  842|      </>
+  843|    );
+  844|  };
+     |  ^
+  845|  
+  846|  export default NotificationCenter;
+  
+      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
+      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
+      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
+      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
+      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
+      at Socket.emit (node:events:524:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
+1:14:31 PM [vite] page reload src/NotificationCenter.js
+1:14:33 PM [vite] Pre-transform error: Transform failed with 1 error:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:822:0: ERROR: Unexpected "}"
+1:14:37 PM [vite] Internal server error: Transform failed with 1 error:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:822:0: ERROR: Unexpected "}"
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:822:0
+  
+  Unexpected "}"
+  820|      </>
+  821|    );
+  822|  };
+     |  ^
+  823|  
+  824|  export default NotificationCenter;
+  
+      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
+      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
+      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
+      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
+      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
+      at Socket.emit (node:events:524:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
+1:14:39 PM [vite] Internal server error: Transform failed with 1 error:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:822:0: ERROR: Unexpected "}"
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:822:0
+  
+  Unexpected "}"
+  820|      </>
+  821|    );
+  822|  };
+     |  ^
+  823|  
+  824|  export default NotificationCenter;
+  
+      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
+      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
+      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
+      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
+      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
+      at Socket.emit (node:events:524:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
+1:14:41 PM [vite] page reload src/NotificationCenter.js
+1:17:12 PM [vite] page reload src/NotificationCenter.js
+1:17:13 PM [vite] Pre-transform error: Transform failed with 1 error:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:822:0: ERROR: Unexpected "export"
+1:17:17 PM [vite] Internal server error: Transform failed with 1 error:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:822:0: ERROR: Unexpected "export"
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:822:0
+  
+  Unexpected "export"
+  820|  };
+  821|  
+  822|  export default NotificationCenter;
+     |  ^
+  
+      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
+      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
+      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
+      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
+      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
+      at Socket.emit (node:events:524:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
+1:17:18 PM [vite] Internal server error: Transform failed with 1 error:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:822:0: ERROR: Unexpected "export"
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/NotificationCenter.js:822:0
+  
+  Unexpected "export"
+  820|  };
+  821|  
+  822|  export default NotificationCenter;
+     |  ^
+  
+      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
+      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
+      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
+      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
+      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
+      at Socket.emit (node:events:524:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
+1:17:20 PM [vite] page reload src/NotificationCenter.js
+1:18:46 PM [vite] page reload src/NotificationCenter.js
+1:23:27 PM [vite] page reload src/NotificationCenter.js
+1:27:26 PM [vite] page reload src/NotificationCenter.js
+1:27:49 PM [vite] page reload src/NotificationCenter.js
+1:31:23 PM [vite] page reload src/NotificationCenter.js
+1:31:32 PM [vite] page reload src/NotificationCenter.js
+1:35:05 PM [vite] page reload src/NotificationCenter.js
+1:35:30 PM [vite] page reload src/NotificationCenter.js
+1:38:10 PM [vite] page reload src/NotificationCenter.js
+1:38:52 PM [vite] page reload src/NotificationCenter.js
+3:11:14 PM [vite] page reload src/App.js
+3:20:54 PM [vite] page reload src/App.js
+3:26:31 PM [vite] page reload src/App.js
+3:34:07 PM [vite] page reload src/App.js
+3:34:51 PM [vite] page reload src/App.js
+3:37:28 PM [vite] page reload src/App.js
+3:38:20 PM [vite] page reload src/App.js
+3:39:15 PM [vite] page reload src/App.js
+3:40:14 PM [vite] page reload src/App.js
+3:55:49 PM [vite] page reload src/App.js
+3:55:58 PM [vite] page reload src/App.js
+3:56:08 PM [vite] page reload src/App.js
+4:11:28 PM [vite] hmr update /src/App.css
+4:11:57 PM [vite] hmr update /src/App.css
+The request url "/root/linera-protocol/examples/gmic-buildathon/web-frontend/.env" is outside of Vite serving allow list.
+4:14:51 PM [vite] ws proxy socket error:
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:218:20)
+4:15:35 PM [vite] ws proxy socket error:
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:218:20)
+4:28:20 PM [vite] page reload src/App.js
+4:28:43 PM [vite] page reload src/App.js
+4:28:45 PM [vite] ws proxy socket error:
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:218:20)
+4:31:47 PM [vite] ws proxy socket error:
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:218:20)
+12:28:21 AM [vite] page reload src/GMOperations.js
+12:28:34 AM [vite] page reload src/GMOperations.js
+12:28:47 AM [vite] page reload src/App.js
+12:28:47 AM [vite] page reload src/App.js
+12:28:58 AM [vite] page reload src/App.js
+12:28:59 AM [vite] page reload src/App.js
+12:29:12 AM [vite] page reload src/App.js
+12:29:13 AM [vite] page reload src/App.js
+12:34:24 AM [vite] page reload src/NotificationCenter.js
+12:41:02 AM [vite] page reload src/GMOperations.js
+12:41:09 AM [vite] page reload src/App.js
+12:41:10 AM [vite] page reload src/App.js
+12:41:19 AM [vite] page reload src/App.js
+12:41:19 AM [vite] page reload src/App.js
+1:00:33 AM [vite] page reload src/NotificationCenter.js
+1:01:04 AM [vite] page reload src/App.js
+1:01:21 AM [vite] page reload src/App.js
+1:06:45 AM [vite] page reload src/App.js
+1:07:12 AM [vite] page reload src/App.js
+1:08:37 AM [vite] page reload src/App.js
+1:16:00 AM [vite] page reload src/App.js
+1:18:34 AM [vite] page reload src/App.js
+1:19:11 AM [vite] page reload src/App.js
+1:22:53 AM [vite] page reload src/App.js
+1:24:05 AM [vite] page reload src/App.js
+1:27:49 AM [vite] page reload src/App.js
+1:37:24 AM [vite] page reload src/App.js
+1:37:25 AM [vite] Pre-transform error: Transform failed with 1 error:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:1317:30: ERROR: Syntax error "\u{5c0f}"
+1:37:28 AM [vite] Internal server error: Transform failed with 1 error:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:1317:30: ERROR: Syntax error "\u{5c0f}"
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:1317:30
+  
+  Syntax error "\u{5c0f}"
+  1315|                            console.log('问题分析:', {
+  1316|                              白名单查询正常: !!additionalData.whitelistData,
+  1317|                              24小时开关状态查询异常: !gmOps.cooldownStatusData,
+     |                                ^
+  1318|                              GM记录查询异常: !gmOps.gmRecordData,
+  1319|                              冷却状态查询异常: !gmOps.cooldownCheckData,
+  
+      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
+      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
+      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
+      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
+      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
+      at Socket.emit (node:events:524:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
+1:37:29 AM [vite] Internal server error: Transform failed with 1 error:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:1317:30: ERROR: Syntax error "\u{5c0f}"
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:1317:30
+  
+  Syntax error "\u{5c0f}"
+  1315|                            console.log('问题分析:', {
+  1316|                              白名单查询正常: !!additionalData.whitelistData,
+  1317|                              24小时开关状态查询异常: !gmOps.cooldownStatusData,
+     |                                ^
+  1318|                              GM记录查询异常: !gmOps.gmRecordData,
+  1319|                              冷却状态查询异常: !gmOps.cooldownCheckData,
+  
+      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
+      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
+      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
+      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
+      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
+      at Socket.emit (node:events:524:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
+1:40:40 AM [vite] Internal server error: Transform failed with 1 error:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:1317:30: ERROR: Syntax error "\u{5c0f}"
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:1317:30
+  
+  Syntax error "\u{5c0f}"
+  1315|                            console.log('问题分析:', {
+  1316|                              白名单查询正常: !!additionalData.whitelistData,
+  1317|                              24小时开关状态查询异常: !gmOps.cooldownStatusData,
+     |                                ^
+  1318|                              GM记录查询异常: !gmOps.gmRecordData,
+  1319|                              冷却状态查询异常: !gmOps.cooldownCheckData,
+  
+      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
+      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
+      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
+      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
+      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
+      at Socket.emit (node:events:524:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
+1:43:17 AM [vite] Internal server error: Transform failed with 1 error:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:1317:30: ERROR: Syntax error "\u{5c0f}"
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:1317:30
+  
+  Syntax error "\u{5c0f}"
+  1315|                            console.log('问题分析:', {
+  1316|                              白名单查询正常: !!additionalData.whitelistData,
+  1317|                              24小时开关状态查询异常: !gmOps.cooldownStatusData,
+     |                                ^
+  1318|                              GM记录查询异常: !gmOps.gmRecordData,
+  1319|                              冷却状态查询异常: !gmOps.cooldownCheckData,
+  
+      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
+      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
+      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
+      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
+      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
+      at Socket.emit (node:events:524:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
+1:43:50 AM [vite] Internal server error: Transform failed with 1 error:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:1317:30: ERROR: Syntax error "\u{5c0f}"
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:1317:30
+  
+  Syntax error "\u{5c0f}"
+  1315|                            console.log('问题分析:', {
+  1316|                              白名单查询正常: !!additionalData.whitelistData,
+  1317|                              24小时开关状态查询异常: !gmOps.cooldownStatusData,
+     |                                ^
+  1318|                              GM记录查询异常: !gmOps.gmRecordData,
+  1319|                              冷却状态查询异常: !gmOps.cooldownCheckData,
+  
+      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
+      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
+      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
+      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
+      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
+      at Socket.emit (node:events:524:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
+1:44:35 AM [vite] page reload src/App.js
+1:53:44 AM [vite] page reload src/App.js
+1:53:52 AM [vite] page reload src/App.js
+1:54:10 AM [vite] page reload src/App.js
+1:54:44 AM [vite] page reload src/App.js
+1:56:20 AM [vite] page reload src/App.js
+1:56:33 AM [vite] page reload src/App.js
+1:57:08 AM [vite] page reload src/App.js
+1:57:37 AM [vite] page reload src/App.js
+1:58:57 AM [vite] page reload src/App.js
+1:59:33 AM [vite] page reload src/App.js
+2:01:44 AM [vite] page reload src/App.js
+2:02:05 AM [vite] page reload src/App.js
+2:03:41 AM [vite] page reload src/App.js
+6:59:06 AM [vite] page reload src/App.js
+6:59:12 AM [vite] page reload src/App.js
+7:04:54 AM [vite] page reload src/App.js
+7:21:44 AM [vite] page reload src/App.js
+7:21:53 AM [vite] page reload src/App.js
+7:23:56 AM [vite] page reload src/App.js
+7:25:42 AM [vite] page reload src/App.js
+7:31:48 AM [vite] page reload src/GMOperations.js
+7:34:19 AM [vite] page reload src/App.js
+7:36:27 AM [vite] page reload src/App.js
+7:38:52 AM [vite] page reload src/App.js
+7:44:55 AM [vite] page reload src/GMOperations.js
+7:48:26 AM [vite] page reload src/GMOperations.js
+8:06:13 AM [vite] page reload src/App.js
+8:11:05 AM [vite] page reload src/App.js
+8:18:42 AM [vite] page reload src/GMOperations.js
+8:18:56 AM [vite] page reload src/App.js
+8:21:02 AM [vite] page reload src/GMOperations.js
+8:22:04 AM [vite] page reload src/GMOperations.js
+8:23:49 AM [vite] page reload src/GMOperations.js
+8:24:48 AM [vite] page reload src/GMOperations.js
+8:28:39 AM [vite] page reload src/App.js
+8:33:53 AM [vite] page reload src/GMOperations.js
+8:34:17 AM [vite] page reload src/GMOperations.js
+8:41:48 AM [vite] page reload src/GMOperations.js
+8:43:56 AM [vite] page reload src/App.js
+8:44:01 AM [vite] page reload src/App.js
+8:48:16 AM [vite] page reload src/GMOperations.js
+8:56:50 AM [vite] page reload src/App.js
+8:57:18 AM [vite] page reload src/App.js
+9:21:11 AM [vite] page reload src/App.js
+9:24:53 AM [vite] page reload src/App.js
+9:25:35 AM [vite] page reload src/App.js
+9:28:52 AM [vite] page reload src/App.js
+9:31:18 AM [vite] page reload src/App.js
+9:36:39 AM [vite] page reload src/App.js
+9:36:47 AM [vite] page reload src/GMOperations.js
+9:37:25 AM [vite] page reload src/GMOperations.js
+9:37:35 AM [vite] page reload src/GMOperations.js
+9:37:42 AM [vite] page reload src/App.js
+9:40:56 AM [vite] page reload src/App.js
+9:45:26 AM [vite] page reload src/App.js
+9:49:24 AM [vite] page reload src/App.js
+9:50:10 AM [vite] page reload src/App.js
+9:50:19 AM [vite] page reload src/App.js
+9:51:04 AM [vite] page reload src/App.js
+9:51:10 AM [vite] page reload src/App.js
+9:51:41 AM [vite] page reload src/App.js
+9:53:32 AM [vite] page reload src/App.js
+9:53:55 AM [vite] page reload src/App.js
+9:54:42 AM [vite] page reload src/App.js
+9:55:14 AM [vite] page reload src/App.js
+9:55:42 AM [vite] page reload src/App.js
+9:56:25 AM [vite] page reload src/App.js

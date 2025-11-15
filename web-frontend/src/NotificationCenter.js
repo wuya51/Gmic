@@ -326,7 +326,7 @@ const NotificationCenter = ({
       if (!currentTimerState || currentTimerState.isPaused) return;
       
       const elapsedTime = Date.now() - currentTimerState.startTime;
-      const newRemainingTime = Math.max(0, 8000 - elapsedTime);
+      const newRemainingTime = Math.max(0, currentTimerState.remainingTime - elapsedTime);
       currentTimerState.remainingTime = newRemainingTime;
       const newCountdown = Math.ceil(newRemainingTime / 1000);
       
@@ -378,6 +378,8 @@ const NotificationCenter = ({
         currentTimerState.isPaused = false;
       }
       
+      // 使用剩余时间而不是总是重置为8秒
+      const remainingTime = currentTimerState.remainingTime || 8000;
       currentTimerState.startTime = Date.now();
       
       // 清理之前的计时器
@@ -394,7 +396,7 @@ const NotificationCenter = ({
       // 设置每秒更新
       currentTimerState.countdownInterval = setInterval(executeCountdown, 1000);
       
-      // 设置自动隐藏计时器（8秒后）
+      // 设置自动隐藏计时器（使用剩余时间）
       currentTimerState.autoHideTimer = setTimeout(() => {
         const finalTimerState = notificationTimersRef.current[notificationId];
         if (!finalTimerState || finalTimerState.isPaused) return;
@@ -424,7 +426,7 @@ const NotificationCenter = ({
           }
           return prev;
         });
-      }, 8000);
+      }, remainingTime);
     };
     
     const pauseAutoHide = () => {
@@ -443,7 +445,7 @@ const NotificationCenter = ({
       
       // 正确计算剩余时间
       const elapsedTime = Date.now() - currentTimerState.startTime;
-      currentTimerState.remainingTime = Math.max(0, 8000 - elapsedTime);
+      currentTimerState.remainingTime = Math.max(0, currentTimerState.remainingTime - elapsedTime);
     };
     
     const handleReply = async () => {

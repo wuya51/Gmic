@@ -122,7 +122,14 @@ const NotificationCenter = ({
       }
     };
 
+    // 设置10秒定时器
+    const interval = setInterval(handleSubscriptionEvent, 10000);
+    setQueryInterval(interval);
+
     return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
       if (queryInterval) {
         clearInterval(queryInterval);
       }

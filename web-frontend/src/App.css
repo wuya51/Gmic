@@ -461,15 +461,11 @@ body {
 
 /* Card Styles */
 .card {
-  background: linear-gradient(135deg, #ffffff, #f9f7f2);
+  background-color: #fff;
   border: 1px solid rgba(255,42,0,0.15);
-  border-radius: 16px;
-  padding: 1.5rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  z-index: auto;
+  border-radius: 12px;
+  padding: 1.25rem;
+  transition: box-shadow 0.2s ease;
 }
 
 .card::before {
@@ -511,16 +507,66 @@ body {
 .invitation-card {
   width: 100%;
   animation: fadeIn 0.5s ease-out;
-  z-index: auto;
+  z-index: 1;
+  position: relative;
+  border: 2px solid rgba(0, 123, 255, 0.1); /* 蓝色边界区分 */
+  transition: all 0.3s ease;
+  isolation: isolate; /* 创建新的堆叠上下文 */
+}
+
+.invitation-card:hover {
+  border-color: rgba(0, 123, 255, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(0, 123, 255, 0.15);
+}
+
+.invitation-card::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  border: 1px solid rgba(0, 123, 255, 0.05);
+  border-radius: 17px;
+  pointer-events: none;
+  z-index: -1;
 }
 
 /* 排行榜卡片样式 */
 .leaderboard-card {
   width: 100%;
   animation: fadeIn 0.5s ease-out;
-  z-index: auto;
+  z-index: 2;
   position: relative;
-  contain: layout style paint;
+  margin-bottom: 1.5rem; /* 添加底部间距 */
+  border: 2px solid rgba(255, 42, 0, 0.1); /* 明确边界 */
+  transition: all 0.3s ease;
+  isolation: isolate; /* 创建新的堆叠上下文 */
+}
+
+.leaderboard-card:hover {
+  border-color: rgba(255, 42, 0, 0.3);
+  transform: translateY(-2px); /* 减少悬停移动距离 */
+  box-shadow: 0 6px 25px rgba(255, 42, 0, 0.15);
+}
+
+.leaderboard-card::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  border: 1px solid rgba(255, 42, 0, 0.05);
+  border-radius: 17px;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.leaderboard-card:focus-within {
+  border-color: rgba(255, 42, 0, 0.5);
+  box-shadow: 0 0 0 3px rgba(255, 42, 0, 0.1);
 }
 
 /* Wallet Status */
@@ -3124,9 +3170,6 @@ body {
     padding: 0.8rem;
   }
   
-  .card {
-    padding: 1rem;
-  }
   
   .action-btn {
     padding: 0.5rem 1rem;

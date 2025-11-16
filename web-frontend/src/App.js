@@ -31,6 +31,13 @@ const isButtonDisabled = (operationStatus, currentAccount, gmOps, cooldownRemain
   const WARNING_THRESHOLD = 250;
 
 function App({ chainId, appId, ownerId }) {
+  const appRenderCountRef = useRef(0);
+  appRenderCountRef.current += 1;
+  
+  const forceUpdateRef = useRef(0);
+  const cooldownRemainingRef = useRef(0);
+  const activeTabRef = useRef('unknown');
+  
   const pageLoadTime = useRef(0);
   
   useEffect(() => {
@@ -47,7 +54,24 @@ function App({ chainId, appId, ownerId }) {
   
   let walletState = {};
   try {
+    if (typeof useWallet !== 'function') {
+      throw new Error('useWallet is not available - WalletProvider may not be properly configured');
+    }
+    
     walletState = useWallet();
+    
+    if (!walletState || typeof walletState !== 'object') {
+      throw new Error('Invalid wallet state returned from useWallet hook');
+    }
+    
+    if (typeof walletState.connectWallet !== 'function') {
+      walletState.connectWallet = () => Promise.reject(new Error('Wallet connection not available'));
+    }
+    
+    if (typeof walletState.disconnectWallet !== 'function') {
+      walletState.disconnectWallet = () => Promise.resolve();
+    }
+    
   } catch (error) {
     walletState = {
       account: null,
@@ -56,10 +80,18 @@ function App({ chainId, appId, ownerId }) {
       walletChainId: null,
       walletType: null,
       isLoading: false,
-      error: null,
-      connectWallet: () => {},
-      disconnectWallet: () => {}
+      error: error.message || 'Wallet initialization failed',
+      connectWallet: () => {
+        return Promise.reject(new Error('Wallet is in error state'));
+      },
+      disconnectWallet: () => {
+        return Promise.resolve();
+      },
+      isValidAccountOwner: () => false,
+      formatCooldown: (seconds) => `${Math.floor(seconds / 60)}m ${seconds % 60}s`
     };
+    
+    setConnectionError(error.message || 'Wallet connection failed');
   }
   
   const { 
@@ -86,27 +118,36 @@ function App({ chainId, appId, ownerId }) {
   const [connectionError, setConnectionError] = useState("");
   const [queryRetryCount, setQueryRetryCount] = useState(0);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
-  const [addressValidationError, setAddressValidationError] = useState("");  
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);  
+  const [addressValidationError, setAddressValidationError] = useState("");
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [previousTotalMessages, setPreviousTotalMessages] = useState(null);
-  const [forceUpdate, setForceUpdate] = useState(0);  
+  const [forceUpdate, setForceUpdate] = useState(0);
   const [showInvitationSection, setShowInvitationSection] = useState(false);
-  const [showLeaderboard, setShowLeaderboard] = useState(true);  
-  const [activeTab, setActiveTab] = useState('messages');  
-  const [cooldownStatus, setCooldownStatus] = useState(null);  
-  const [localCooldownEnabled, setLocalCooldownEnabled] = useState(false);  
-  const [notifications, setNotifications] = useState([]);  
+  const [showLeaderboard, setShowLeaderboard] = useState(true);
+  const getInitialActiveTab = () => {
+    const savedActiveTab = localStorage.getItem('activeTab');
+    return savedActiveTab || 'messages';
+  };
+  const [activeTab, setActiveTab] = useState(getInitialActiveTab());
+  const [cooldownStatus, setCooldownStatus] = useState(null);
+  const [localCooldownEnabled, setLocalCooldownEnabled] = useState(false);
+  const [notifications, setNotifications] = useState([]);
   const [gmRecords, setGmRecords] = useState([]);
   const previousEventCountRef = useRef(0);
   const previousLatestTimestampRef = useRef(0);
-  const pageLoadTimestampRef = useRef(0);   
+  const pageLoadTimestampRef = useRef(0);
   const [historyRecords, setHistoryRecords] = useState([]);
   const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
-  const [historyLoading, setHistoryLoading] = useState(false);  
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [customMessageEnabled, setCustomMessageEnabled] = useState(true);
   const [customMessage, setCustomMessage] = useState('');
-  const [selectedMessage, setSelectedMessage] = useState('gm');  
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);  
+  const [selectedMessage, setSelectedMessage] = useState('gm');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  
+  forceUpdateRef.current = forceUpdate;
+  cooldownRemainingRef.current = cooldownRemaining;
+  activeTabRef.current = activeTab;
+  
   const addNotification = useCallback((message, type = 'info') => {
     const id = Date.now().toString();
     const newNotification = {
@@ -204,6 +245,9 @@ function App({ chainId, appId, ownerId }) {
   const currentAccount = connectedAccount ? formatAccountOwner(connectedAccount) : null;
   const currentChainId = connectedChainId;
   const currentIsConnected = isConnected;
+
+  const memoizedCurrentAccount = useMemo(() => currentAccount, [currentAccount]);
+  const memoizedIsMobile = useMemo(() => isMobile, [isMobile]);
   
   const { primaryWallet, handleLogOut } = useDynamicContext();
   const isDynamicConnected = (primaryWallet && primaryWallet.address) || (walletType === 'dynamic' && isConnected);
@@ -215,10 +259,6 @@ function App({ chainId, appId, ownerId }) {
       const timer = setTimeout(() => {
         if (primaryWallet && primaryWallet.address && !isActiveDynamicWallet) {
           connectWallet('dynamic');
-          setTimeout(() => {
-            setForceUpdate(prev => prev + 1);
-            setForceUpdate(prev => prev + 1);
-          }, 300);
         }
       }, 500);
       
@@ -245,6 +285,66 @@ function App({ chainId, appId, ownerId }) {
       }
     }
   }, [walletType, connectedWalletChainId, chainId]);
+  
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+    activeTabRef.current = activeTab;
+    
+    const saveTimeout = setTimeout(() => {
+      const currentSaved = localStorage.getItem('activeTab');
+      if (currentSaved !== activeTab) {
+        localStorage.setItem('activeTab', activeTab);
+      }
+    }, 100);
+    
+    return () => clearTimeout(saveTimeout);
+  }, [activeTab]);
+
+  useEffect(() => {
+    const checkAndRestoreActiveTab = () => {
+      try {
+        const saved = localStorage.getItem('activeTab');
+        if (saved && saved !== activeTab && ['messages', 'leaderboards', 'settings'].includes(saved)) {
+          setActiveTab(saved);
+        }
+      } catch (error) {
+        console.error('[activeTab] Restoration error:', error);
+      }
+    };
+
+    checkAndRestoreActiveTab();
+    
+    const handleErrorBoundaryRecovery = () => {
+      setTimeout(checkAndRestoreActiveTab, 100);
+    };
+
+    window.addEventListener('error', handleErrorBoundaryRecovery);
+    window.addEventListener('unhandledrejection', handleErrorBoundaryRecovery);
+    
+    return () => {
+      window.removeEventListener('error', handleErrorBoundaryRecovery);
+      window.removeEventListener('unhandledrejection', handleErrorBoundaryRecovery);
+    };
+  }, [activeTab]);
+
+  useEffect(() => {
+    const tabCheckInterval = setInterval(() => {
+      try {
+        const saved = localStorage.getItem('activeTab');
+        const isValidTab = ['messages', 'leaderboards', 'settings'].includes(activeTab);
+        const isSavedValid = saved && ['messages', 'leaderboards', 'settings'].includes(saved);
+        
+        if (!isValidTab && isSavedValid) {
+          setActiveTab(saved);
+          activeTabRef.current = saved;
+        }
+      } catch (error) {
+        console.warn('[activeTab] Stability check error:', error);
+      }
+    }, 10000);
+
+    return () => clearInterval(tabCheckInterval);
+  }, [activeTab]);
   
   const disconnectDynamicWallet = async (disconnectWalletFn) => {
     try {
@@ -327,24 +427,8 @@ function App({ chainId, appId, ownerId }) {
         }
         if (!isDynamicConnected && !isActiveDynamicWallet) {
           await props.connectWallet('dynamic');
-          setTimeout(() => {
-            setForceUpdate(prev => prev + 1);
-          }, 200);
         }
-
-        setTimeout(() => {
-          setForceUpdate(prev => prev + 1);
-        }, 100);
-        
-        setTimeout(() => {
-          setForceUpdate(prev => prev + 1);
-        }, 300);
-        
-        setTimeout(() => {
-          setForceUpdate(prev => prev + 1);
-        }, 500);
       } catch (error) {
-        console.log(`Failed to handle Dynamic wallet: ${error.message}`);
         addNotification(`Failed to handle Dynamic wallet: ${error.message}`, 'error');
       }
     };
@@ -424,17 +508,35 @@ function App({ chainId, appId, ownerId }) {
     refetchLeaderboard,
     onTabChange
   }) => {
+    const renderCountRef = useRef(0);
+    renderCountRef.current += 1;
+    
+    const getCallStack = () => {
+      try {
+        const stack = new Error().stack;
+        const stackLines = stack.split('\n').slice(3, 8);
+        return stackLines.map(line => line.trim()).join(' <- ');
+      } catch (e) {
+        return 'Stack trace unavailable';
+      }
+    };
+    
+    const propsChanged = {};
+    if (renderCountRef.current > 1) {
+      propsChanged.showLeaderboard = showLeaderboard !== undefined;
+      propsChanged.leaderboardData = leaderboardData !== undefined;
+      propsChanged.currentAccount = currentAccount !== undefined;
+      propsChanged.isMobile = isMobile !== undefined;
+    }
+    
     const hasFetchedRef = useRef(false);
     
     useEffect(() => {
-      if (showLeaderboard && (!leaderboardData?.getTopUsers || leaderboardData.getTopUsers.length === 0) && !hasFetchedRef.current) {
-        refetchLeaderboard && refetchLeaderboard();
-        hasFetchedRef.current = true;
-      }
-      if (onTabChange) {
-        onTabChange();
-      }
-    }, [showLeaderboard, refetchLeaderboard, onTabChange]); // 移除leaderboardData依赖
+      return () => {
+      };
+    }, []);
+    
+    const mountTimeRef = useRef(Date.now());
 
     const leaderboardItems = useMemo(() => {
       if (!leaderboardData?.getTopUsers || leaderboardData.getTopUsers.length === 0) {
@@ -511,7 +613,6 @@ function App({ chainId, appId, ownerId }) {
       </div>
     );
   }, (prevProps, nextProps) => {
-    // 只有当实际数据内容变化时才重新渲染
     const leaderboardDataChanged = 
       prevProps.leaderboardData?.getTopUsers?.length !== nextProps.leaderboardData?.getTopUsers?.length ||
       JSON.stringify(prevProps.leaderboardData?.getTopUsers) !== JSON.stringify(nextProps.leaderboardData?.getTopUsers);
@@ -520,12 +621,11 @@ function App({ chainId, appId, ownerId }) {
     const currentAccountChanged = prevProps.currentAccount !== nextProps.currentAccount;
     const isMobileChanged = prevProps.isMobile !== nextProps.isMobile;
     
-    // 只有当关键props发生实质性变化时才重新渲染
     if (leaderboardDataChanged || showLeaderboardChanged || currentAccountChanged || isMobileChanged) {
-      return false; // 返回false表示需要重新渲染
+      return false;
     }
     
-    return true; // 返回true表示不需要重新渲染
+    return true;
   });
   
   const handleConnectWallet = useCallback(async (newWalletType) => {
@@ -554,6 +654,10 @@ function App({ chainId, appId, ownerId }) {
     addNotification(message, type);
   }, [addNotification]);
   
+  const memoizedSetShowLeaderboard = useCallback((value) => {
+    setShowLeaderboard(value);
+  }, []);
+
   const copyToClipboard = useCallback((text, event) => {
     const copyText = async (textToCopy) => {
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -653,6 +757,14 @@ function App({ chainId, appId, ownerId }) {
     setQueryRetryCount
   });
 
+  const memoizedLeaderboardData = useMemo(() => additionalData.leaderboardData, [additionalData.leaderboardData]);
+
+  useEffect(() => {
+    if (activeTab === 'leaderboards' && additionalData.refetchLeaderboard) {
+      additionalData.refetchLeaderboard();
+    }
+  }, [activeTab, additionalData.refetchLeaderboard]);
+
   const gmOps = GMOperations({
     chainId,
     currentAccount,
@@ -664,14 +776,7 @@ function App({ chainId, appId, ownerId }) {
     setMessage,
     setOperationStatus,
     setClaimStatus,
-    onMutationComplete: (data, type) => {
-      console.log('Mutation completed:', type, data);
-      setOperationStatus("success");
-      setTimeout(() => setOperationStatus(null), 3000);
-
-      if (gmOps.refetch) gmOps.refetch();
-
-    },
+    onMutationComplete: handleMutationComplete,
     onMutationError: (error) => {
       console.error('Mutation error:', error);
       setOperationStatus("error");
@@ -735,7 +840,6 @@ function App({ chainId, appId, ownerId }) {
       setMessage("Invalid account address", "error");
       return;
     }
-    console.log('Setting 24-hour limit status:', enabled ? 'enabled' : 'disabled');
 
     setOperationStatus("processing");
     
@@ -790,7 +894,11 @@ function App({ chainId, appId, ownerId }) {
               console.log('Syncing 24-hour limit status:', currentCooldownStatus ? 'ENABLED' : 'DISABLED');
             }
           }).catch(error => {
-            console.error('Failed to sync 24-hour limit status:', error);
+            console.warn('Failed to sync 24-hour limit status (non-critical):', error.message);
+            const cachedCooldownStatus = additionalData.cooldownStatusData?.getCooldownStatus?.enabled;
+            if (typeof cachedCooldownStatus === 'boolean') {
+              setLocalCooldownEnabled(cachedCooldownStatus);
+            }
           });
         }
       };
@@ -805,8 +913,6 @@ function App({ chainId, appId, ownerId }) {
   useEffect(() => {
     const streamEvents = gmOps.streamEventsData || [];
     const gmEvents = gmOps.gmEventsData || [];
-    if (gmOps.streamEventsData && streamEvents.length === 0) {
-    }
 
     const allEvents = streamEvents;
     
@@ -863,22 +969,49 @@ function App({ chainId, appId, ownerId }) {
   useEffect(() => {
     if (gmOps.subscriptionStatus?.gmEvents?.lastUpdate) {
       const refreshTimeout = setTimeout(() => {
+        console.groupCollapsed('[cause] subscription-update');
         if (gmOps.refetchGmEvents) {
           gmOps.refetchGmEvents();
         }
-        if (gmOps.refetchStreamEvents) {
-          gmOps.refetchStreamEvents();
-        }
-      }, 500);
+        console.groupEnd();
+      }, 30000);
       
       return () => clearTimeout(refreshTimeout);
     }
-  }, [gmOps.subscriptionStatus?.gmEvents?.lastUpdate, gmOps.refetchGmEvents, gmOps.refetchStreamEvents]);
+  }, [gmOps.subscriptionStatus?.gmEvents?.lastUpdate, gmOps.refetchGmEvents]);
+
+  useEffect(() => {
+    if (gmOps.subscriptionStatus?.gmEvents?.lastUpdate) {
+      const refreshTimeout = setTimeout(() => {
+        console.groupCollapsed('[cause] subscription-event-received');
+        if (additionalData.refetchCooldownStatus) {
+          additionalData.refetchCooldownStatus({
+            fetchPolicy: 'network-only',
+            nextFetchPolicy: 'cache-first'
+          });
+        }
+        if (additionalData.refetchGmRecord) {
+          additionalData.refetchGmRecord({
+            fetchPolicy: 'network-only',
+            nextFetchPolicy: 'cache-and-network'
+          });
+        }
+        console.groupEnd();
+      }, 1000);
+      
+      return () => clearTimeout(refreshTimeout);
+    }
+  }, [gmOps.subscriptionStatus?.gmEvents?.lastUpdate, additionalData.refetchCooldownStatus, additionalData.refetchGmRecord]);
 
   const [lastProcessedSubscriptionTime, setLastProcessedSubscriptionTime] = useState(null);
+  
+  useEffect(() => {
+    const isCooldownEnabled = additionalData.cooldownStatusData?.getCooldownStatus?.enabled;
+    setLocalCooldownEnabled(!!isCooldownEnabled);
+  }, [additionalData.cooldownStatusData]);
+  
   useEffect(() => {
     const COOLDOWN_MS = 86_400_000;
-    let intervalId;
     
     const isCooldownEnabled = additionalData.cooldownStatusData?.getCooldownStatus?.enabled;
     const hasValidTimestamp = additionalData.gmRecordData?.getGmRecord?.timestamp;
@@ -894,23 +1027,15 @@ function App({ chainId, appId, ownerId }) {
         lastGm = timestamp;
       }
       
-      const updateCooldown = () => {
-        const currentTs = Date.now();
-        if (currentTs < lastGm + COOLDOWN_MS) {
-          setCooldownRemaining(lastGm + COOLDOWN_MS - currentTs);
-        } else {
-          setCooldownRemaining(0);
-          clearInterval(intervalId);
-        }
-      };
-
-      updateCooldown();
-      intervalId = setInterval(updateCooldown, 1000);
+      const currentTs = Date.now();
+      if (currentTs < lastGm + COOLDOWN_MS) {
+        setCooldownRemaining(lastGm + COOLDOWN_MS - currentTs);
+      } else {
+        setCooldownRemaining(0);
+      }
     } else {
       setCooldownRemaining(0);
     }
-
-    return () => clearInterval(intervalId);
   }, [additionalData.gmRecordData, additionalData.cooldownStatusData]);
 
   const isManualTargetChainChange = useRef(false);
@@ -999,7 +1124,7 @@ function App({ chainId, appId, ownerId }) {
   }, [gmOps, customMessageEnabled, customMessage, recipientAddress, additionalData]);
 
   return (
-    <ErrorBoundary>
+    <div>
       <header className="top-navbar">
         <div className="navbar-container">
           <div className="logo">
@@ -1016,9 +1141,18 @@ function App({ chainId, appId, ownerId }) {
               className={`nav-tab ${activeTab === 'leaderboards' ? 'active' : ''}`}
               onClick={() => {
                 setActiveTab('leaderboards');
-                if (!additionalData.leaderboardData?.getTopUsers || additionalData.leaderboardData.getTopUsers.length === 0) {
-                  additionalData.refetchLeaderboard && additionalData.refetchLeaderboard();
-                }
+                setTimeout(() => {
+                  const shouldRefetch = (
+                    !additionalData.leaderboardData?.getTopUsers || 
+                    additionalData.leaderboardData.getTopUsers.length === 0 ||
+                    (additionalData.leaderboardData && !additionalData.leaderboardData.getTopUsers) ||
+                    additionalData.leaderboardError
+                  );
+                  
+                  if (shouldRefetch && additionalData.refetchLeaderboard) {
+                    additionalData.refetchLeaderboard();
+                  }
+                }, 0);
               }}
             >
               Leaderboards
@@ -1030,7 +1164,6 @@ function App({ chainId, appId, ownerId }) {
               Settings
             </button>
           </nav>
-          
           <WalletConnectionSection 
             isDynamicConnected={isDynamicConnected}
             isActiveDynamicWallet={isActiveDynamicWallet}
@@ -1517,7 +1650,7 @@ function App({ chainId, appId, ownerId }) {
             )}
 
         {activeTab === 'leaderboards' && (
-          <>
+          <div className="leaderboards-container">
             <LeaderboardSection
               showLeaderboard={showLeaderboard}
               setShowLeaderboard={setShowLeaderboard}
@@ -1591,7 +1724,7 @@ function App({ chainId, appId, ownerId }) {
                 </div>
               )}
             </div>
-          </>
+          </div>
         )}
 
       </header>
@@ -1606,78 +1739,8 @@ function App({ chainId, appId, ownerId }) {
     gmOperations={gmOps}
     chainId={chainId}
   />
-</ErrorBoundary>
+</div>
   );
-}
-
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { 
-      hasError: false,
-      error: null,
-      errorInfo: null
-    };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { 
-      hasError: true,
-      error: error
-    };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    this.setState({
-      error: error,
-      errorInfo: errorInfo
-    });
-  }
-
-  render() {
-    if (this.state.hasError) {
-      const userLang = navigator.language || navigator.userLanguage;
-      const isEnglish = userLang.startsWith('en');
-      
-      return (
-        <div className="error-fallback">
-          <div className="error-container">
-            <h2 className="error-title">
-              Application Error
-            </h2>
-            <p className="error-message">
-              Sorry, the application encountered an error:
-            </p>
-            <div className="error-details">
-              {this.state.error && (
-                <div className="error-text">
-                  {this.state.error.toString()}
-                </div>
-              )}
-              {this.state.errorInfo && (
-                <details className="error-stack">
-                  <summary>
-                    Error Details
-                  </summary>
-                  <pre>{this.state.errorInfo.componentStack}</pre>
-                </details>
-              )}
-            </div>
-            <p className="error-suggestion">
-              Please refresh the page to try again, or check if the URL parameters are correct.
-            </p>
-            <button 
-              className="error-retry-button"
-              onClick={() => window.location.reload()}
-            >
-              Refresh Page
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
 }
 
 export default App;

@@ -16,11 +16,39 @@ class ErrorBoundary extends React.Component {
   }
 
   static getDerivedStateFromError(error) {
-    return { hasError: true, error };
+    const isCriticalError = !(
+      error?.message?.includes('ApolloError') ||
+      error?.message?.includes('Network error') ||
+      error?.message?.includes('502') ||
+      error?.message?.includes('503') ||
+      error?.message?.includes('504') ||
+      error?.name?.includes('ApolloError')
+    );
+    
+    if (isCriticalError) {
+      console.error('Critical error caught by ErrorBoundary:', error);
+      return { hasError: true, error };
+    } else {
+      console.warn('Non-critical error ignored by ErrorBoundary:', error?.message);
+      return { hasError: false, error: null };
+    }
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error("Error caught by ErrorBoundary:", error, errorInfo);
+    const isCriticalError = !(
+      error?.message?.includes('ApolloError') ||
+      error?.message?.includes('Network error') ||
+      error?.message?.includes('502') ||
+      error?.message?.includes('503') ||
+      error?.message?.includes('504') ||
+      error?.name?.includes('ApolloError')
+    );
+    
+    if (isCriticalError) {
+      console.error("Critical error caught by ErrorBoundary:", error, errorInfo);
+    } else {
+      console.warn('Non-critical error ignored by ErrorBoundary:', error?.message);
+    }
   }
 
   render() {
@@ -51,7 +79,6 @@ class ErrorBoundary extends React.Component {
 const root = ReactDOM.createRoot(document.getElementById("root"));
 
 root.render(
-  <React.StrictMode>
     <ErrorBoundary>
       <BrowserRouter>
         <Routes>
@@ -60,7 +87,6 @@ root.render(
         </Routes>
       </BrowserRouter>
     </ErrorBoundary>
-  </React.StrictMode>
 );
 
 function DefaultGraphQLApp() {

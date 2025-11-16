@@ -224,7 +224,9 @@ const GMOperations = ({
           if (refetchGmEvents) refetchGmEvents();
           if (refetchStreamEvents) refetchStreamEvents();
           if (refetchWalletMessages) refetchWalletMessages();
-          if (refetch) refetch(); 
+          if (refetch) refetch();
+          if (refetchGmRecord) refetchGmRecord({ fetchPolicy: 'network-only', nextFetchPolicy: 'cache-and-network' });
+          if (refetchCooldownStatus) refetchCooldownStatus({ fetchPolicy: 'network-only', nextFetchPolicy: 'cache-first' }); 
           
           setTimeout(() => {
             setSubscriptionStatus(prev => ({
@@ -240,16 +242,6 @@ const GMOperations = ({
           console.error('Subscription event processing failed:', error);
         }
       }
-    },
-    onError: (error) => {
-      setSubscriptionStatus(prev => ({
-        ...prev,
-        gmEvents: {
-          active: false,
-          lastUpdate: prev.gmEvents.lastUpdate,
-          error: error.message
-        }
-      }));
     }
   });
 
@@ -268,24 +260,28 @@ const GMOperations = ({
     variables: { chainId: queryChainId, owner: currentAccount ? formatAccountOwner(currentAccount) : null },
     fetchPolicy: "no-cache",
     skip: !isValidChainId(queryChainId),
+  });
 
-    onCompleted: (data) => {
-    },
-    
-    onError: (err) => {
-      if (err.message && err.message.includes('Failed to parse')) {
-        console.warn('ChainId parsing error, skipping retry:', err.message);
+  // 处理GET_GM_STATS查询错误
+  useEffect(() => {
+    if (queryError) {
+      console.error("GET_GM_STATS query error:", queryError);
+      
+      if (queryError.message && queryError.message.includes('Failed to parse')) {
+        console.warn('ChainId parsing error, skipping retry:', queryError.message);
         return;
       }
       
-      if (err.networkError?.statusCode === 500 && queryRetryCount < 3) {
-        setTimeout(() => {
+      if (queryError.networkError?.statusCode === 500 && queryRetryCount < 3) {
+        const retryTimeout = setTimeout(() => {
           setQueryRetryCount((prev) => prev + 1);
           refetch();
         }, 2000 * (queryRetryCount + 1));
+        
+        return () => clearTimeout(retryTimeout);
       }
-    },
-  });
+    }
+  }, [queryError, queryRetryCount, refetch]);
 
   const { data: gmRecordData, refetch: refetchGmRecord } = useQuery(GET_GM_RECORD, {
     variables: { owner: formatAccountOwner(currentAccount) },
@@ -307,7 +303,9 @@ const GMOperations = ({
 
   const { data: leaderboardData, refetch: refetchLeaderboard } = useQuery(GET_LEADERBOARD, {
     variables: { limit: 15 },
-    fetchPolicy: "cache-only",
+    fetchPolicy: "cache-and-network",
+    pollInterval: 0, 
+    nextFetchPolicy: "cache-first",
   });
 
   const { data: cooldownStatusData, refetch: refetchCooldownStatus } = useQuery(GET_COOLDOWN_STATUS, {
@@ -369,12 +367,7 @@ const GMOperations = ({
     return filterNewEvents(streamEventsData.getStreamEvents);
   }, [streamEventsData, filterNewEvents]);
 
-  const [sendGm] = useMutation(SEND_GM, {
-    onCompleted: (data) => {
-      const result = typeof data === 'string' ? { hash: data } : data;
-      onMutationComplete(result, 'sendGM');
-    },
-    onError: onMutationError,
+  const [sendGm, { data: sendGmData, error: sendGmError }] = useMutation(SEND_GM, {
     update: () => {},
     errorPolicy: 'ignore',
     fetchPolicy: 'no-cache',
@@ -385,12 +378,21 @@ const GMOperations = ({
     },
   });
 
-  const [sendGmTo] = useMutation(SEND_GM_TO, {
-    onCompleted: (data) => {
-      const result = typeof data === 'string' ? { hash: data } : data;
+  // 处理SEND_GM mutation结果
+  useEffect(() => {
+    if (sendGmData) {
+      const result = typeof sendGmData === 'string' ? { hash: sendGmData } : sendGmData;
       onMutationComplete(result, 'sendGM');
-    },
-    onError: onMutationError,
+    }
+  }, [sendGmData, onMutationComplete]);
+
+  useEffect(() => {
+    if (sendGmError) {
+      onMutationError(sendGmError);
+    }
+  }, [sendGmError, onMutationError]);
+
+  const [sendGmTo, { data: sendGmToData, error: sendGmToError }] = useMutation(SEND_GM_TO, {
     update: () => {},
     errorPolicy: 'ignore',
     fetchPolicy: 'no-cache',
@@ -401,35 +403,76 @@ const GMOperations = ({
     },
   });
 
-  const [sendGmWithInvitation] = useMutation(SEND_GM_WITH_INVITATION, {
-    onCompleted: (data) => {
-      const result = typeof data === 'string' ? { hash: data } : data;
+  // 处理SEND_GM_TO mutation结果
+  useEffect(() => {
+    if (sendGmToData) {
+      const result = typeof sendGmToData === 'string' ? { hash: sendGmToData } : sendGmToData;
       onMutationComplete(result, 'sendGM');
-    },
-    onError: onMutationError,
+    }
+  }, [sendGmToData, onMutationComplete]);
+
+  useEffect(() => {
+    if (sendGmToError) {
+      onMutationError(sendGmToError);
+    }
+  }, [sendGmToError, onMutationError]);
+
+  const [sendGmWithInvitation, { data: sendGmWithInvitationData, error: sendGmWithInvitationError }] = useMutation(SEND_GM_WITH_INVITATION, {
     update: () => {},
     errorPolicy: 'ignore',
   });
 
-  const [claimInvitationRewards] = useMutation(CLAIM_INVITATION_REWARDS, {
-    onCompleted: (data) => {
-      onMutationComplete(data, 'invitation');
+  // 处理SEND_GM_WITH_INVITATION mutation结果
+  useEffect(() => {
+    if (sendGmWithInvitationData) {
+      const result = typeof sendGmWithInvitationData === 'string' ? { hash: sendGmWithInvitationData } : sendGmWithInvitationData;
+      onMutationComplete(result, 'sendGM');
+    }
+  }, [sendGmWithInvitationData, onMutationComplete]);
+
+  useEffect(() => {
+    if (sendGmWithInvitationError) {
+      onMutationError(sendGmWithInvitationError);
+    }
+  }, [sendGmWithInvitationError, onMutationError]);
+
+  const [claimInvitationRewards, { data: claimInvitationRewardsData, error: claimInvitationRewardsError }] = useMutation(CLAIM_INVITATION_REWARDS, {
+    update: () => {},
+  });
+
+  // 处理CLAIM_INVITATION_REWARDS mutation结果
+  useEffect(() => {
+    if (claimInvitationRewardsData) {
+      onMutationComplete(claimInvitationRewardsData, 'invitation');
       setClaimStatus("success");
       setTimeout(() => setClaimStatus(null), 5000);
-    },
-    onError: (error) => {
-      onMutationError(error);
+    }
+  }, [claimInvitationRewardsData, onMutationComplete, setClaimStatus]);
+
+  useEffect(() => {
+    if (claimInvitationRewardsError) {
+      onMutationError(claimInvitationRewardsError);
       setClaimStatus("error");
       setTimeout(() => setClaimStatus(null), 5000);
-    },
+    }
+  }, [claimInvitationRewardsError, onMutationError, setClaimStatus]);
+
+  const [setCooldownEnabled, { data: setCooldownEnabledData, error: setCooldownEnabledError }] = useMutation(SET_COOLDOWN_ENABLED, {
     update: () => {},
   });
 
-  const [setCooldownEnabled] = useMutation(SET_COOLDOWN_ENABLED, {
-    onCompleted: (data) => onMutationComplete(data, 'setCooldown'),
-    onError: onMutationError,
-    update: () => {},
-  });
+  // 处理SET_COOLDOWN_ENABLED mutation结果
+  useEffect(() => {
+    if (setCooldownEnabledData) {
+      onMutationComplete(setCooldownEnabledData, 'setCooldown');
+    }
+  }, [setCooldownEnabledData, onMutationComplete]);
+
+  useEffect(() => {
+    if (setCooldownEnabledError) {
+      onMutationError(setCooldownEnabledError);
+    }
+  }, [setCooldownEnabledError, onMutationError]);
 
   const handleSendGM = useCallback(async (content = "Gmicrochains") => {
     if (!isValidAccountOwner(currentAccount)) {
@@ -687,9 +730,13 @@ export const useGMAdditionalData = ({
     },
     skip: !currentAccount || !chainId,
     fetchPolicy: 'cache-and-network',
-    notifyOnNetworkStatusChange: true,
-    onError: (error) => {
-      console.error('Error fetching GM record:', error);
+    notifyOnNetworkStatusChange: true
+  });
+
+  // 使用useEffect处理错误，替代已弃用的onError回调
+  useEffect(() => {
+    if (gmRecordError) {
+      console.error('Error fetching GM record:', gmRecordError);
       if (queryRetryCount < 3) {
         setTimeout(() => {
           setQueryRetryCount(prev => prev + 1);
@@ -697,7 +744,7 @@ export const useGMAdditionalData = ({
         }, 1000);
       }
     }
-  });
+  }, [gmRecordError, queryRetryCount, setQueryRetryCount, refetchGmRecord]);
 
   const { data: invitationStatsData, loading: invitationStatsLoading, error: invitationStatsError, refetch: refetchInvitationStats } = useQuery(GET_INVITATION_STATS, {
     variables: { 
@@ -706,9 +753,12 @@ export const useGMAdditionalData = ({
     },
     skip: !currentAccount || !chainId,
     fetchPolicy: 'cache-and-network',
-    notifyOnNetworkStatusChange: true,
-    onError: (error) => {
-      console.error('Error fetching invitation stats:', error);
+    notifyOnNetworkStatusChange: true
+  });
+
+  useEffect(() => {
+    if (invitationStatsError) {
+      console.error('Error fetching invitation stats:', invitationStatsError);
       if (queryRetryCount < 3) {
         setTimeout(() => {
           setQueryRetryCount(prev => prev + 1);
@@ -716,31 +766,23 @@ export const useGMAdditionalData = ({
         }, 1000);
       }
     }
-  });
+  }, [invitationStatsError, queryRetryCount, setQueryRetryCount, refetchInvitationStats]);
 
   const { data: leaderboardData, loading: leaderboardLoading, error: leaderboardError, refetch: refetchLeaderboard } = useQuery(GET_LEADERBOARD, {
     variables: { 
       limit: 15 
     },
     skip: false, // 默认启用查询，确保数据可用
-    fetchPolicy: 'cache-first',
-    notifyOnNetworkStatusChange: false,
+    fetchPolicy: 'cache-and-network',
+    notifyOnNetworkStatusChange: true,
     pollInterval: 0,
     nextFetchPolicy: 'cache-first',
-    onError: (error) => {
-      console.error('Error fetching leaderboard:', error);
-      // 移除自动重试逻辑，避免持续轮询
-    }
   });
 
   const { data: cooldownStatusData, loading: cooldownStatusLoading, error: cooldownStatusError, refetch: refetchCooldownStatus } = useQuery(GET_COOLDOWN_STATUS, {
     fetchPolicy: 'cache-first',
     notifyOnNetworkStatusChange: false,
     skip: false, // 始终查询，但使用缓存策略
-    onError: (error) => {
-      console.error('Error fetching cooldown status:', error);
-      // 移除自动重试逻辑，避免轮询
-    }
   });
 
   const { data: cooldownCheckData, loading: cooldownCheckLoading, error: cooldownCheckError, refetch: refetchCooldownCheck } = useQuery(CHECK_COOLDOWN, {
@@ -752,10 +794,6 @@ export const useGMAdditionalData = ({
     notifyOnNetworkStatusChange: false,
     pollInterval: 0,
     nextFetchPolicy: 'cache-first',
-    onError: (error) => {
-      console.error('Error checking cooldown:', error);
-      // 移除自动重试逻辑，避免持续轮询
-    }
   });
 
   const { data: whitelistData, loading: whitelistLoading, error: whitelistError, refetch: refetchWhitelist } = useQuery(IS_USER_WHITELISTED, {
@@ -764,9 +802,12 @@ export const useGMAdditionalData = ({
     },
     skip: !currentAccount,
     fetchPolicy: 'network-only',
-    notifyOnNetworkStatusChange: true,
-    onError: (error) => {
-      console.error('Error checking whitelist:', error);
+    notifyOnNetworkStatusChange: true
+  });
+
+  useEffect(() => {
+    if (whitelistError) {
+      console.error('Error checking whitelist:', whitelistError);
       if (queryRetryCount < 3) {
         setTimeout(() => {
           setQueryRetryCount(prev => prev + 1);
@@ -774,7 +815,31 @@ export const useGMAdditionalData = ({
         }, 1000);
       }
     }
-  });
+  }, [whitelistError, queryRetryCount, setQueryRetryCount, refetchWhitelist]);
+
+  // 处理GET_LEADERBOARD查询错误
+  useEffect(() => {
+    if (leaderboardError) {
+      console.error('Error fetching leaderboard:', leaderboardError);
+      // 移除自动重试逻辑，避免持续轮询
+    }
+  }, [leaderboardError]);
+
+  // 处理GET_COOLDOWN_STATUS查询错误
+  useEffect(() => {
+    if (cooldownStatusError) {
+      console.error('Error fetching cooldown status:', cooldownStatusError);
+      // 移除自动重试逻辑，避免轮询
+    }
+  }, [cooldownStatusError]);
+
+  // 处理CHECK_COOLDOWN查询错误
+  useEffect(() => {
+    if (cooldownCheckError) {
+      console.error('Error checking cooldown:', cooldownCheckError);
+      // 移除自动重试逻辑，避免持续轮询
+    }
+  }, [cooldownCheckError]);
 
   const loading = gmRecordLoading || invitationStatsLoading || leaderboardLoading || cooldownStatusLoading || cooldownCheckLoading || whitelistLoading;
   const queryError = gmRecordError || invitationStatsError || leaderboardError || cooldownStatusError || cooldownCheckError || whitelistError;

@@ -2231,3 +2231,5 @@ The request url "/root/linera-protocol/examples/gmic-buildathon/web-frontend/.en
 3:58:49 AM [vite] page reload src/NotificationCenter.js
 The request url "/root/linera-protocol/examples/gmic-buildathon/web-frontend/.env" is outside of Vite serving allow list.
 5:33:47 AM [vite] page reload src/NotificationCenter.js
+5:39:53 AM [vite] page reload src/NotificationCenter.js
+5:40:04 AM [vite] page reload src/NotificationCenter.js

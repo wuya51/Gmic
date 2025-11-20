@@ -571,6 +571,7 @@ const NotificationCenter = ({
             onClick={() => onRemoveNotification(notification.id)}
           >
             <span className="notification-message">{notification.message}</span>
+            <span className="notification-timestamp">{new Date(notification.timestamp).toLocaleTimeString()}</span>
           </div>
         ))}
       </div>
@@ -641,7 +642,7 @@ const NotificationCenter = ({
                 <span className="message-text">{centerNotification.content}</span>
               </div>
               <div className="notification-time">
-                {new Date(centerNotification.timestamp).toLocaleTimeString()}
+                {centerNotification.timestamp}
               </div>
               <div className="notification-countdown">
                 Auto-close countdown: {centerNotification.countdown || 8} seconds

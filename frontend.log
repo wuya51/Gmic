@@ -2226,3 +2226,8 @@ Error: read ECONNRESET
 9:25:12 AM [vite] page reload src/App.js
 9:25:49 AM [vite] page reload src/App.js
 9:31:48 AM [vite] page reload src/App.js
+The request url "/root/linera-protocol/examples/gmic-buildathon/web-frontend/.env" is outside of Vite serving allow list.
+The request url "/root/linera-protocol/examples/gmic-buildathon/web-frontend/.env" is outside of Vite serving allow list.
+3:58:49 AM [vite] page reload src/NotificationCenter.js
+The request url "/root/linera-protocol/examples/gmic-buildathon/web-frontend/.env" is outside of Vite serving allow list.
+5:33:47 AM [vite] page reload src/NotificationCenter.js

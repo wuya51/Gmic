@@ -287,6 +287,37 @@ body {
   margin-bottom: 0;
 }
 
+.invitation-leaderboard-tab {
+  margin-top: 20px;
+}
+
+.message-editor.visible {
+  display: block;
+}
+
+.message-editor.hidden {
+  display: none;
+}
+
+/* 冷却计时器填充样式 */
+.cooldown-timer-fill.active {
+  background: linear-gradient(90deg, #ff2a00, #ff6b6b);
+  transition: width 0.5s ease;
+}
+
+.cooldown-timer-fill.inactive {
+  background: #4ade80;
+  width: 100%;
+}
+
+.cooldown-timer-fill.cooldown-remaining {
+  width: var(--cooldown-percentage, 100%);
+}
+
+.cooldown-timer-fill.cooldown-complete {
+  width: 100%;
+}
+
 .emoji-category-title {
   display: block;
   font-weight: 600;
@@ -1906,21 +1937,6 @@ body {
   color: #ff2a00;
 }
 
-.refresh-btn {
-  background: transparent;
-  border: 1px solid rgba(255,42,0,0.15);
-  color: #ff2a00;
-  border-radius: 6px;
-  padding: 0.3rem 0.8rem;
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.refresh-btn:hover {
-  background-color: rgba(255, 42, 0, 0.1);
-}
-
 .stats-panel {
   display: flex;
   justify-content: flex-start;
@@ -2095,6 +2111,349 @@ body {
   font-size: 1.2rem;
   font-weight: 600;
   margin-bottom: 0.3rem;
+}
+
+/* 推荐分享悬浮按钮样式 */
+.referral-floating-btn {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  transform: none;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: white;
+  border: none;
+  border-radius: 50px;
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+  z-index: 999;
+  transition: all 0.3s ease;
+  text-orientation: mixed;
+  white-space: nowrap;
+}
+
+.referral-floating-btn:hover {
+  background: linear-gradient(135deg, #4338ca, #6d28d9);
+  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
+  transform: scale(1.05);
+}
+
+/* 模态窗口样式 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1001;
+  animation: fadeIn 0.3s ease;
+}
+
+.modal-overlay.fade-out {
+  animation: fadeOut 0.3s ease;
+}
+
+.referral-modal {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+  animation: slideUp 0.3s ease;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 24px 0 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+  background-color: #f3f4f6;
+  color: #1f2937;
+}
+
+.modal-content {
+  padding: 24px;
+}
+
+/* 推荐统计信息样式 */
+.referral-stats {
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.referral-stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.referral-stat-item:last-child {
+  margin-bottom: 0;
+}
+
+.referral-stat-label {
+  font-size: 16px;
+  color: #6b7280;
+}
+
+.referral-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ff2a00;
+}
+
+/* 推荐链接部分样式 */
+.referral-link-section {
+  margin-bottom: 24px;
+}
+
+.referral-link-section label {
+  display: block;
+  margin-bottom: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.link-container {
+  display: flex;
+  gap: 10px;
+}
+
+.referral-link-input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  background-color: #f9fafb;
+  color: #374151;
+}
+
+.referral-link-input:focus {
+  outline: none;
+  border-color: #ff2a00;
+  box-shadow: 0 0 0 3px rgba(255, 42, 0, 0.1);
+}
+
+.copy-btn {
+  background: linear-gradient(135deg, #ff2a00, #ff5a00);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(255, 42, 0, 0.2);
+}
+
+.copy-btn:hover {
+  background: linear-gradient(135deg, #ff5a00, #ff2a00);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 42, 0, 0.3);
+}
+
+.copy-btn:active {
+  transform: scale(0.95);
+}
+
+/* 分享选项样式 */
+.share-options {
+  margin-bottom: 16px;
+}
+
+.share-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 12px;
+}
+
+.social-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.social-btn {
+  background: linear-gradient(135deg, #ff2a00, #ff5a00);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  text-align: center;
+  display: inline-block;
+  box-shadow: 0 2px 8px rgba(255, 42, 0, 0.2);
+}
+
+.social-btn:hover {
+  background: linear-gradient(135deg, #ff5a00, #ff2a00);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 42, 0, 0.3);
+}
+
+.social-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.social-btn.twitter {
+  background: #1DA1F2;
+}
+
+.social-btn.twitter:hover {
+  background: #0d8bd9;
+}
+
+.social-btn.telegram {
+  background: #2CA5E0;
+}
+
+.social-btn.telegram:hover {
+  background: #1b98d3;
+}
+
+/* 邀请奖励说明样式 */
+.referral-rewards-info {
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #6b7280;
+}
+
+.social-btn:disabled {
+  background: #cccccc;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.social-btn.twitter {
+  background-color: #1da1f2;
+  color: white;
+}
+
+.social-btn.twitter:hover {
+  background-color: #0d95e8;
+}
+
+.social-btn.telegram {
+  background-color: #0088cc;
+  color: white;
+}
+
+.social-btn.telegram:hover {
+  background-color: #0077b5;
+  cursor: not-allowed;
+}
+
+/* 无钱包消息样式 */
+.no-wallet-message {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+}
+
+.no-wallet-message p {
+  font-size: 16px;
+  margin: 0;
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 响应式样式 */
+@media (max-width: 768px) {
+  .referral-floating-btn {
+    left: 10px;
+    font-size: 14px;
+    padding: 10px 14px;
+  }
+  
+  .referral-modal {
+    width: 95%;
+    margin: 20px;
+  }
+  
+  .modal-header h3 {
+    font-size: 20px;
+  }
+  
+  .social-buttons {
+    gap: 10px;
+  }
+  
+  .social-btn {
+    padding: 10px 14px;
+    font-size: 14px;
+  }
 }
 
 /* 通知系统样式 */

@@ -82,15 +82,13 @@ impl Contract for GmContract {
                     None => return,
                 }
             }
-            GmOperation::Gm { sender, recipient: _, content: _ } => sender.clone(),
-            GmOperation::GmTo { sender, recipient: _, content: _ } => sender.clone(),
-            GmOperation::GmWithInvitation { sender, recipient: _, content: _, inviter: _ } => sender.clone(),
+            GmOperation::Gm { sender, recipient: _, content: _, inviter: _ } => sender.clone(),
             GmOperation::ClaimInvitationRewards { sender } => sender.clone(),
         };
         
         let chain_id = self.runtime.chain_id();
         let mut state = self.state.lock().await;
-        let owner = match state.owner.get() {
+        let _owner = match state.owner.get() {
             Some(owner) => owner.clone(),
             None => return,
         };
@@ -101,7 +99,7 @@ impl Contract for GmContract {
                 let _ = state.set_cooldown_enabled(&sender, enabled).await;
                 let _ = state.save().await;
             }
-            GmOperation::Gm { sender: _, recipient: _, content } => {
+            GmOperation::Gm { sender: _, recipient, content, inviter } => {
                 let content_str = content.as_deref().unwrap_or("GMicrochains");
                 if !Self::is_message_content_valid(content_str) {
                     return;
@@ -116,55 +114,7 @@ impl Contract for GmContract {
                 }
                 
                 let final_content = if content.is_none() { Some("GMicrochains".to_string()) } else { content.clone() };
-                let _ = state.record_gm(chain_id, sender, Some(owner.clone()), timestamp, final_content.clone()).await;
-                
-                let event_message = GmMessage::Gm { sender, recipient: Some(owner), timestamp, content: final_content };
-                
-                self.runtime.emit(
-                    StreamName::from("gm_events"),
-                    &event_message,
-                );
-            }
-            GmOperation::GmTo { sender: _, recipient, content } => {
-                let content_str = content.as_deref().unwrap_or("GMicrochains");
-                if !Self::is_message_content_valid(content_str) {
-                    return;
-                }
-                
-                let (in_cooldown, _) = match state.is_in_cooldown(chain_id, &sender, timestamp.micros()).await {
-                    Ok(result) => result,
-                    Err(_e) => return,
-                };
-                if in_cooldown {
-                    return;
-                }
-                
-                let final_content = if content.is_none() { Some("GMicrochains".to_string()) } else { content.clone() };
-                let _ = state.record_gm(chain_id, sender, Some(recipient.clone()), timestamp, final_content.clone()).await;
-                
-                self.runtime.emit(
-                    StreamName::from("gm_events"),
-                    &GmMessage::Gm { sender, recipient: Some(recipient), timestamp, content: final_content },
-                );
-            }
-            GmOperation::GmWithInvitation { sender: _, recipient, content, inviter } => {
-                let content_str = content.as_deref().unwrap_or("GMicrochains");
-                if !Self::is_message_content_valid(content_str) {
-                    return;
-                }
-                
-                let (in_cooldown, _) = match state.is_in_cooldown(chain_id, &sender, timestamp.micros()).await {
-                    Ok(result) => result,
-                    Err(_e) => return,
-                };
-                if in_cooldown {
-                    return;
-                }
-                
-                let final_content = if content.is_none() { Some("GMicrochains".to_string()) } else { content.clone() };
-                let _ = state.record_gm(chain_id, sender, Some(recipient.clone()), timestamp, final_content.clone()).await;
-                
-                let _ = state.handle_gm_with_invitation(sender, inviter, timestamp).await;
+                let _ = state.record_gm(chain_id, sender, Some(recipient.clone()), timestamp, final_content.clone(), inviter).await;
                 
                 self.runtime.emit(
                     StreamName::from("gm_events"),
@@ -172,7 +122,7 @@ impl Contract for GmContract {
                 );
             }
             GmOperation::ClaimInvitationRewards { sender: _ } => {
-                let _ = state.claim_invitation_rewards(sender).await;
+                let _ = state.get_user_invitation_rewards(sender).await;
             }
         }
     }
@@ -186,7 +136,8 @@ impl Contract for GmContract {
                 timestamp,
                 content,
             } => {
-                let _ = state.record_gm(self.runtime.chain_id(), sender, recipient, timestamp, content).await;
+                // 对于消息执行，不传递inviter参数
+                let _ = state.record_gm(self.runtime.chain_id(), sender, recipient, timestamp, content, None).await;
             }
         }
     }

@@ -30,7 +30,7 @@ const isButtonDisabled = (operationStatus, currentAccount, gmOps, cooldownRemain
   const MAX_MESSAGE_LENGTH = 280;
   const WARNING_THRESHOLD = 250;
 
-function App({ chainId, appId, ownerId }) {
+function App({ chainId, appId, ownerId, inviter, port }) {
   const appRenderCountRef = useRef(0);
   appRenderCountRef.current += 1;
   
@@ -51,6 +51,8 @@ function App({ chainId, appId, ownerId }) {
     
     pageLoadTimestampRef.current = pageLoadTime.current;
   }, []);
+  
+  const [connectionError, setConnectionError] = useState("");
   
   let walletState = {};
   try {
@@ -115,14 +117,12 @@ function App({ chainId, appId, ownerId }) {
   const [operationStatus, setOperationStatus] = useState(null);
   const [claimStatus, setClaimStatus] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
-  const [connectionError, setConnectionError] = useState("");
   const [queryRetryCount, setQueryRetryCount] = useState(0);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [addressValidationError, setAddressValidationError] = useState("");
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [previousTotalMessages, setPreviousTotalMessages] = useState(null);
   const [forceUpdate, setForceUpdate] = useState(0);
-  const [showInvitationSection, setShowInvitationSection] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(true);
   const getInitialActiveTab = () => {
     const savedActiveTab = localStorage.getItem('activeTab');
@@ -143,7 +143,8 @@ function App({ chainId, appId, ownerId }) {
   const [customMessage, setCustomMessage] = useState('');
   const [selectedMessage, setSelectedMessage] = useState('gm');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  
+  const [showShareReferralModal, setShowShareReferralModal] = useState(false);
+
   forceUpdateRef.current = forceUpdate;
   cooldownRemainingRef.current = cooldownRemaining;
   activeTabRef.current = activeTab;
@@ -249,7 +250,79 @@ function App({ chainId, appId, ownerId }) {
   const memoizedCurrentAccount = useMemo(() => currentAccount, [currentAccount]);
   const memoizedIsMobile = useMemo(() => isMobile, [isMobile]);
   
+  const handleToggleShareReferral = useCallback(() => {
+    setShowShareReferralModal(!showShareReferralModal);
+  }, [showShareReferralModal]);
+
+  const copyReferralLink = useCallback(() => {
+    if (!memoizedCurrentAccount) {
+      console.error('No account found');
+      alert('Please connect your wallet first');
+      return;
+    }
+    const referralLink = `${window.location.origin}${window.location.pathname}?app=${appId || ''}&owner=${ownerId || ''}&port=${port || '8080'}&inviter=${memoizedCurrentAccount}`;
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(referralLink)
+        .then(() => {
+          const btn = document.querySelector('.copy-btn');
+          if (btn) {
+            const originalText = btn.textContent;
+            btn.textContent = 'Copied!';
+            btn.style.backgroundColor = '#4CAF50';
+            setTimeout(() => {
+              btn.textContent = originalText;
+              btn.style.backgroundColor = '';
+            }, 2000);
+          }
+          console.log('Referral link copied to clipboard using Clipboard API!');
+        })
+        .catch(err => {
+          console.error('Failed to copy using Clipboard API:', err);
+          fallbackCopyTextToClipboard(referralLink);
+        });
+    } else {
+      fallbackCopyTextToClipboard(referralLink);
+    }
+  }, [memoizedCurrentAccount]);
+  
+  const fallbackCopyTextToClipboard = useCallback((text) => {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+      const successful = document.execCommand('copy');
+      if (successful) {
+        const btn = document.querySelector('.copy-btn');
+        if (btn) {
+          const originalText = btn.textContent;
+          btn.textContent = 'Copied!';
+          btn.style.backgroundColor = '#4CAF50';
+          setTimeout(() => {
+            btn.textContent = originalText;
+            btn.style.backgroundColor = '';
+          }, 2000);
+        }
+        console.log('Referral link copied to clipboard using fallback method!');
+      } else {
+        throw new Error('Copy command failed');
+      }
+    } catch (err) {
+      console.error('Failed to copy using fallback method:', err);
+      alert('Failed to copy referral link');
+    } finally {
+      document.body.removeChild(textArea);
+    }
+  }, []);
+  
   const { primaryWallet, handleLogOut } = useDynamicContext();
+  
   const isDynamicConnected = (primaryWallet && primaryWallet.address) || (walletType === 'dynamic' && isConnected);
   const dynamicAccount = isDynamicConnected ? formatAccountOwner(primaryWallet?.address || currentAccount) : null;
   const isActiveDynamicWallet = (isConnected && walletType === 'dynamic' && currentAccount) || (primaryWallet && primaryWallet.address && walletType === 'dynamic');
@@ -502,10 +575,12 @@ function App({ chainId, appId, ownerId }) {
     showLeaderboard,
     setShowLeaderboard,
     leaderboardData,
+    invitationLeaderboardData,
     currentAccount,
     isMobile,
     copyToClipboard,
     refetchLeaderboard,
+    refetchInvitationLeaderboard,
     onTabChange
   }) => {
     const renderCountRef = useRef(0);
@@ -538,7 +613,7 @@ function App({ chainId, appId, ownerId }) {
     
     const mountTimeRef = useRef(Date.now());
 
-    const leaderboardItems = useMemo(() => {
+    const gmLeaderboardItems = useMemo(() => {
       if (!leaderboardData?.getTopUsers || leaderboardData.getTopUsers.length === 0) {
         return null;
       }
@@ -562,6 +637,31 @@ function App({ chainId, appId, ownerId }) {
         </tr>
       ));
     }, [leaderboardData?.getTopUsers, currentAccount, isMobile, copyToClipboard]);
+    
+    const invitationLeaderboardItems = useMemo(() => {
+      if (!invitationLeaderboardData?.getTopInvitors || invitationLeaderboardData.getTopInvitors.length === 0) {
+        return null;
+      }
+      
+      return invitationLeaderboardData.getTopInvitors.map((entry, index) => (
+        <tr key={`${entry.user}-${index}`} className={entry.user === currentAccount ? "current-user" : ""}>
+          <td>{index + 1}</td>
+          <td>
+            <span 
+              className="address-simple" 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                copyToClipboard(entry.user, e);
+              }}
+            >
+              {isMobile ? `${entry.user.slice(0, 6)}...${entry.user.slice(-4)}` : entry.user}
+            </span>
+          </td>
+          <td>{entry.count}</td>
+        </tr>
+      ));
+    }, [invitationLeaderboardData?.getTopInvitors, currentAccount, isMobile, copyToClipboard]);
 
     return (
       <div className="card leaderboard-card">
@@ -576,38 +676,75 @@ function App({ chainId, appId, ownerId }) {
         </div>
         {showLeaderboard && (
           <div className="leaderboard-content">
-            <div className="stats-header">
-              <h4>Top GMicrochains Senders</h4>
-              <button 
-                className="refresh-btn"
-                onClick={() => {
-                  refetchLeaderboard && refetchLeaderboard();
-                }}
-                title="Refresh leaderboard"
-              >
-                🔄 Refresh
-              </button>
+            <div className="leaderboard-tabs">
+              <div className="stats-header">
+                <h4>Top GMicrochains Senders</h4>
+                <button 
+                  className="refresh-btn"
+                  onClick={() => {
+                    refetchLeaderboard && refetchLeaderboard();
+                  }}
+                  title="Refresh leaderboard"
+                >
+                  🔄 Refresh
+                </button>
+              </div>
+              {gmLeaderboardItems ? (
+                <div className="leaderboard-list">
+                  <table className="leaderboard-table">
+                    <thead>
+                      <tr>
+                        <th>Rank</th>
+                        <th>User</th>
+                        <th>Count</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {gmLeaderboardItems}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="no-leaderboard-data">
+                  <p>No leaderboard data available yet.</p>
+                </div>
+              )}
             </div>
-            {leaderboardItems ? (
-              <div className="leaderboard-list">
-                <table className="leaderboard-table">
-                  <thead>
-                    <tr>
-                      <th>Rank</th>
-                      <th>User</th>
-                      <th>Count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {leaderboardItems}
-                  </tbody>
-                </table>
+            
+            <div className="leaderboard-tabs invitation-leaderboard-tab">
+              <div className="stats-header">
+                <h4>Top Invitors</h4>
+                <button 
+                  className="refresh-btn"
+                  onClick={() => {
+                    refetchInvitationLeaderboard && refetchInvitationLeaderboard();
+                  }}
+                  title="Refresh invitation leaderboard"
+                >
+                  🔄 Refresh
+                </button>
               </div>
-            ) : (
-              <div className="no-leaderboard-data">
-                <p>No leaderboard data available yet.</p>
-              </div>
-            )}
+              {invitationLeaderboardItems ? (
+                <div className="leaderboard-list">
+                  <table className="leaderboard-table">
+                    <thead>
+                      <tr>
+                        <th>Rank</th>
+                        <th>User</th>
+                        <th>Points</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {invitationLeaderboardItems}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="no-leaderboard-data">
+                  <p>No invitation leaderboard data available yet.</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -620,8 +757,11 @@ function App({ chainId, appId, ownerId }) {
     const showLeaderboardChanged = prevProps.showLeaderboard !== nextProps.showLeaderboard;
     const currentAccountChanged = prevProps.currentAccount !== nextProps.currentAccount;
     const isMobileChanged = prevProps.isMobile !== nextProps.isMobile;
+    const invitationLeaderboardDataChanged = 
+      prevProps.invitationLeaderboardData?.getTopInvitors?.length !== nextProps.invitationLeaderboardData?.getTopInvitors?.length ||
+      JSON.stringify(prevProps.invitationLeaderboardData?.getTopInvitors) !== JSON.stringify(nextProps.invitationLeaderboardData?.getTopInvitors);
     
-    if (leaderboardDataChanged || showLeaderboardChanged || currentAccountChanged || isMobileChanged) {
+    if (leaderboardDataChanged || invitationLeaderboardDataChanged || showLeaderboardChanged || currentAccountChanged || isMobileChanged) {
       return false;
     }
     
@@ -760,11 +900,17 @@ function App({ chainId, appId, ownerId }) {
   const memoizedLeaderboardData = useMemo(() => additionalData.leaderboardData, [additionalData.leaderboardData]);
 
   useEffect(() => {
-    if (activeTab === 'leaderboards' && additionalData.refetchLeaderboard) {
-      additionalData.refetchLeaderboard();
+    if (activeTab === 'leaderboards') {
+      if (additionalData.refetchLeaderboard) {
+        additionalData.refetchLeaderboard();
+      }
+      if (additionalData.refetchInvitationLeaderboard) {
+        additionalData.refetchInvitationLeaderboard();
+      }
     }
-  }, [activeTab, additionalData.refetchLeaderboard]);
+  }, [activeTab, additionalData.refetchLeaderboard, additionalData.refetchInvitationLeaderboard]);
 
+  // 使用GMOperations函数初始化gmOps对象
   const gmOps = GMOperations({
     chainId,
     currentAccount,
@@ -782,9 +928,23 @@ function App({ chainId, appId, ownerId }) {
       setOperationStatus("error");
       setTimeout(() => setOperationStatus(null), 5000);
       addNotification(`Operation failed: ${error.message}`, "error");
-    }
+    },
+    inviter,
+    queryRetryCount,
+    setQueryRetryCount
   });
-
+  
+  // 确保gmOps至少是一个空对象，防止未定义错误
+  const safeGmOps = gmOps || {};
+  
+  // 当分享弹窗打开时，刷新邀请统计数据
+  useEffect(() => {
+    if (showShareReferralModal) {
+      if (safeGmOps.refetchInvitationRewards && typeof safeGmOps.refetchInvitationRewards === 'function') {
+        safeGmOps.refetchInvitationRewards();
+      }
+    }
+  }, [showShareReferralModal, safeGmOps]);
 
   const handleHistoryToggle = useCallback(async () => {
     if (showHistoryDropdown) {
@@ -880,11 +1040,6 @@ function App({ chainId, appId, ownerId }) {
   
   useEffect(() => {
     if (currentAccount && currentChainId) {
-      if (!gmOps.invitationStatsData) {
-        setTimeout(() => {
-          gmOps.refetchInvitationStats && gmOps.refetchInvitationStats();
-        }, 100);
-      }
       const syncCooldownStatus = () => {
         if (additionalData?.refetchCooldownStatus) {
           additionalData.refetchCooldownStatus().then((res) => {
@@ -1125,6 +1280,97 @@ function App({ chainId, appId, ownerId }) {
 
   return (
     <div>
+      {/* 左侧悬浮推荐分享按钮 */}
+      <button 
+        className="referral-floating-btn"
+        onClick={handleToggleShareReferral}
+        title="Share your referral link"
+      >
+        🔗 Share Referral
+      </button>
+
+      {/* 推荐分享弹出窗口 */}
+      {showShareReferralModal && (
+        <div className="modal-overlay" onClick={handleToggleShareReferral}>
+          <div className="referral-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Share Your Referral Link ✨</h3>
+              <button className="modal-close" onClick={handleToggleShareReferral}>×</button>
+            </div>
+            <div className="modal-content">
+              {memoizedCurrentAccount && (
+                <>
+                  {/* 推荐统计信息 */}
+                  <div className="referral-stats">
+                    <div className="referral-stat-item">
+                      <span className="referral-stat-label">Invited Users:</span>
+                      <span className="referral-stat-value">{safeGmOps.invitationStatsData?.totalInvited || 0}</span>
+                    </div>
+                    <div className="referral-stat-item">
+                      <span className="referral-stat-label">Your Reward Points:</span>
+                      <span className="referral-stat-value">{safeGmOps.invitationStatsData?.totalRewards || 0}</span>
+                    </div>
+                    {safeGmOps.invitationStatsData?.lastRewardTime && (
+                      <div className="referral-stat-item">
+                        <span className="referral-stat-label">Last Reward:</span>
+                        <span className="referral-stat-value">{new Date(safeGmOps.invitationStatsData.lastRewardTime * 1000).toLocaleString()}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* 推荐链接显示和复制 */}
+                  <div className="referral-link-section">
+                    <label>Your Referral Link:</label>
+                    <div className="link-container">
+                      <input 
+                        type="text" 
+                        value={`${window.location.origin}${window.location.pathname}?app=${appId || ''}&owner=${ownerId || ''}&port=${port || '8080'}&inviter=${memoizedCurrentAccount}`}
+                        readOnly
+                        className="referral-link-input"
+                      />
+                      <button onClick={copyReferralLink} className="copy-btn">Copy</button>
+                    </div>
+                  </div>
+                  
+                  {/* 社交媒体分享选项 */}
+                  <div className="share-options">
+                    <p className="share-label">Share directly:</p>
+                    <div className="social-buttons">
+                      <a 
+                        href={`https://twitter.com/intent/tweet?text=Join%20GMicrochains%20and%20use%20my%20referral%20link!&url=${encodeURIComponent(window.location.origin + window.location.pathname + '?app=' + (appId || '') + '&owner=' + (ownerId || '') + '&port=' + (port || '8080') + '&inviter=' + memoizedCurrentAccount)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="social-btn twitter"
+                      >
+                        Twitter
+                      </a>
+                      <a 
+                        href={`https://t.me/share/url?url=${encodeURIComponent(window.location.origin + window.location.pathname + '?inviter=' + memoizedCurrentAccount)}&text=Join%20GMicrochains%20and%20use%20my%20referral%20link!`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="social-btn telegram"
+                      >
+                        Telegram
+                      </a>
+                    </div>
+                  </div>
+                  
+                  {/* 邀请奖励说明 */}
+                  <div className="referral-rewards-info">
+                    <p>Invite a user to send their first GMIC → 30 points</p>
+                    <p>Each GMIC they send after → +10 points</p>
+                  </div>
+                </>
+              )}
+              {!memoizedCurrentAccount && (
+                <div className="no-wallet-message">
+                  <p>Please connect your wallet to access your referral link</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       <header className="top-navbar">
         <div className="navbar-container">
           <div className="logo">
@@ -1141,6 +1387,8 @@ function App({ chainId, appId, ownerId }) {
               className={`nav-tab ${activeTab === 'leaderboards' ? 'active' : ''}`}
               onClick={() => {
                 setActiveTab('leaderboards');
+                setShowLeaderboard(true);
+                setShowInvitationSection(true);
                 setTimeout(() => {
                   const shouldRefetch = (
                     !additionalData.leaderboardData?.getTopUsers || 
@@ -1151,6 +1399,9 @@ function App({ chainId, appId, ownerId }) {
                   
                   if (shouldRefetch && additionalData.refetchLeaderboard) {
                     additionalData.refetchLeaderboard();
+                  }
+                  if (additionalData.refetchInvitationLeaderboard) {
+                    additionalData.refetchInvitationLeaderboard();
                   }
                 }, 0);
               }}
@@ -1271,15 +1522,7 @@ function App({ chainId, appId, ownerId }) {
                     <div className="cooldown-timer-bar">
                       <div className="cooldown-timer-track"></div>
                       <div 
-                        className={`cooldown-timer-fill ${localCooldownEnabled ? 'active' : 'inactive'}`}
-                        style={{
-                          width: localCooldownEnabled 
-                            ? `${Math.max(0, Math.min(100, (cooldownRemaining / 86_400_000) * 100))}%`
-                            : '100%',
-                          background: localCooldownEnabled 
-                            ? 'linear-gradient(90deg, #ff2a00, #ff6b6b)'
-                            : '#4ade80'
-                        }}
+                        className={`cooldown-timer-fill ${localCooldownEnabled ? 'active' : 'inactive'} ${cooldownRemaining > 0 ? 'cooldown-remaining' : 'cooldown-complete'}`}
                       ></div>
                     </div>
                   </div>
@@ -1448,7 +1691,7 @@ function App({ chainId, appId, ownerId }) {
                       <div className="toggle-switch-thumb"></div>
                     </div>
                   </div>
-                  <div className="message-editor" id="messageEditor" style={{display: customMessageEnabled ? 'block' : 'none'}}>
+                  <div className={`message-editor ${customMessageEnabled ? 'visible' : 'hidden'}`} id="messageEditor">
                     <div className="message-input-container">
                       <textarea 
                         id="customMessage" 
@@ -1652,78 +1895,16 @@ function App({ chainId, appId, ownerId }) {
         {activeTab === 'leaderboards' && (
           <div className="leaderboards-container">
             <LeaderboardSection
-              showLeaderboard={showLeaderboard}
-              setShowLeaderboard={setShowLeaderboard}
-              leaderboardData={additionalData.leaderboardData}
-              currentAccount={currentAccount}
-              isMobile={isMobile}
-              copyToClipboard={copyToClipboard}
-              refetchLeaderboard={additionalData.refetchLeaderboard}
-            />
-            <div className="card invitation-card">
-              <div className="section-header">
-                <h3>Invitation System</h3>
-                <button 
-                  className="toggle-btn"
-                  onClick={() => setShowInvitationSection(!showInvitationSection)}
-                >
-                  {showInvitationSection ? "▼" : "▶"}
-                </button>
-              </div>
-              
-              {showInvitationSection && (
-                <div className="invitation-content">
-                  {gmOps.invitationStatsData?.getInvitationStats && (
-                    <div className="invitation-stats">
-                      <p className="stats-item">
-                        <span className="label">Invited Users:</span> 
-                        <span className="stats-value">{gmOps.invitationStatsData.getInvitationStats.totalInvited}</span>
-                      </p>
-                      <p className="stats-item">
-                        <span className="label">Total Rewards:</span> 
-                        <span className="stats-value">{gmOps.invitationStatsData.getInvitationStats.totalRewards}</span>
-                      </p>
-                    </div>
-                  )}
-                  
-                  <div className="invitation-actions">
-                    <button
-                      className="action-btn secondary"
-                      onClick={handleSendGMWithInvitation}
-                      disabled={
-                        !currentIsConnected ||
-                        !recipientAddress ||
-                        isButtonDisabled(operationStatus, currentAccount, gmOps, cooldownRemaining, localCooldownEnabled)
-                      }
-                    >
-                      {operationStatus === "processing" ? (
-                        <span className="button-loading">
-                          <span className="spinner">⏳</span> Sending...
-                        </span>
-                      ) : localCooldownEnabled && cooldownRemaining > 0 ? (
-                        `⏳ ${gmOps.formatCooldown(cooldownRemaining)}`
-                      ) : (
-                        "🎁 Send with Invitation"
-                      )}
-                    </button>
-                    
-                    <button
-                      className="action-btn secondary"
-                      onClick={handleClaimInvitationRewards}
-                      disabled={claimStatus === "processing" || isButtonDisabled(claimStatus, currentAccount, gmOps)}
-                    >
-                      {claimStatus === "processing" ? (
-                        <span className="button-loading">
-                          <span className="spinner">⏳</span> Claiming...
-                        </span>
-                      ) : (
-                        "💰 Claim Rewards"
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+                    showLeaderboard={showLeaderboard}
+                    setShowLeaderboard={setShowLeaderboard}
+                    leaderboardData={additionalData.leaderboardData}
+                    invitationLeaderboardData={additionalData.invitationLeaderboardData}
+                    currentAccount={currentAccount}
+                    isMobile={isMobile}
+                    copyToClipboard={copyToClipboard}
+                    refetchLeaderboard={additionalData.refetchLeaderboard}
+                    refetchInvitationLeaderboard={additionalData.refetchInvitationLeaderboard}
+                  />
           </div>
         )}
 

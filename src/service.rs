@@ -191,6 +191,12 @@ struct LeaderboardChain {
     count: u64,
 }
 
+#[derive(SimpleObject, Serialize, Deserialize)]
+pub struct LeaderboardInvitationUser {
+    pub user: String,
+    pub count: u32,
+}
+
 impl GmService {
     fn simple_verify_signature(
         &self,
@@ -512,14 +518,52 @@ impl QueryRoot {
         Ok(record)
     }
     
-    async fn has_received_invitation_reward(
+    async fn get_user_invitation_rewards(
         &self,
         _ctx: &async_graphql::Context<'_>,
-        invitee: AccountOwner,
-    ) -> Result<bool, async_graphql::Error> {
+        user: AccountOwner,
+    ) -> Result<u32, async_graphql::Error> {
         let state = self.state.lock().await;
-        let has_rewarded = state.has_received_invitation_reward(invitee).await?;
-        Ok(has_rewarded)
+        let rewards = state.get_user_invitation_rewards(user).await?;
+        Ok(rewards)
+    }
+    
+    async fn get_top_invitors(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        limit: u32,
+    ) -> Result<Vec<LeaderboardInvitationUser>, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let top_rewards = state.get_top_invitation_rewards(limit).await?;
+        Ok(top_rewards.into_iter().map(|(user, rewards)| LeaderboardInvitationUser {
+            user: user.to_string(),
+            count: rewards,
+        }).collect())
+    }
+    
+    async fn get_top_invitation_rewards(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        limit: u32,
+    ) -> Result<Vec<LeaderboardInvitationUser>, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let top_users = state.get_top_invitation_rewards(limit).await?;
+        Ok(top_users.into_iter()
+            .map(|(user, rewards)| LeaderboardInvitationUser {
+                user: user.to_string(),
+                count: rewards,
+            })
+            .collect())
+    }
+    
+    async fn get_invitation_rank(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        user: AccountOwner,
+    ) -> Result<u32, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let rank = state.get_invitation_rank(&user).await?;
+        Ok(rank)
     }
 
 
@@ -593,9 +637,11 @@ impl MutationRoot {
         _ctx: &async_graphql::Context<'_>,
         chain_id: ChainId,
         sender: AccountOwner,
+        recipient: Option<AccountOwner>,
         content: Option<String>,
+        inviter: Option<AccountOwner>,
     ) -> Result<SendGmResponse, async_graphql::Error> {
-        self.send_gm_with_signature(_ctx, chain_id, sender, None, "".to_string(), 0, content).await
+        self.send_gm_with_signature(_ctx, chain_id, sender, recipient, "".to_string(), 0, content, inviter).await
     }
     
     async fn send_gm_with_signature(
@@ -607,6 +653,7 @@ impl MutationRoot {
         signature: String,
         nonce: u64,
         content: Option<String>,
+        inviter: Option<AccountOwner>,
     ) -> Result<SendGmResponse, async_graphql::Error> {
         let current_chain_id = self.runtime.chain_id();
         
@@ -652,29 +699,28 @@ impl MutationRoot {
     let default_content = Some("Gmicrochains".to_string());
     let final_content = content.or(default_content);
     
+    let recipient = recipient.unwrap_or(owner.clone());
+    
+    // 无论是否跨链，都只创建单一的GmOperation::Gm变体
+    let operation = GmOperation::Gm {
+        sender,
+        recipient,
+        content: final_content.clone(),
+        inviter
+    };
+    
     if chain_id != current_chain_id {
-        let operation = if let Some(recipient) = recipient {
-            GmOperation::GmTo { sender, recipient, content: final_content.clone() }
-        } else {
-            GmOperation::Gm { sender, recipient: owner, content: final_content.clone() }
-        };
         drop(state);
         self.runtime.schedule_operation(&operation);
         return Ok(SendGmResponse {
             success: true,
             message: format!("Cross-chain GM sent successfully, sender: {}, recipient: {}, chain ID: {}", 
                 sender, 
-                recipient.as_ref().map_or(owner.to_string(), |r| r.to_string()), 
+                recipient,
                 chain_id),
             timestamp: self.runtime.system_time().micros(),
         });
     }
-    
-    let operation = if let Some(recipient) = recipient {
-        GmOperation::GmTo { sender, recipient, content: final_content.clone() }
-    } else {
-        GmOperation::Gm { sender, recipient: owner, content: final_content.clone() }
-    };
     
     drop(state);
     self.runtime.schedule_operation(&operation);
@@ -683,112 +729,10 @@ impl MutationRoot {
         success: true,
         message: format!("GM recorded successfully, sender: {}, recipient: {}, block height: {}", 
             sender,
-            recipient.as_ref().map_or(owner.to_string(), |r| r.to_string()),
+            recipient.to_string(),
             block_height),
         timestamp: self.runtime.system_time().micros(),
     })
-    }
-
-    async fn send_gm_to(
-        &self,
-        _ctx: &async_graphql::Context<'_>,
-        chain_id: ChainId, // Used for signature verification and cross-chain operation in send_gm_with_signature
-        sender: AccountOwner,
-        recipient: AccountOwner,
-        content: Option<String>,
-    ) -> Result<SendGmResponse, async_graphql::Error> {
-        // Explicitly use chain_id to avoid unused variable warning
-        let _chain_id_for_verification = chain_id.clone();
-        self.send_gm_with_signature(_ctx, chain_id, sender, Some(recipient), "".to_string(), 0, content).await
-    }
-    
-    async fn send_gm_to_with_signature(
-        &self,
-        _ctx: &async_graphql::Context<'_>,
-        chain_id: ChainId,
-        sender: AccountOwner,
-        recipient: AccountOwner,
-        signature: String,
-        nonce: u64,
-        content: Option<String>,
-    ) -> Result<SendGmResponse, async_graphql::Error> {
-        if !signature.is_empty() {
-            let signature_data = SignatureData {
-                sender: sender.to_string(),
-                recipient: Some(recipient.to_string()),
-                chain_id: chain_id.to_string(),
-                timestamp: self.runtime.system_time().micros(),
-                nonce,
-                content: content.clone(),
-            };
-            
-            let service = GmService {
-                state: Arc::clone(&self.state), 
-                runtime: Arc::clone(&self.runtime),
-            };
-            let verification_result = service.simple_verify_signature(&signature_data, &signature)?;
-            
-            if !verification_result.success {
-                return Ok(SendGmResponse {
-                    success: false,
-                    message: format!("Signature verification failed: {}", verification_result.message),
-                    timestamp: 0,
-                });
-            }
-        }
-        
-        let current_chain_id = self.runtime.chain_id();
-        let state = self.state.lock().await; 
-        
-        let default_content = Some("Gmicrochains".to_string());
-        let final_content = content.or(default_content);
-        
-        if chain_id != current_chain_id {
-            let operation = GmOperation::GmTo { sender, recipient, content: final_content.clone() };
-            drop(state);
-            self.runtime.schedule_operation(&operation);
-            return Ok(SendGmResponse {
-                success: true,
-                message: format!("Cross-chain GM sent successfully, sender: {}, recipient: {}, chain ID: {}", sender, recipient, chain_id),
-                timestamp: self.runtime.system_time().micros(),
-            });
-        }
-        
-        let operation = GmOperation::GmTo { sender, recipient, content: final_content.clone() };
-        drop(state);
-        self.runtime.schedule_operation(&operation);
-        Ok(SendGmResponse {
-            success: true,
-            message: format!("Targeted GM sent successfully, sender: {}, recipient: {}", sender, recipient),
-            timestamp: self.runtime.system_time().micros(),
-        })
-    }
-    
-    async fn send_gm_with_invitation(
-        &self,
-        _ctx: &async_graphql::Context<'_>,
-        chain_id: ChainId,
-        sender: AccountOwner,
-        recipient: AccountOwner,
-        inviter: Option<AccountOwner>,
-        content: Option<String>,
-    ) -> Result<SendGmResponse, async_graphql::Error> {
-        // Use chain_id for potential future cross-chain operations or signature verification
-        let _chain_id_for_future_use = chain_id;
-        
-        let operation = GmOperation::GmWithInvitation { 
-            sender,
-            recipient, 
-            content,
-            inviter 
-        };
-        self.runtime.schedule_operation(&operation);
-        
-        Ok(SendGmResponse {
-            success: true,
-            message: format!("GM with invitation sent successfully: sender={}, recipient={}", sender, recipient),
-            timestamp: self.runtime.system_time().micros(),
-        })
     }
     
     async fn claim_invitation_rewards(

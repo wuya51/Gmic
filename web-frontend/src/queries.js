@@ -22,15 +22,7 @@ export const GET_GM_RECORD = gql`
   }
 `;
 
-export const GET_INVITATION_STATS = gql`
-  query GetInvitationStats($user: AccountOwner!) {
-    getInvitationStats(user: $user) {
-      totalInvited
-      totalRewards
-      lastRewardTime
-    }
-  }
-`;
+
 
 export const GET_LEADERBOARD = gql`
   query GetLeaderboard($limit: Int) {
@@ -38,6 +30,37 @@ export const GET_LEADERBOARD = gql`
       user
       count
     }
+  }
+`;
+
+export const GET_USER_INVITATION_REWARDS = gql`
+  query GetUserInvitationRewards($user: AccountOwner!) {
+    getUserInvitationRewards(user: $user)
+  }
+`;
+
+export const GET_INVITATION_STATS = gql`
+  query GetInvitationStats($user: AccountOwner!) {
+    getInvitationStats(user: $user) {
+      total_invited
+      total_rewards
+      last_reward_time
+    }
+  }
+`;
+
+export const GET_INVITATION_LEADERBOARD = gql`
+  query GetInvitationLeaderboard($limit: Int) {
+    getTopInvitors(limit: $limit) {
+      user
+      count
+    }
+  }
+`;
+
+export const GET_INVITATION_RANK = gql`
+  query GetInvitationRank($user: AccountOwner!) {
+    getInvitationRank(user: $user)
   }
 `;
 
@@ -95,28 +118,8 @@ export const SUBSCRIBE_GM_EVENTS = gql`
 
 // Mutations
 export const SEND_GM = gql`
-  mutation SendGm($chainId: ChainId!, $sender: AccountOwner!, $content: String) {
-    sendGm(chainId: $chainId, sender: $sender, content: $content) {
-      success
-      message
-      timestamp
-    }
-  }
-`;
-
-export const SEND_GM_TO = gql`
-  mutation SendGmTo($chainId: ChainId!, $sender: AccountOwner!, $recipient: AccountOwner!, $content: String) {
-    sendGmTo(chainId: $chainId, sender: $sender, recipient: $recipient, content: $content) {
-      success
-      message
-      timestamp
-    }
-  }
-`;
-
-export const SEND_GM_WITH_INVITATION = gql`
-  mutation SendGmWithInvitation($chainId: ChainId!, $sender: AccountOwner!, $recipient: AccountOwner!, $inviter: AccountOwner, $content: String) {
-    sendGmWithInvitation(chainId: $chainId, sender: $sender, recipient: $recipient, inviter: $inviter, content: $content) {
+  mutation SendGm($chainId: ChainId!, $sender: AccountOwner!, $recipient: AccountOwner, $content: String, $inviter: AccountOwner) {
+    sendGm(chainId: $chainId, sender: $sender, recipient: $recipient, content: $content, inviter: $inviter) {
       success
       message
       timestamp

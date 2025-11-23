@@ -41,6 +41,7 @@ impl GmState {
         recipient: Option<AccountOwner>,
         timestamp: Timestamp,
         content: Option<String>,
+        inviter: Option<AccountOwner>,
     ) -> Result<(), ViewError> {
         let current_ts = timestamp.micros();
         if current_ts == 0 {
@@ -64,6 +65,60 @@ impl GmState {
         let total = self.total_messages.get();
         let new_total = total + 1;
         self.total_messages.set(new_total);
+        let existing_invitation = self.invitations.get(&sender).await?;        
+        if let Some(inviter) = inviter {
+            if let Some(record) = existing_invitation {
+                if record.inviter == inviter {
+                    let mut stats = self.invitation_stats.get(&inviter).await?.unwrap_or(InvitationStats {
+                        total_invited: 0,
+                        total_rewards: 0,
+                        last_reward_time: None,
+                    });
+                    
+                    let reward = 10;
+                    stats.total_rewards += reward;
+                    stats.last_reward_time = Some(timestamp);
+                    
+                    self.invitation_stats.insert(&inviter, stats)?;
+                }
+            } else {
+                let invitation = InvitationRecord {
+                    inviter: inviter.clone(),
+                    invitee: sender.clone(),
+                    invited_at: timestamp,
+                    rewarded: true,
+                    rewarded_at: Some(timestamp),
+                };
+
+                self.invitations.insert(&sender, invitation)?;
+                
+                let mut stats = self.invitation_stats.get(&inviter).await?.unwrap_or(InvitationStats {
+                    total_invited: 0,
+                    total_rewards: 0,
+                    last_reward_time: None,
+                });
+                
+                let reward = 30;
+                stats.total_invited += 1;
+                stats.total_rewards += reward;
+                stats.last_reward_time = Some(timestamp);
+                
+                self.invitation_stats.insert(&inviter, stats)?;
+            }
+        } else if let Some(record) = existing_invitation {
+            let inviter = record.inviter.clone();
+            let mut stats = self.invitation_stats.get(&inviter).await?.unwrap_or(InvitationStats {
+                total_invited: 0,
+                total_rewards: 0,
+                last_reward_time: None,
+            });
+            
+            let reward = 10;
+            stats.total_rewards += reward;
+            stats.last_reward_time = Some(timestamp);
+            
+            self.invitation_stats.insert(&inviter, stats)?;
+        }
 
         self.update_time_statistics(chain_id, current_ts).await?;
 
@@ -378,58 +433,12 @@ impl GmState {
 
         self.get_daily_stats(chain_id, start_day, end_day).await
     }
-
-    pub async fn handle_gm_with_invitation(
-        &mut self,
-        sender: AccountOwner,
-        inviter: Option<AccountOwner>,
-        current_time: Timestamp,
-    ) -> Result<u32, ViewError> {
-        let inviter = match inviter {
-            Some(inviter) => inviter,
-            None => return Ok(0),
-        };
-
-        if let Some(existing_record) = self.invitations.get(&sender).await? {
-            if existing_record.rewarded {
-                return Ok(0);
-            }
+    pub async fn get_user_invitation_rewards(&self, user: AccountOwner) -> Result<u32, ViewError> {
+        if let Some(stats) = self.invitation_stats.get(&user).await? {
+            Ok(stats.total_rewards)
+        } else {
+            Ok(0) 
         }
-
-        let invitation = InvitationRecord {
-            inviter: inviter.clone(),
-            invitee: sender.clone(),
-            invited_at: current_time,
-            rewarded: true,
-            rewarded_at: Some(current_time),
-        };
-
-        self.invitations.insert(&sender, invitation)?;
-
-        let mut stats = self.invitation_stats.get(&inviter).await?.unwrap_or(InvitationStats {
-            total_invited: 0,
-            total_rewards: 0,
-            last_reward_time: None,
-        });
-
-        let reward = 10;
-        stats.total_invited += 1;
-        stats.total_rewards += reward;
-        stats.last_reward_time = Some(current_time);
-
-        self.invitation_stats.insert(&inviter, stats)?;
-
-        self.save().await?;
-        Ok(reward)
-    }
-
-    pub async fn claim_invitation_rewards(&mut self, user: AccountOwner) -> Result<u32, ViewError> {
-        let stats = match self.invitation_stats.get(&user).await? {
-            Some(stats) => stats,
-            None => return Err(ViewError::NotFound("No invitation rewards available".to_string())),
-        };
-
-        Ok(stats.total_rewards)
     }
 
     pub async fn get_invitation_stats(&self, user: AccountOwner) -> Result<Option<InvitationStats>, ViewError> {
@@ -440,12 +449,43 @@ impl GmState {
         self.invitations.get(&invitee).await
     }
 
-    pub async fn has_received_invitation_reward(&self, invitee: AccountOwner) -> Result<bool, ViewError> {
-        if let Some(record) = self.invitations.get(&invitee).await? {
-            Ok(record.rewarded)
-        } else {
-            Ok(false)
+    pub async fn get_top_invitation_rewards(&self, limit: u32) -> Result<Vec<(AccountOwner, u32)>, ViewError> {
+        let mut reward_list = Vec::new();
+
+        self.invitation_stats
+            .for_each_index_value(|owner, stats| {
+                reward_list.push((owner.clone(), stats.total_rewards));
+                Ok(())
+            })
+            .await?;
+
+        reward_list.sort_by(|a, b| b.1.cmp(&a.1));
+        let top_rewards: Vec<(AccountOwner, u32)> = reward_list
+            .into_iter()
+            .take(limit as usize)
+            .collect();
+
+        Ok(top_rewards)
+    }
+
+    pub async fn get_invitation_rank(&self, user: &AccountOwner) -> Result<u32, ViewError> {
+        let mut all_users = Vec::new();
+        self.invitation_stats
+            .for_each_index_value(|owner, stats| {
+                all_users.push((owner.clone(), stats.total_rewards));
+                Ok(())
+            })
+            .await?;
+
+        all_users.sort_by(|a, b| b.1.cmp(&a.1));
+
+        for (rank, (owner, _)) in all_users.iter().enumerate() {
+            if owner == user {
+                return Ok((rank + 1) as u32);
+            }
         }
+
+        Ok(0)
     }
 
     pub async fn get_user_activity_trend(

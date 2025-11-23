@@ -96,6 +96,7 @@ function DefaultGraphQLApp() {
   const OWNER_ID = "0xfee4148c7bd7a824b1dc6e2b4be10476cfaec92783c7db06a9b8d7559bb3f9d9";
   const PORT = "8080";
   const HOST = "gmic.top";
+  const INVITER = null;
   
   try {
     
@@ -130,6 +131,8 @@ function DefaultGraphQLApp() {
                 ownerId={OWNER_ID} 
                 appId={APP_ID}
                 appChainId={CHAIN_ID}
+                port={PORT}
+                inviter={INVITER}
               />
             </GraphQLProvider>
           </WalletProvider>
@@ -167,6 +170,7 @@ function GraphQLApp() {
     const OWNER_ID = searchParams.get("owner") || import.meta.env.VITE_OWNER_ID;
     const PORT = searchParams.get("port") || import.meta.env.VITE_PORT || "8080";
     const HOST = searchParams.get("host") || import.meta.env.VITE_HOST || "localhost";
+    const INVITER = searchParams.get("inviter"); // 获取inviter参数
     
     return (
       <ErrorBoundary>
@@ -199,6 +203,8 @@ function GraphQLApp() {
                 ownerId={OWNER_ID} 
                 appId={APP_ID}
                 appChainId={CHAIN_ID}
+                port={PORT}
+                inviter={INVITER}
               />
             </GraphQLProvider>
           </WalletProvider>

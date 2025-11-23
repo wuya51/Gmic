@@ -27,9 +27,7 @@ impl linera_sdk::abi::ServiceAbi for GmAbi {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum GmOperation {
-    Gm { sender: AccountOwner, recipient: AccountOwner, content: Option<String> },
-    GmTo { sender: AccountOwner, recipient: AccountOwner, content: Option<String> },
-    GmWithInvitation { sender: AccountOwner, recipient: AccountOwner, content: Option<String>, inviter: Option<AccountOwner> },
+    Gm { sender: AccountOwner, recipient: AccountOwner, content: Option<String>, inviter: Option<AccountOwner> },
     ClaimInvitationRewards { sender: AccountOwner },
     SetCooldownEnabled { enabled: bool },
 }

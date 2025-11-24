@@ -456,7 +456,7 @@ const NotificationCenter = ({
     };
     
     const handleReply = async () => {
-      if (!gmOperations || !gmOperations.handleSendGMTo || !gmOperations.formatAccountOwner || !gmOperations.isValidAccountOwner) {
+      if (!gmOperations || !gmOperations.handleSendGM || !gmOperations.formatAccountOwner || !gmOperations.isValidAccountOwner) {
         return;
       }
       
@@ -485,7 +485,7 @@ const NotificationCenter = ({
         
         gmOperations.targetChainId = chainId;
         
-        await gmOperations.handleSendGMToWithAddress(formattedAddress, 'Gmicrochains');
+        await gmOperations.handleSendGM('Gmicrochains', formattedAddress);
         
         gmOperations.targetChainId = originalTargetChainId;
         

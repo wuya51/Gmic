@@ -5,6 +5,28 @@ import "./App.css";
 import GMOperations, { useGMAdditionalData } from './GMOperations';
 import NotificationCenter from './NotificationCenter';
 
+// 添加全局错误处理器，记录完整的错误堆栈信息
+window.onerror = function(message, source, lineno, colno, error) {
+  console.error('Global error captured:', {
+    message,
+    source,
+    lineno,
+    colno,
+    error,
+    stack: error ? error.stack : null
+  });
+  return true;
+};
+
+window.onunhandledrejection = function(event) {
+  console.error('Global unhandled promise rejection captured:', {
+    reason: event.reason,
+    stack: event.reason ? event.reason.stack : null,
+    promise: event.promise
+  });
+  return true;
+};
+
 const formatAccountOwner = (address) => {
   if (!address) return '';
   const cleanAddress = address.trim();
@@ -29,6 +51,43 @@ const isButtonDisabled = (operationStatus, currentAccount, gmOps, cooldownRemain
 
   const MAX_MESSAGE_LENGTH = 280;
   const WARNING_THRESHOLD = 250;
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('React component error captured by ErrorBoundary:', {
+      error,
+      errorInfo,
+      stack: errorInfo.componentStack
+    });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="error-boundary">
+          <h2>Something went wrong.</h2>
+          <details style={{ whiteSpace: 'pre-wrap' }}>
+            {this.state.error && this.state.error.toString()}
+            <br />
+            {this.state.errorInfo && this.state.errorInfo.componentStack}
+          </details>
+          <button onClick={() => this.setState({ hasError: false })}>Try Again</button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 function App({ chainId, appId, ownerId, inviter, port }) {
   const appRenderCountRef = useRef(0);
@@ -897,6 +956,15 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     setQueryRetryCount
   });
 
+  const shareModalAdditionalData = useGMAdditionalData({
+    chainId,
+    currentAccount,
+    currentChainId: connectedWalletChainId,
+    walletType,
+    queryRetryCount,
+    setQueryRetryCount
+  });
+
   const memoizedLeaderboardData = useMemo(() => additionalData.leaderboardData, [additionalData.leaderboardData]);
 
   useEffect(() => {
@@ -910,8 +978,8 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     }
   }, [activeTab, additionalData.refetchLeaderboard, additionalData.refetchInvitationLeaderboard]);
 
-  // 使用GMOperations函数初始化gmOps对象
-  const gmOps = GMOperations({
+
+  const gmOperationsResult = GMOperations({
     chainId,
     currentAccount,
     currentChainId: connectedWalletChainId,
@@ -932,19 +1000,51 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     inviter,
     queryRetryCount,
     setQueryRetryCount
-  });
-  
-  // 确保gmOps至少是一个空对象，防止未定义错误
-  const safeGmOps = gmOps || {};
-  
-  // 当分享弹窗打开时，刷新邀请统计数据
+  }) || {};
+  const gmOps = {
+    walletMessagesData: { walletMessages: 0 },
+    subscriptionStatus: {},
+    streamEventsData: [],
+    gmEventsData: {},
+    loading: false,
+    error: null,
+    data: { totalMessages: 0 },
+    queryError: null,
+    invitationStatsData: {
+      totalInvited: 0,
+      totalRewards: 0,
+      lastRewardTime: null
+    },
+    refetchInvitationRewards: () => Promise.resolve({}),
+    refetchLeaderboard: () => Promise.resolve({}),
+    refetchGmEvents: () => Promise.resolve({}),
+    refetchWalletMessages: () => Promise.resolve({}),
+    refetchInvitationStats: () => Promise.resolve({}),
+    refetchStreamEvents: () => Promise.resolve({}),
+    handleSendGM: () => Promise.resolve({}),
+    handleSendGMToWithAddress: () => Promise.resolve({}),
+    handleSendGMWithInvitation: () => Promise.resolve({}),
+    handleClaimInvitationRewards: () => Promise.resolve({}),
+    handleSetCooldownEnabled: () => Promise.resolve({}),
+    isValidAccountOwner: () => false,
+    formatCooldown: (seconds) => `${Math.floor(seconds / 60)}m ${seconds % 60}s`,
+    validateRecipientAddress: () => ({ isValid: false, error: '' }),
+    formatAccountOwner: (address) => address || '',
+    ...gmOperationsResult,
+    invitationStatsData: {
+      totalInvited: 0,
+      totalRewards: 0,
+      lastRewardTime: null,
+      ...(gmOperationsResult.invitationStatsData || {})
+    }
+  };
   useEffect(() => {
-    if (showShareReferralModal) {
-      if (safeGmOps.refetchInvitationRewards && typeof safeGmOps.refetchInvitationRewards === 'function') {
-        safeGmOps.refetchInvitationRewards();
+    if (showShareReferralModal && memoizedCurrentAccount && shareModalAdditionalData) {
+      if (shareModalAdditionalData.refetchInvitationStats) {
+        shareModalAdditionalData.refetchInvitationStats();
       }
     }
-  }, [showShareReferralModal, safeGmOps]);
+  }, [showShareReferralModal, memoizedCurrentAccount, shareModalAdditionalData]);
 
   const handleHistoryToggle = useCallback(async () => {
     if (showHistoryDropdown) {
@@ -1202,17 +1302,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     }
   }, [targetChainId]);
 
-  const validateRecipientAddress = useCallback((address) => {
-    if (!address || address.trim() === '') {
-      setAddressValidationError('');
-      return true;
-    }
-    
-    const formattedAddress = formatAccountOwner(address);
-    const validation = gmOps.validateRecipientAddress(formattedAddress);
-    setAddressValidationError(validation.error);
-    return validation.isValid;
-  }, [gmOps.validateRecipientAddress, currentAccount, gmOps]);
+
 
   const countdown = gmOps.formatCooldown(cooldownRemaining, true);
 
@@ -1240,8 +1330,19 @@ function App({ chainId, appId, ownerId, inviter, port }) {
       return;
     }
     
+    let formattedRecipient = null;
+    if (recipientAddress && recipientAddress.trim() !== '') {
+      formattedRecipient = gmOps.formatAccountOwner(recipientAddress);
+      const validation = gmOps.validateRecipientAddress(formattedRecipient);
+      if (!validation.isValid) {
+        setAddressValidationError(validation.error);
+        return;
+      }
+    }
+    
     const messageContent = customMessageEnabled ? customMessage : null;
-    await gmOps.handleSendGM(messageContent);
+    await gmOps.handleSendGM(messageContent, formattedRecipient);
+    
     setTimeout(() => {
       if (additionalData.refetchCooldownStatus) {
         additionalData.refetchCooldownStatus();
@@ -1256,43 +1357,21 @@ function App({ chainId, appId, ownerId, inviter, port }) {
         gmOps.refetchWalletMessages();
       }
     }, 1000);
-  }, [currentIsConnected, connectWallet, gmOps, addNotification, customMessageEnabled, customMessage, additionalData]);
-
-  const handleSendGMTo = useCallback(async () => {
-    const messageContent = customMessageEnabled ? customMessage : null;
-    const formattedAddress = gmOps.formatAccountOwner(recipientAddress);
-    await gmOps.handleSendGMToWithAddress(formattedAddress, messageContent);
-    setTimeout(() => {
-      if (additionalData.refetchCooldownStatus) {
-        additionalData.refetchCooldownStatus();
-      }
-      if (additionalData.refetchGmRecord) {
-        additionalData.refetchGmRecord();
-      }
-      if (additionalData.refetchCooldownCheck) {
-        additionalData.refetchCooldownCheck();
-      }
-      if (gmOps.refetchWalletMessages) {
-        gmOps.refetchWalletMessages();
-      }
-    }, 1000);
-  }, [gmOps, customMessageEnabled, customMessage, recipientAddress, additionalData]);
+  }, [currentIsConnected, connectWallet, gmOps, addNotification, customMessageEnabled, customMessage, additionalData, recipientAddress, setAddressValidationError]);
 
   return (
-    <div>
-      {/* 左侧悬浮推荐分享按钮 */}
-      <button 
-        className="referral-floating-btn"
-        onClick={handleToggleShareReferral}
-        title="Share your referral link"
-      >
-        🔗 Share Referral
-      </button>
-
-      {/* 推荐分享弹出窗口 */}
-      {showShareReferralModal && (
-        <div className="modal-overlay" onClick={handleToggleShareReferral}>
-          <div className="referral-modal" onClick={(e) => e.stopPropagation()}>
+    <ErrorBoundary>
+      <div>
+        <button 
+          className="referral-floating-btn"
+          onClick={handleToggleShareReferral}
+          title="Share your referral link"
+        >
+          🔗 Share Referral
+        </button>
+        {showShareReferralModal && (
+          <div className="modal-overlay" onClick={handleToggleShareReferral}>
+            <div className="referral-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Share Your Referral Link ✨</h3>
               <button className="modal-close" onClick={handleToggleShareReferral}>×</button>
@@ -1300,25 +1379,48 @@ function App({ chainId, appId, ownerId, inviter, port }) {
             <div className="modal-content">
               {memoizedCurrentAccount && (
                 <>
-                  {/* 推荐统计信息 */}
                   <div className="referral-stats">
-                    <div className="referral-stat-item">
-                      <span className="referral-stat-label">Invited Users:</span>
-                      <span className="referral-stat-value">{safeGmOps.invitationStatsData?.totalInvited || 0}</span>
-                    </div>
-                    <div className="referral-stat-item">
-                      <span className="referral-stat-label">Your Reward Points:</span>
-                      <span className="referral-stat-value">{safeGmOps.invitationStatsData?.totalRewards || 0}</span>
-                    </div>
-                    {safeGmOps.invitationStatsData?.lastRewardTime && (
+                    <button 
+                      className="refresh-btn" 
+                      onClick={() => shareModalAdditionalData?.refetchInvitationStats && shareModalAdditionalData.refetchInvitationStats()}
+                      title="Refresh invitation stats"
+                    >
+                      🔄 Refresh
+                    </button>
+                <div className="referral-stat-item">
+                  <span className="referral-stat-label">Invited Users:</span>
+                  <span className="referral-stat-value">{(() => {
+                    try {
+                      return Number(shareModalAdditionalData?.invitationStatsData?.totalInvited) || 0;
+                    } catch (error) {
+                      return 0;
+                    }
+                  })()}</span>
+                </div>
+                <div className="referral-stat-item">
+                  <span className="referral-stat-label">Your Reward Points:</span>
+                  <span className="referral-stat-value">{(() => {
+                    try {
+                      return Number(shareModalAdditionalData?.invitationStatsData?.totalRewards) || 0;
+                    } catch (error) {
+                      return 0;
+                    }
+                  })()}</span>
+                </div>
+                {(() => {
+                  try {
+                    const lastRewardTime = shareModalAdditionalData?.invitationStatsData?.lastRewardTime;
+                    return lastRewardTime ? (
                       <div className="referral-stat-item">
                         <span className="referral-stat-label">Last Reward:</span>
-                        <span className="referral-stat-value">{new Date(safeGmOps.invitationStatsData.lastRewardTime * 1000).toLocaleString()}</span>
+                        <span className="referral-stat-value">{new Date(Number(lastRewardTime) / 1000).toLocaleString()}</span>
                       </div>
-                    )}
+                    ) : null;
+                  } catch (error) {
+                    return null;
+                  }
+                })()}
                   </div>
-                  
-                  {/* 推荐链接显示和复制 */}
                   <div className="referral-link-section">
                     <label>Your Referral Link:</label>
                     <div className="link-container">
@@ -1331,8 +1433,6 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                       <button onClick={copyReferralLink} className="copy-btn">Copy</button>
                     </div>
                   </div>
-                  
-                  {/* 社交媒体分享选项 */}
                   <div className="share-options">
                     <p className="share-label">Share directly:</p>
                     <div className="social-buttons">
@@ -1354,8 +1454,6 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                       </a>
                     </div>
                   </div>
-                  
-                  {/* 邀请奖励说明 */}
                   <div className="referral-rewards-info">
                     <p>Invite a user to send their first GMIC → 30 points</p>
                     <p>Each GMIC they send after → +10 points</p>
@@ -1802,7 +1900,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                     <button 
                       className="send-button" 
                       id="sendButton"
-                      onClick={recipientAddress ? handleSendGMTo : handleSendGM}
+                      onClick={handleSendGM}
                       disabled={
                         isButtonDisabled(operationStatus, currentAccount, gmOps, cooldownRemaining, localCooldownEnabled)
                       }
@@ -1921,6 +2019,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     chainId={chainId}
   />
 </div>
+  </ErrorBoundary>
   );
 }
 

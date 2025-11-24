@@ -11,10 +11,8 @@ import {
   GET_STREAM_EVENTS,
   IS_USER_WHITELISTED,
   GET_INVITATION_LEADERBOARD,
-  GET_USER_INVITATION_REWARDS,
   GET_INVITATION_STATS,
   SEND_GM, 
-  CLAIM_INVITATION_REWARDS,
   SET_COOLDOWN_ENABLED,
   SUBSCRIBE_GM_EVENTS
 } from './queries';
@@ -263,8 +261,7 @@ const GMOperations = ({
     skip: !isValidChainId(queryChainId),
   });
 
-  // 处理GET_GM_STATS查询错误
-  useEffect(() => {
+   useEffect(() => {
     if (queryError) {
       console.error("GET_GM_STATS query error:", queryError);
       
@@ -315,7 +312,6 @@ const GMOperations = ({
     skip: !currentAccount,
   });
 
-  // 获取用户邀请统计信息
   const { data: invitationStatsDataRaw, refetch: refetchInvitationRewards } = useQuery(GET_INVITATION_STATS, {
     variables: { 
       user: formatAccountOwner(currentAccount) 
@@ -324,10 +320,9 @@ const GMOperations = ({
     skip: !currentAccount,
   });
 
-  // 计算邀请统计数据
   const invitationStatsData = {
-    totalInvited: invitationStatsDataRaw?.getInvitationStats?.total_invited || 0,
-    totalRewards: invitationStatsDataRaw?.getInvitationStats?.total_rewards || 0,
+    totalInvited: Number(invitationStatsDataRaw?.getInvitationStats?.total_invited) || 0,
+    totalRewards: Number(invitationStatsDataRaw?.getInvitationStats?.total_rewards) || 0,
     lastRewardTime: invitationStatsDataRaw?.getInvitationStats?.last_reward_time || null
   };
 
@@ -389,7 +384,6 @@ const GMOperations = ({
     },
   });
 
-  // 处理SEND_GM mutation结果
   useEffect(() => {
     if (sendGmData) {
       const result = typeof sendGmData === 'string' ? { hash: sendGmData } : sendGmData;
@@ -402,41 +396,10 @@ const GMOperations = ({
       onMutationError(sendGmError);
     }
   }, [sendGmError, onMutationError]);
-
-  // SEND_GM_TO and SEND_GM_WITH_INVITATION mutations removed
-  // All functionality is now handled by the unified SEND_GM mutation
-
-  const [claimInvitationRewards, { data: claimInvitationRewardsData, error: claimInvitationRewardsError }] = useMutation(CLAIM_INVITATION_REWARDS, {
-    update: () => {
-      // 当领取奖励成功后，重新获取邀请奖励数据
-      if (refetchInvitationRewards) {
-        refetchInvitationRewards();
-      }
-    },
-  });
-
-  // 处理CLAIM_INVITATION_REWARDS mutation结果
-  useEffect(() => {
-    if (claimInvitationRewardsData) {
-      onMutationComplete(claimInvitationRewardsData, 'invitation');
-      setClaimStatus("success");
-      setTimeout(() => setClaimStatus(null), 5000);
-    }
-  }, [claimInvitationRewardsData, onMutationComplete, setClaimStatus]);
-
-  useEffect(() => {
-    if (claimInvitationRewardsError) {
-      onMutationError(claimInvitationRewardsError);
-      setClaimStatus("error");
-      setTimeout(() => setClaimStatus(null), 5000);
-    }
-  }, [claimInvitationRewardsError, onMutationError, setClaimStatus]);
-
   const [setCooldownEnabled, { data: setCooldownEnabledData, error: setCooldownEnabledError }] = useMutation(SET_COOLDOWN_ENABLED, {
     update: () => {},
   });
 
-  // 处理SET_COOLDOWN_ENABLED mutation结果
   useEffect(() => {
     if (setCooldownEnabledData) {
       onMutationComplete(setCooldownEnabledData, 'setCooldown');
@@ -449,7 +412,7 @@ const GMOperations = ({
     }
   }, [setCooldownEnabledError, onMutationError]);
 
-  const handleSendGM = useCallback(async (content = "Gmicrochains") => {
+  const handleSendGM = useCallback(async (content = "Gmicrochains", recipient = null) => {
     if (!isValidAccountOwner(currentAccount)) {
       setMessage("Invalid wallet account", "error");
       setOperationStatus("error");
@@ -463,122 +426,19 @@ const GMOperations = ({
       setOperationStatus("error");
       return;
     }
-    
-    try {
-      setOperationStatus("processing");
-      await sendGm({
-        variables: {
-          chainId: targetChainId || currentChainId,
-          sender: formatAccountOwner(currentAccount),
-          recipient: null,
-          content: content,
-          inviter: inviter ? formatAccountOwner(inviter) : null,
-        },
-      });
-    } catch (error) {
-      onMutationError(error);
-    }
-  }, [currentAccount, currentChainId, targetChainId, inviter, sendGm, onMutationError, cooldownCheckData, setMessage]);
 
-  const handleSendGMTo = useCallback(async (content = "Gmicrochains") => {
-    const formattedAddress = formatAccountOwner(recipientAddress);
-    const formattedSender = formatAccountOwner(currentAccount);
-    
-    if (!isValidAccountOwner(formattedAddress)) {
-      setMessage("Invalid recipient address (must be 0x followed by 64 or 40 hex characters)", "error");
-      setOperationStatus("error");
-      return;
-    }
-    
-    if (formattedAddress === formattedSender) {
-      setMessage("Cannot send GMicrochains to yourself", "error");
-      setOperationStatus("error");
-      return;
-    }
-    
-    if (cooldownStatus?.enabled === true && cooldownCheckData?.checkCooldown?.inCooldown) {
-      const remainingTime = cooldownCheckData.checkCooldown.remainingTime;
-      const formattedTime = formatCooldown(remainingTime);
-      setMessage(`Within 24-hour cooldown period, please wait ${formattedTime} before sending`, "warning");
-      setOperationStatus("error");
-      return;
-    }
-    
-    try {
-      setOperationStatus("processing");
-      await sendGm({
-        variables: {
-          chainId: targetChainId || currentChainId,
-          sender: formattedSender,
-          recipient: formattedAddress,
-          content: content,
-          inviter: inviter ? formatAccountOwner(inviter) : null,
-        },
-      });
-    } catch (error) {
-      onMutationError(error);
-    }
-  }, [currentAccount, currentChainId, targetChainId, recipientAddress, sendGm, onMutationError, cooldownCheckData, setMessage]);
-
-  const handleSendGMToWithAddress = useCallback(async (address, content = "Gmicrochains") => {
-    const formattedAddress = formatAccountOwner(address);
-    const formattedSender = formatAccountOwner(currentAccount);
-    
-    if (!isValidAccountOwner(formattedAddress)) {
-      setMessage("Invalid recipient address (must be 0x followed by 64 or 40 hex characters)", "error");
-      setOperationStatus("error");
-      return;
-    }
-    
-    if (formattedAddress === formattedSender) {
-      setMessage("Cannot send GMicrochains to yourself", "error");
-      setOperationStatus("error");
-      return;
-    }
-    
-    if (cooldownStatus?.enabled === true && cooldownCheckData?.checkCooldown?.inCooldown) {
-      const remainingTime = cooldownCheckData.checkCooldown.remainingTime;
-      const formattedTime = formatCooldown(remainingTime);
-      setMessage(`Within 24-hour cooldown period, please wait ${formattedTime} before sending`, "warning");
-      setOperationStatus("error");
-      return;
-    }
-    
-    try {
-      setOperationStatus("processing");
-      await sendGm({
-        variables: {
-          chainId: targetChainId || currentChainId,
-          sender: formattedSender,
-          recipient: formattedAddress,
-          content: content,
-          inviter: inviter ? formatAccountOwner(inviter) : null,
-        },
-      });
-    } catch (error) {
-      onMutationError(error);
-    }
-  }, [currentAccount, currentChainId, targetChainId, sendGm, onMutationError, cooldownCheckData, setMessage, inviter]);
-
-  const handleSendGMWithInvitation = useCallback(async (content = "Gmicrochains") => {
-    const formattedAddress = recipientAddress ? formatAccountOwner(recipientAddress) : null;
-    if (recipientAddress && !isValidAccountOwner(formattedAddress)) {
-      setMessage("Invalid recipient address (must be 0x followed by 64 or 40 hex characters)", "error");
-      setOperationStatus("error");
-      return;
-    }
-    if (formattedAddress && formattedAddress === currentAccount) {
-      setMessage("Cannot send GMicrochains to yourself", "error");
-      setOperationStatus("error");
-      return;
-    }
-    
-    if (cooldownStatus?.enabled === true && cooldownCheckData?.checkCooldown?.inCooldown) {
-      const remainingTime = cooldownCheckData.checkCooldown.remainingTime;
-      const formattedTime = formatCooldown(remainingTime);
-      setMessage(`Within 24-hour cooldown period, please wait ${formattedTime} before sending`, "warning");
-      setOperationStatus("error");
-      return;
+    if (recipient) {
+      if (!recipient.startsWith('0x') || !(/^0x[0-9a-fA-F]{40,64}$/.test(recipient))) {
+        setMessage("Invalid recipient address (must be 0x followed by 64 or 40 hex characters)", "error");
+        setOperationStatus("error");
+        return;
+      }
+      
+      if (recipient === formatAccountOwner(currentAccount)) {
+        setMessage("Cannot send GMicrochains to yourself", "error");
+        setOperationStatus("error");
+        return;
+      }
     }
     
     try {
@@ -587,7 +447,7 @@ const GMOperations = ({
         variables: {
           chainId: targetChainId || currentChainId,
           sender: formatAccountOwner(currentAccount),
-          recipient: formattedAddress,
+          recipient: recipient,
           content: content,
           inviter: inviter ? formatAccountOwner(inviter) : null,
         },
@@ -595,20 +455,9 @@ const GMOperations = ({
     } catch (error) {
       onMutationError(error);
     }
-  }, [currentAccount, currentChainId, targetChainId, recipientAddress, sendGm, onMutationError, cooldownCheckData, setMessage, inviter]);
+  }, [currentAccount, currentChainId, targetChainId, inviter, sendGm, onMutationError, cooldownCheckData, setMessage, formatAccountOwner]);
 
-  const handleClaimInvitationRewards = useCallback(async () => {
-    try {
-      setClaimStatus("processing");
-      await claimInvitationRewards({
-        variables: {
-          user: formatAccountOwner(currentAccount),
-        },
-      });
-    } catch (error) {
-      onMutationError(error);
-    }
-  }, [currentAccount, currentChainId, targetChainId, claimInvitationRewards, onMutationError, setClaimStatus]);
+  
 
   const handleSetCooldownEnabled = useCallback(async (enabled) => {
     if (!isValidAccountOwner(currentAccount)) {
@@ -673,32 +522,28 @@ const GMOperations = ({
 
 
   const safeInvitationStats = useMemo(() => {
-    // 从邀请统计数据中提取信息
     return {
-      totalInvited: invitationStatsData?.getInvitationStats?.total_invited || 0,
-      totalRewards: invitationStatsData?.getInvitationStats?.total_rewards || 0,
-      lastRewardTime: invitationStatsData?.getInvitationStats?.last_reward_time || null
+      totalInvited: invitationStatsData?.getInvitationStats?.totalInvited || 0,
+      totalRewards: invitationStatsData?.getInvitationStats?.totalRewards || 0,
+      lastRewardTime: invitationStatsData?.getInvitationStats?.lastRewardTime || null
     };
   }, [invitationStatsData]);
 
   return {
-    data,
-    walletMessagesData,
-    gmEventsData: filteredGmEvents,
-    streamEventsData: filteredStreamEvents,
+    data: data || {},
+    walletMessagesData: walletMessagesData || {},
+    gmEventsData: filteredGmEvents || [],
+    streamEventsData: filteredStreamEvents || [],
     loading,
     queryError,
-    invitationStatsData,
-    safeInvitationStats,
+    invitationStatsData: invitationStatsData || { totalInvited: 0, totalRewards: 0, lastRewardTime: null },
+    safeInvitationStats: safeInvitationStats || { totalInvited: 0, totalRewards: 0, lastRewardTime: null },
     refetch,
     refetchGmEvents,
     refetchStreamEvents,
     refetchInvitationRewards,
     handleSendGM,
-    handleSendGMTo,
-    handleSendGMToWithAddress,
     handleSetCooldownEnabled,
-    handleClaimInvitationRewards,
     validateRecipientAddress,
     formatCooldown,
     isValidAccountOwner,
@@ -714,6 +559,28 @@ export const useGMAdditionalData = ({
   queryRetryCount,
   setQueryRetryCount
 }) => {
+  const { data: invitationStatsDataRaw, loading: invitationStatsLoading, error: invitationStatsError, refetch: refetchInvitationStats } = useQuery(GET_INVITATION_STATS, {
+    variables: { 
+      user: currentAccount ? formatAccountOwner(currentAccount) : null
+    },
+    skip: !currentAccount,
+    fetchPolicy: 'cache-and-network',
+    pollInterval: 0,
+    nextFetchPolicy: 'cache-first',
+    notifyOnNetworkStatusChange: false
+  });
+
+  const invitationStatsData = {
+    totalInvited: Number(invitationStatsDataRaw?.getInvitationStats?.totalInvited) || 0,
+    totalRewards: Number(invitationStatsDataRaw?.getInvitationStats?.totalRewards) || 0,
+    lastRewardTime: invitationStatsDataRaw?.getInvitationStats?.lastRewardTime || null
+  };
+  
+  useEffect(() => {
+    if (invitationStatsError) {
+      console.error('Error fetching invitation stats:', invitationStatsError);
+    }
+  }, [invitationStatsError]);
   const { data: gmRecordData, loading: gmRecordLoading, error: gmRecordError, refetch: refetchGmRecord } = useQuery(GET_GM_RECORD, {
     variables: { 
       owner: currentAccount ? formatAccountOwner(currentAccount) : null,
@@ -721,10 +588,11 @@ export const useGMAdditionalData = ({
     },
     skip: !currentAccount || !chainId,
     fetchPolicy: 'cache-and-network',
-    notifyOnNetworkStatusChange: true
+    notifyOnNetworkStatusChange: false,
+    pollInterval: 0,
+    nextFetchPolicy: 'cache-first'
   });
 
-  // 使用useEffect处理错误，替代已弃用的onError回调
   useEffect(() => {
     if (gmRecordError) {
       console.error('Error fetching GM record:', gmRecordError);
@@ -741,7 +609,7 @@ export const useGMAdditionalData = ({
     variables: { 
       limit: 15 
     },
-    skip: false, // 默认启用查询，确保数据可用
+    skip: false,
     fetchPolicy: 'cache-and-network',
     notifyOnNetworkStatusChange: true,
     pollInterval: 0,
@@ -802,33 +670,24 @@ export const useGMAdditionalData = ({
       }
     }
   }, [whitelistError, queryRetryCount, setQueryRetryCount, refetchWhitelist]);
-
-  // 处理GET_LEADERBOARD查询错误
   useEffect(() => {
     if (leaderboardError) {
       console.error('Error fetching leaderboard:', leaderboardError);
-      // 移除自动重试逻辑，避免持续轮询
     }
   }, [leaderboardError]);
-
-  // 处理GET_COOLDOWN_STATUS查询错误
   useEffect(() => {
     if (cooldownStatusError) {
       console.error('Error fetching cooldown status:', cooldownStatusError);
-      // 移除自动重试逻辑，避免轮询
     }
   }, [cooldownStatusError]);
-
-  // 处理CHECK_COOLDOWN查询错误
   useEffect(() => {
     if (cooldownCheckError) {
       console.error('Error checking cooldown:', cooldownCheckError);
-      // 移除自动重试逻辑，避免持续轮询
     }
   }, [cooldownCheckError]);
 
-  const loading = gmRecordLoading || leaderboardLoading || invitationLeaderboardLoading || cooldownStatusLoading || cooldownCheckLoading || whitelistLoading;
-  const queryError = gmRecordError || leaderboardError || invitationLeaderboardError || cooldownStatusError || cooldownCheckError || whitelistError;
+  const loading = gmRecordLoading || leaderboardLoading || invitationLeaderboardLoading || cooldownStatusLoading || cooldownCheckLoading || whitelistLoading || invitationStatsLoading;
+  const queryError = gmRecordError || leaderboardError || invitationLeaderboardError || cooldownStatusError || cooldownCheckError || whitelistError || invitationStatsError;
 
   return {
     gmRecordData,
@@ -837,6 +696,7 @@ export const useGMAdditionalData = ({
     cooldownStatusData,
     cooldownCheckData,
     whitelistData,
+    invitationStatsData,
     loading,
     queryError,
     refetchGmRecord,
@@ -844,7 +704,8 @@ export const useGMAdditionalData = ({
     refetchInvitationLeaderboard,
     refetchCooldownStatus,
     refetchCooldownCheck,
-    refetchWhitelist
+    refetchWhitelist,
+    refetchInvitationStats
   };
 };
 

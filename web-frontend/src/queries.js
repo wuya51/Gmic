@@ -22,8 +22,6 @@ export const GET_GM_RECORD = gql`
   }
 `;
 
-
-
 export const GET_LEADERBOARD = gql`
   query GetLeaderboard($limit: Int) {
     getTopUsers(limit: $limit) {
@@ -33,18 +31,12 @@ export const GET_LEADERBOARD = gql`
   }
 `;
 
-export const GET_USER_INVITATION_REWARDS = gql`
-  query GetUserInvitationRewards($user: AccountOwner!) {
-    getUserInvitationRewards(user: $user)
-  }
-`;
-
 export const GET_INVITATION_STATS = gql`
   query GetInvitationStats($user: AccountOwner!) {
     getInvitationStats(user: $user) {
-      total_invited
-      total_rewards
-      last_reward_time
+      totalInvited
+      totalRewards
+      lastRewardTime
     }
   }
 `;
@@ -116,20 +108,9 @@ export const SUBSCRIBE_GM_EVENTS = gql`
   }
 `;
 
-// Mutations
 export const SEND_GM = gql`
   mutation SendGm($chainId: ChainId!, $sender: AccountOwner!, $recipient: AccountOwner, $content: String, $inviter: AccountOwner) {
     sendGm(chainId: $chainId, sender: $sender, recipient: $recipient, content: $content, inviter: $inviter) {
-      success
-      message
-      timestamp
-    }
-  }
-`;
-
-export const CLAIM_INVITATION_REWARDS = gql`
-  mutation ClaimInvitationRewards($user: AccountOwner!) {
-    claimInvitationRewards(user: $user) {
       success
       message
       timestamp

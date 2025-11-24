@@ -2174,7 +2174,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 24px 0 24px;
+  padding: 8px;
   border-bottom: 1px solid #e5e7eb;
 }
 
@@ -2207,15 +2207,15 @@ body {
 }
 
 .modal-content {
-  padding: 24px;
+  padding: 10px 24px;
 }
 
 /* 推荐统计信息样式 */
 .referral-stats {
   background: #f9fafb;
   border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 24px;
+  padding: 5px;
+  margin-bottom: 5px;
 }
 
 .referral-stat-item {
@@ -2362,8 +2362,8 @@ body {
   background-color: #f9fafb;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  padding: 16px;
-  margin-top: 16px;
+  padding: 5px;
+  margin-top: 5px;
   font-size: 14px;
   line-height: 1.5;
   color: #6b7280;

@@ -733,22 +733,7 @@ impl MutationRoot {
             block_height),
         timestamp: self.runtime.system_time().micros(),
     })
-    }
-    
-    async fn claim_invitation_rewards(
-        &self,
-        _ctx: &async_graphql::Context<'_>,
-        user: AccountOwner,
-    ) -> Result<SendGmResponse, async_graphql::Error> {
-        let operation = GmOperation::ClaimInvitationRewards { sender: user };
-        self.runtime.schedule_operation(&operation);
-        
-        Ok(SendGmResponse {
-            success: true,
-            message: format!("Invitation reward claimed successfully: user={}", user),
-            timestamp: self.runtime.system_time().micros(),
-        })
-    }
+    }  
     
     async fn set_cooldown_enabled(
         &self,

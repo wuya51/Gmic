@@ -3,217 +3,192 @@
 > vite
 
 
-  VITE v5.4.21  ready in 407 ms
+  VITE v5.4.21  ready in 598 ms
 
   ➜  Local:   http://localhost:3000/
   ➜  Network: http://194.60.87.30:3000/
   ➜  Network: http://172.24.0.1:3000/
-12:54:04 PM [vite] page reload src/App.js
-12:57:44 PM [vite] page reload src/App.js
-12:58:02 PM [vite] page reload src/App.js
-1:01:48 PM [vite] page reload src/App.js
-1:04:53 PM [vite] page reload src/App.js
-1:12:42 PM [vite] page reload src/GMOperations.js
-1:13:37 PM [vite] page reload src/GMOperations.js
-1:17:42 PM [vite] page reload src/App.js
-1:19:41 PM [vite] page reload src/App.js
-1:21:40 PM [vite] page reload src/App.js
-1:21:48 PM [vite] page reload src/App.js
-1:27:54 PM [vite] page reload src/App.js
-1:28:05 PM [vite] hmr update /src/App.css
-1:30:33 PM [vite] page reload src/App.js
-1:32:42 PM [vite] page reload src/App.js
-1:36:37 PM [vite] page reload src/App.js
-1:43:07 PM [vite] page reload src/App.js
-1:48:12 PM [vite] page reload src/GMOperations.js
-1:50:11 PM [vite] page reload src/App.js
-1:50:12 PM [vite] Pre-transform error: Transform failed with 1 error:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:917:8: ERROR: The symbol "gmOps" has already been declared
-1:50:13 PM [vite] Internal server error: Transform failed with 1 error:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:917:8: ERROR: The symbol "gmOps" has already been declared
+10:16:28 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1035|      formatAccountOwner: (address) => address || '',
+1036|      ...gmOperationsResult,
+1037|      invitationStatsData: {
+   |      ^
+1038|        totalInvited: 0,
+1039|        totalRewards: 0,
+
   Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:917:8
-  
-  The symbol "gmOps" has already been declared
-  915|    }, [activeTab, additionalData.refetchLeaderboard, additionalData.refetchInvitationLeaderboard]);
-  916|  
-  917|    const gmOps = GMOperations({
-     |          ^
-  918|      chainId,
-  919|      currentAccount,
-  
-      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
-      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
-      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
-      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
-      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
-      at Socket.emit (node:events:524:28)
-      at addChunk (node:internal/streams/readable:561:12)
-      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
-      at Readable.push (node:internal/streams/readable:392:5)
-      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
-1:50:38 PM [vite] page reload src/App.js
-1:50:39 PM [vite] Pre-transform error: Transform failed with 1 error:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:917:8: ERROR: The symbol "gmOps" has already been declared
-1:50:40 PM [vite] Internal server error: Transform failed with 1 error:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:917:8: ERROR: The symbol "gmOps" has already been declared
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
+10:46:50 AM [vite] hmr update /src/App.css
+10:46:58 AM [vite] page reload src/App.js
+10:46:59 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1037|      formatAccountOwner: (address) => address || '',
+1038|      ...gmOperationsResult,
+1039|      invitationStatsData: {
+   |      ^
+1040|        totalInvited: 0,
+1041|        totalRewards: 0,
+
   Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:917:8
-  
-  The symbol "gmOps" has already been declared
-  915|    }, [activeTab, additionalData.refetchLeaderboard, additionalData.refetchInvitationLeaderboard]);
-  916|  
-  917|    const gmOps = GMOperations({
-     |          ^
-  918|      chainId,
-  919|      currentAccount,
-  
-      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
-      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
-      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
-      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
-      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
-      at Socket.emit (node:events:524:28)
-      at addChunk (node:internal/streams/readable:561:12)
-      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
-      at Readable.push (node:internal/streams/readable:392:5)
-      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
-1:51:23 PM [vite] page reload src/App.js
-1:51:23 PM [vite] Pre-transform error: Transform failed with 1 error:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:924:8: ERROR: The symbol "gmOps" has already been declared
-1:51:24 PM [vite] Internal server error: Transform failed with 1 error:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:924:8: ERROR: The symbol "gmOps" has already been declared
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
+10:53:39 AM [vite] hmr update /src/App.css
+10:54:48 AM [vite] page reload src/App.js
+10:54:48 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1037|      formatAccountOwner: (address) => address || '',
+1038|      ...gmOperationsResult,
+1039|      invitationStatsData: {
+   |      ^
+1040|        totalInvited: 0,
+1041|        totalRewards: 0,
+
   Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:924:8
-  
-  The symbol "gmOps" has already been declared
-  922|    }, [activeTab, additionalData.refetchLeaderboard, additionalData.refetchInvitationLeaderboard]);
-  923|  
-  924|    const gmOps = GMOperations({
-     |          ^
-  925|      chainId,
-  926|      currentAccount,
-  
-      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
-      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
-      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
-      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
-      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
-      at Socket.emit (node:events:524:28)
-      at addChunk (node:internal/streams/readable:561:12)
-      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
-      at Readable.push (node:internal/streams/readable:392:5)
-      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
-1:53:39 PM [vite] page reload src/App.js
-1:53:39 PM [vite] Pre-transform error: Transform failed with 2 errors:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:340:8: ERROR: The symbol "safeGmOps" has already been declared
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:927:8: ERROR: The symbol "gmOps" has already been declared
-1:53:41 PM [vite] Internal server error: Transform failed with 2 errors:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:340:8: ERROR: The symbol "safeGmOps" has already been declared
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:927:8: ERROR: The symbol "gmOps" has already been declared
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
+10:57:57 AM [vite] page reload src/App.js
+10:57:58 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1037|      formatAccountOwner: (address) => address || '',
+1038|      ...gmOperationsResult,
+1039|      invitationStatsData: {
+   |      ^
+1040|        totalInvited: 0,
+1041|        totalRewards: 0,
+
   Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:340:8
-  
-  The symbol "safeGmOps" has already been declared
-  338|    const isDynamicConnected = (primaryWallet && primaryWallet.address) || (walletType === 'dynamic' && isConnected);
-  339|    // 确保gmOps至少是一个空对象，防止未定义错误
-  340|    const safeGmOps = gmOps || {};
-     |          ^
-  341|    const dynamicAccount = isDynamicConnected ? formatAccountOwner(primaryWallet?.address || currentAccount) : null;
-  342|    const isActiveDynamicWallet = (isConnected && walletType === 'dynamic' && currentAccount) || (primaryWallet && primaryWallet.address && walletType === 'dynamic');
-  
-  The symbol "gmOps" has already been declared
-  925|    }, [activeTab, additionalData.refetchLeaderboard, additionalData.refetchInvitationLeaderboard]);
-  926|  
-  927|    const gmOps = GMOperations({
-     |          ^
-  928|      chainId,
-  929|      currentAccount,
-  
-      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
-      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
-      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
-      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
-      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
-      at Socket.emit (node:events:524:28)
-      at addChunk (node:internal/streams/readable:561:12)
-      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
-      at Readable.push (node:internal/streams/readable:392:5)
-      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
-1:54:11 PM [vite] Internal server error: Transform failed with 2 errors:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:340:8: ERROR: The symbol "safeGmOps" has already been declared
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:927:8: ERROR: The symbol "gmOps" has already been declared
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
+10:59:09 AM [vite] hmr update /src/App.css
+11:00:38 AM [vite] hmr update /src/App.css
+11:01:51 AM [vite] page reload src/App.js
+11:01:52 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1061|      formatAccountOwner: (address) => address || '',
+1062|      ...gmOperationsResult,
+1063|      invitationStatsData: {
+   |      ^
+1064|        totalInvited: 0,
+1065|        totalRewards: 0,
+
   Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:340:8
-  
-  The symbol "safeGmOps" has already been declared
-  338|    const isDynamicConnected = (primaryWallet && primaryWallet.address) || (walletType === 'dynamic' && isConnected);
-  339|    // 确保gmOps至少是一个空对象，防止未定义错误
-  340|    const safeGmOps = gmOps || {};
-     |          ^
-  341|    const dynamicAccount = isDynamicConnected ? formatAccountOwner(primaryWallet?.address || currentAccount) : null;
-  342|    const isActiveDynamicWallet = (isConnected && walletType === 'dynamic' && currentAccount) || (primaryWallet && primaryWallet.address && walletType === 'dynamic');
-  
-  The symbol "gmOps" has already been declared
-  925|    }, [activeTab, additionalData.refetchLeaderboard, additionalData.refetchInvitationLeaderboard]);
-  926|  
-  927|    const gmOps = GMOperations({
-     |          ^
-  928|      chainId,
-  929|      currentAccount,
-  
-      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
-      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
-      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
-      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
-      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
-      at Socket.emit (node:events:524:28)
-      at addChunk (node:internal/streams/readable:561:12)
-      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
-      at Readable.push (node:internal/streams/readable:392:5)
-      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
-1:56:47 PM [vite] page reload src/App.js
-1:57:44 PM [vite] page reload src/App.js
-1:57:45 PM [vite] Pre-transform error: Transform failed with 1 error:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:946:3: ERROR: Unexpected ")"
-1:57:46 PM [vite] Internal server error: Transform failed with 1 error:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:946:3: ERROR: Unexpected ")"
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
+11:02:03 AM [vite] page reload src/App.js
+11:02:03 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
+   |      ^
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
+
   Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:946:3
-  
-  Unexpected ")"
-  944|    // 确保gmOps至少是一个空对象，防止未定义错误
-  945|    const safeGmOps = gmOps || {};
-  946|    });
-     |     ^
-  947|  
-  948|  
-  
-      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
-      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
-      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
-      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
-      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
-      at Socket.emit (node:events:524:28)
-      at addChunk (node:internal/streams/readable:561:12)
-      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
-      at Readable.push (node:internal/streams/readable:392:5)
-      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
-1:58:13 PM [vite] page reload src/App.js
-1:58:13 PM [vite] Pre-transform error: Transform failed with 1 error:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:946:3: ERROR: Unexpected ")"
-1:58:14 PM [vite] Internal server error: Transform failed with 1 error:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:946:3: ERROR: Unexpected ")"
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
+11:05:28 AM [vite] page reload src/App.js
+11:05:28 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
+   |      ^
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
+
   Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:946:3
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
+11:10:55 AM [vite] page reload src/App.js
+11:10:56 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
+   |      ^
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
+
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
+11:13:31 AM [vite] hmr update /src/App.css
+11:15:13 AM [vite] hmr update /src/App.css
+11:15:22 AM [vite] hmr update /src/App.css
+11:17:15 AM [vite] hmr update /src/App.css
+11:17:29 AM [vite] hmr update /src/App.css
+11:18:07 AM [vite] hmr update /src/App.css
+11:21:13 AM [vite] hmr update /src/App.css
+11:23:35 AM [vite] hmr update /src/App.css
+11:27:13 AM [vite] hmr update /src/App.css
+11:27:30 AM [vite] page reload src/App.js
+11:27:30 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
+   |      ^
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
+
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
+11:27:35 AM [vite] hmr update /src/App.css
+11:28:49 AM [vite] page reload src/App.js
+11:28:50 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
+   |      ^
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
+
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
+11:34:48 AM [vite] hmr update /src/App.css
+11:34:56 AM [vite] hmr update /src/App.css
+11:36:11 AM [vite] hmr update /src/App.css
+11:37:38 AM [vite] hmr update /src/App.css
+11:39:17 AM [vite] hmr update /src/App.css
+11:39:44 AM [vite] hmr update /src/App.css
+11:42:54 AM [vite] hmr update /src/App.css
+11:43:16 AM [vite] hmr update /src/App.css
+11:44:15 AM [vite] hmr update /src/App.css
+11:44:38 AM [vite] hmr update /src/App.css
+11:46:51 AM [vite] hmr update /src/App.css
+11:48:20 AM [vite] page reload src/App.js
+11:48:20 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
+   |      ^
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
+
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
+11:50:02 AM [vite] page reload src/App.js
+11:50:03 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
+   |      ^
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
+
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
+11:50:16 AM [vite] page reload src/App.js
+11:50:17 AM [vite] Pre-transform error: Transform failed with 2 errors:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:1541:18: ERROR: Unexpected closing "div" tag does not match opening fragment tag
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:1542:21: ERROR: Expected ")" but found "className"
+11:50:19 AM [vite] Internal server error: Transform failed with 2 errors:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:1541:18: ERROR: Unexpected closing "div" tag does not match opening fragment tag
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:1542:21: ERROR: Expected ")" but found "className"
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:1541:18
   
-  Unexpected ")"
-  944|    // 确保gmOps至少是一个空对象，防止未定义错误
-  945|    const safeGmOps = gmOps || {};
-  946|    });
-     |     ^
-  947|  
-  948|  
+  Unexpected closing "div" tag does not match opening fragment tag
+  1539|                  })()}
+  1540|                    </div>
+  1541|                  </div>
+     |                    ^
+  1542|                  <div className="referral-link-section">
+  1543|                      <label>Your Referral Link:</label>
+  
+  Expected ")" but found "className"
+  1540|                    </div>
+  1541|                  </div>
+  1542|                  <div className="referral-link-section">
+     |                       ^
+  1543|                      <label>Your Referral Link:</label>
+  1544|                      <div className="link-container">
   
       at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
       at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
@@ -225,56 +200,27 @@
       at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
       at Readable.push (node:internal/streams/readable:392:5)
       at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
-2:01:58 PM [vite] page reload src/App.js
-2:19:35 PM [vite] page reload src/App.js
-2:19:45 PM [vite] page reload src/App.js
-2:21:33 PM [vite] page reload src/GMOperations.js
-2:27:01 PM [vite] page reload src/GMOperations.js
-2:27:57 PM [vite] page reload src/GMOperations.js
-2:28:13 PM [vite] page reload src/queries.js
-2:31:44 PM [vite] page reload src/GMOperations.js
-2:33:26 PM [vite] page reload src/App.js
-2:35:45 PM [vite] page reload src/App.js
-2:39:57 PM [vite] page reload src/GMOperations.js
-2:44:25 PM [vite] page reload src/App.js
-2:48:01 PM [vite] page reload src/App.js
-2:53:22 PM [vite] page reload src/App.js
-2:54:06 PM [vite] page reload src/App.js
-2:56:49 PM [vite] page reload src/App.js
-2:58:58 PM [vite] page reload src/App.js
-3:02:57 PM [vite] page reload src/App.js
-3:03:31 PM [vite] page reload src/App.js
-3:05:14 PM [vite] page reload src/App.js
-3:12:24 PM [vite] page reload src/GMOperations.js
-3:12:39 PM [vite] page reload src/App.js
-3:13:19 PM [vite] page reload src/App.js
-3:17:27 PM [vite] page reload src/GMOperations.js
-3:18:22 PM [vite] page reload src/App.js
-12:19:18 AM [vite] page reload src/App.js
-12:19:19 AM [vite] Pre-transform error: Transform failed with 2 errors:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:938:8: ERROR: The symbol "rawGmOps" has already been declared
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:963:4: ERROR: Expected "}" but found "refetchLeaderboard"
-12:19:22 AM [vite] Internal server error: Transform failed with 2 errors:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:938:8: ERROR: The symbol "rawGmOps" has already been declared
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:963:4: ERROR: Expected "}" but found "refetchLeaderboard"
+11:50:32 AM [vite] Internal server error: Transform failed with 2 errors:
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:1541:18: ERROR: Unexpected closing "div" tag does not match opening fragment tag
+/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:1542:21: ERROR: Expected ")" but found "className"
   Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:938:8
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:1541:18
   
-  The symbol "rawGmOps" has already been declared
-  936|  
-  937|    // 首先调用GMOperations hook获取实际数据
-  938|    const rawGmOps = GMOperations({
-     |          ^
-  939|      chainId,
-  940|      currentAccount: memoizedCurrentAccount,
+  Unexpected closing "div" tag does not match opening fragment tag
+  1539|                  })()}
+  1540|                    </div>
+  1541|                  </div>
+     |                    ^
+  1542|                  <div className="referral-link-section">
+  1543|                      <label>Your Referral Link:</label>
   
-  Expected "}" but found "refetchLeaderboard"
-  961|      // 合并实际数据，覆盖默认值
-  962|      ...(rawGmOps || {})
-  963|      refetchLeaderboard: () => Promise.resolve({}),
-     |      ^
-  964|      refetchGmEvents: () => Promise.resolve({}),
-  965|      refetchWalletMessages: () => Promise.resolve({}),
+  Expected ")" but found "className"
+  1540|                    </div>
+  1541|                  </div>
+  1542|                  <div className="referral-link-section">
+     |                       ^
+  1543|                      <label>Your Referral Link:</label>
+  1544|                      <div className="link-container">
   
       at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
       at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
@@ -286,843 +232,138 @@
       at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
       at Readable.push (node:internal/streams/readable:392:5)
       at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
-12:20:21 AM [vite] page reload src/App.js
-12:25:54 AM [vite] page reload src/App.js
-12:28:26 AM [vite] page reload src/App.js
-12:28:27 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-973|      
-974|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-975|      invitationStatsData: {
+11:51:20 AM [vite] page reload src/App.js
+11:51:21 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
    |      ^
-976|        totalInvited: 0,
-977|        totalRewards: 0,
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
 
   Plugin: vite:esbuild
   File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-12:28:58 AM [vite] page reload src/App.js
-12:28:59 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-973|      
-974|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-975|      invitationStatsData: {
+11:54:52 AM [vite] page reload src/App.js
+11:54:53 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1084|      formatAccountOwner: (address) => address || '',
+1085|      ...gmOperationsResult,
+1086|      invitationStatsData: {
    |      ^
-976|        totalInvited: 0,
-977|        totalRewards: 0,
+1087|        totalInvited: 0,
+1088|        totalRewards: 0,
 
   Plugin: vite:esbuild
   File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-12:46:16 AM [vite] page reload src/App.js
-12:46:16 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-998|      
-999|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1000|      invitationStatsData: {
+11:55:06 AM [vite] page reload src/App.js
+11:55:06 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1080|      formatAccountOwner: (address) => address || '',
+1081|      ...gmOperationsResult,
+1082|      invitationStatsData: {
    |      ^
-1001|        totalInvited: 0,
-1002|        totalRewards: 0,
+1083|        totalInvited: 0,
+1084|        totalRewards: 0,
 
   Plugin: vite:esbuild
   File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-12:46:22 AM [vite] page reload src/App.js
-12:46:22 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1040|      
-1041|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1042|      invitationStatsData: {
+11:59:52 AM [vite] page reload src/App.js
+11:59:53 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
    |      ^
-1043|        totalInvited: 0,
-1044|        totalRewards: 0,
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
 
   Plugin: vite:esbuild
   File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-12:46:26 AM [vite] page reload src/App.js
-12:46:27 AM [vite] Pre-transform error: Transform failed with 1 error:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:2057:0: ERROR: Unexpected end of file before a closing "ErrorBoundary" tag
-12:46:28 AM [vite] Internal server error: Transform failed with 1 error:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:2057:0: ERROR: Unexpected end of file before a closing "ErrorBoundary" tag
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:2057:0
-  
-  Unexpected end of file before a closing "ErrorBoundary" tag
-  2055|  
-  2056|  export default App;
-  2057|  
-     |  ^
-  
-      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
-      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
-      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
-      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
-      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
-      at Socket.emit (node:events:524:28)
-      at addChunk (node:internal/streams/readable:561:12)
-      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
-      at Readable.push (node:internal/streams/readable:392:5)
-      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
-12:47:27 AM [vite] page reload src/App.js
-12:47:28 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1040|      
-1041|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1042|      invitationStatsData: {
+12:02:25 PM [vite] page reload src/App.js
+12:02:25 PM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
    |      ^
-1043|        totalInvited: 0,
-1044|        totalRewards: 0,
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
 
   Plugin: vite:esbuild
   File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-12:55:38 AM [vite] page reload src/GMOperations.js
-12:55:39 AM [vite] Pre-transform error: Transform failed with 7 errors:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/GMOperations.js:100:35: ERROR: The symbol "React" has already been declared
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/GMOperations.js:100:57: ERROR: The symbol "useEffect" has already been declared
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/GMOperations.js:100:68: ERROR: The symbol "useState" has already been declared
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/GMOperations.js:178:6: ERROR: The symbol "GMOperations" has already been declared
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/GMOperations.js:811:13: ERROR: Multiple exports with the same name "useGMAdditionalData"
-...
-12:55:44 AM [vite] Internal server error: Transform failed with 7 errors:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/GMOperations.js:100:35: ERROR: The symbol "React" has already been declared
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/GMOperations.js:100:57: ERROR: The symbol "useEffect" has already been declared
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/GMOperations.js:100:68: ERROR: The symbol "useState" has already been declared
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/GMOperations.js:178:6: ERROR: The symbol "GMOperations" has already been declared
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/GMOperations.js:811:13: ERROR: Multiple exports with the same name "useGMAdditionalData"
-...
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/GMOperations.js:100:35
-  
-  The symbol "React" has already been declared
-  98 |  };
-  99 |  
-  100|  export default GMOperations;import React, { useCallback, useEffect, useState, useMemo } from 'react';
-     |                                     ^
-  101|  import { useQuery, useMutation, useSubscription } from '@apollo/client';
-  102|  import {
-  
-  The symbol "useEffect" has already been declared
-  98 |  };
-  99 |  
-  100|  export default GMOperations;import React, { useCallback, useEffect, useState, useMemo } from 'react';
-     |                                                           ^
-  101|  import { useQuery, useMutation, useSubscription } from '@apollo/client';
-  102|  import {
-  
-  The symbol "useState" has already been declared
-  98 |  };
-  99 |  
-  100|  export default GMOperations;import React, { useCallback, useEffect, useState, useMemo } from 'react';
-     |                                                                      ^
-  101|  import { useQuery, useMutation, useSubscription } from '@apollo/client';
-  102|  import {
-  
-  The symbol "GMOperations" has already been declared
-  176|  };
-  177|  
-  178|  const GMOperations = ({
-     |        ^
-  179|    chainId,
-  180|    currentAccount,
-  
-  Multiple exports with the same name "useGMAdditionalData"
-  809|  };
-  810|  
-  811|  export const useGMAdditionalData = ({
-     |               ^
-  812|    chainId,
-  813|    currentAccount,
-  
-  The symbol "useGMAdditionalData" has already been declared
-  809|  };
-  810|  
-  811|  export const useGMAdditionalData = ({
-     |               ^
-  812|    chainId,
-  813|    currentAccount,
-  
-  Multiple exports with the same name "default"
-  953|  };
-  954|  
-  955|  export default GMOperations;
-     |         ^
-  956|  
-  
-      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
-      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
-      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
-      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
-      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
-      at Socket.emit (node:events:524:28)
-      at addChunk (node:internal/streams/readable:561:12)
-      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
-      at Readable.push (node:internal/streams/readable:392:5)
-      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
-12:55:49 AM [vite] page reload src/GMOperations.js
-12:59:55 AM [vite] page reload src/GMOperations.js
-1:02:07 AM [vite] page reload src/GMOperations.js
-1:02:28 AM [vite] page reload src/GMOperations.js
-1:07:11 AM [vite] page reload src/GMOperations.js
-1:09:32 AM [vite] page reload src/queries.js
-1:17:54 AM [vite] page reload src/queries.js
-1:22:42 AM [vite] page reload src/queries.js
-1:26:32 AM [vite] page reload src/App.js
-1:26:33 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1040|      
-1041|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1042|      invitationStatsData: {
+12:02:47 PM [vite] hmr update /src/App.css
+12:05:36 PM [vite] page reload src/GMOperations.js
+12:05:49 PM [vite] page reload src/GMOperations.js
+12:08:22 PM [vite] page reload src/App.js
+12:08:23 PM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
    |      ^
-1043|        totalInvited: 0,
-1044|        totalRewards: 0,
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
 
   Plugin: vite:esbuild
   File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-1:27:03 AM [vite] page reload src/App.js
-1:27:04 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1040|      
-1041|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1042|      invitationStatsData: {
+12:13:51 PM [vite] page reload src/App.js
+12:13:51 PM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
    |      ^
-1043|        totalInvited: 0,
-1044|        totalRewards: 0,
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
 
   Plugin: vite:esbuild
   File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-The request url "/root/linera-protocol/examples/gmic-buildathon/web-frontend/.env" is outside of Vite serving allow list.
-
-- /root/linera-protocol/examples
-
-Refer to docs https://vite.dev/config/server-options.html#server-fs-allow for configurations and more details.
-
-1:40:47 AM [vite] page reload src/GMOperations.js
-1:41:09 AM [vite] page reload src/GMOperations.js
-1:42:05 AM [vite] page reload src/GMOperations.js
-1:44:16 AM [vite] page reload src/GMOperations.js
-1:46:30 AM [vite] page reload src/GMOperations.js
-1:47:48 AM [vite] page reload src/GMOperations.js
-1:48:45 AM [vite] page reload src/GMOperations.js
-1:57:22 AM [vite] page reload src/GMOperations.js
-1:58:19 AM [vite] page reload src/queries.js
-1:58:25 AM [vite] page reload src/queries.js
-2:11:18 AM [vite] page reload src/GMOperations.js
-2:15:54 AM [vite] page reload src/App.js
-2:15:55 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1040|      
-1041|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1042|      invitationStatsData: {
+12:14:01 PM [vite] page reload src/App.js
+12:14:01 PM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
    |      ^
-1043|        totalInvited: 0,
-1044|        totalRewards: 0,
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
 
   Plugin: vite:esbuild
   File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-2:16:49 AM [vite] page reload src/App.js
-2:16:50 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1039|      
-1040|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1041|      invitationStatsData: {
+12:19:52 PM [vite] page reload src/App.js
+12:19:53 PM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
    |      ^
-1042|        totalInvited: 0,
-1043|        totalRewards: 0,
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
 
   Plugin: vite:esbuild
   File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-2:17:59 AM [vite] page reload src/App.js
-2:18:00 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1039|      
-1040|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1041|      invitationStatsData: {
+12:21:52 PM [vite] page reload src/App.js
+12:21:53 PM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
    |      ^
-1042|        totalInvited: 0,
-1043|        totalRewards: 0,
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
 
   Plugin: vite:esbuild
   File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-2:19:42 AM [vite] page reload src/App.js
-2:19:43 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1039|      
-1040|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1041|      invitationStatsData: {
+12:25:34 PM [vite] page reload src/App.js
+12:25:34 PM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
    |      ^
-1042|        totalInvited: 0,
-1043|        totalRewards: 0,
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
 
   Plugin: vite:esbuild
   File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-2:20:50 AM [vite] page reload src/App.js
-2:20:51 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1039|      
-1040|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1041|      invitationStatsData: {
+12:25:51 PM [vite] page reload src/App.js
+12:25:52 PM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
    |      ^
-1042|        totalInvited: 0,
-1043|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-2:22:36 AM [vite] page reload src/App.js
-2:22:37 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1039|      
-1040|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1041|      invitationStatsData: {
-   |      ^
-1042|        totalInvited: 0,
-1043|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-2:23:04 AM [vite] page reload src/App.js
-2:23:05 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1039|      
-1040|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1041|      invitationStatsData: {
-   |      ^
-1042|        totalInvited: 0,
-1043|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-2:30:45 AM [vite] page reload src/App.js
-2:30:46 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1039|      
-1040|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1041|      invitationStatsData: {
-   |      ^
-1042|        totalInvited: 0,
-1043|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-2:30:52 AM [vite] page reload src/App.js
-2:30:53 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1039|      
-1040|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1041|      invitationStatsData: {
-   |      ^
-1042|        totalInvited: 0,
-1043|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-2:31:12 AM [vite] page reload src/App.js
-2:31:12 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1045|      
-1046|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1047|      invitationStatsData: {
-   |      ^
-1048|        totalInvited: 0,
-1049|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-2:31:23 AM [vite] page reload src/GMOperations.js
-2:33:09 AM [vite] page reload src/App.js
-2:33:09 AM [vite] Pre-transform error: Transform failed with 1 error:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:339:41: ERROR: Expected "=>" but found ":"
-2:33:12 AM [vite] Internal server error: Transform failed with 1 error:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:339:41: ERROR: Expected "=>" but found ":"
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:339:41
-  
-  Expected "=>" but found ":"
-  337|    }, [showShareReferralModal, fetchInvitationStats]);
-  338|  
-  339|    const copyReferralLink = useCallback(():
-     |                                           ^
-  340|      if (!memoizedCurrentAccount) {
-  341|        console.error('No account found');
-  
-      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
-      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
-      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
-      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
-      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
-      at Socket.emit (node:events:524:28)
-      at addChunk (node:internal/streams/readable:561:12)
-      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
-      at Readable.push (node:internal/streams/readable:392:5)
-      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
-2:33:46 AM [vite] page reload src/App.js
-2:33:48 AM [vite] Pre-transform error: Transform failed with 1 error:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:339:41: ERROR: Expected "=>" but found ":"
-2:33:50 AM [vite] Internal server error: Transform failed with 1 error:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:339:41: ERROR: Expected "=>" but found ":"
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:339:41
-  
-  Expected "=>" but found ":"
-  337|    }, [showShareReferralModal, fetchInvitationStats]);
-  338|  
-  339|    const copyReferralLink = useCallback(():
-     |                                           ^
-  340|      if (!memoizedCurrentAccount) {
-  341|        console.error('No account found');
-  
-      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
-      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
-      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
-      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
-      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
-      at Socket.emit (node:events:524:28)
-      at addChunk (node:internal/streams/readable:561:12)
-      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
-      at Readable.push (node:internal/streams/readable:392:5)
-      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
-2:34:05 AM [vite] Internal server error: Transform failed with 1 error:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:339:41: ERROR: Expected "=>" but found ":"
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:339:41
-  
-  Expected "=>" but found ":"
-  337|    }, [showShareReferralModal, fetchInvitationStats]);
-  338|  
-  339|    const copyReferralLink = useCallback(():
-     |                                           ^
-  340|      if (!memoizedCurrentAccount) {
-  341|        console.error('No account found');
-  
-      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
-      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
-      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
-      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
-      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
-      at Socket.emit (node:events:524:28)
-      at addChunk (node:internal/streams/readable:561:12)
-      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
-      at Readable.push (node:internal/streams/readable:392:5)
-      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
-2:34:33 AM [vite] page reload src/App.js
-2:34:33 AM [vite] Pre-transform error: Transform failed with 1 error:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:339:41: ERROR: Expected "=>" but found ":"
-2:34:35 AM [vite] Internal server error: Transform failed with 1 error:
-/root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:339:41: ERROR: Expected "=>" but found ":"
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js:339:41
-  
-  Expected "=>" but found ":"
-  337|    }, [showShareReferralModal, fetchInvitationStats]);
-  338|  
-  339|    const copyReferralLink = useCallback(():
-     |                                           ^
-  340|      if (!memoizedCurrentAccount) {
-  341|        console.error('No account found');
-  
-      at failureErrorWithLog (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:1472:15)
-      at /root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:755:50
-      at responseCallbacks.<computed> (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:622:9)
-      at handleIncomingPacket (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:677:12)
-      at Socket.readFromStdout (/root/linera-protocol/examples/gmic-buildathon/web-frontend/node_modules/esbuild/lib/main.js:600:7)
-      at Socket.emit (node:events:524:28)
-      at addChunk (node:internal/streams/readable:561:12)
-      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
-      at Readable.push (node:internal/streams/readable:392:5)
-      at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
-2:34:56 AM [vite] page reload src/App.js
-2:34:56 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1052|      ...gmOperationsResult,
-1053|      
-1054|      invitationStatsData: {
-   |      ^
-1055|        totalInvited: 0,
-1056|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-2:35:39 AM [vite] page reload src/App.js
-2:35:40 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1052|      ...gmOperationsResult,
-1053|      
-1054|      invitationStatsData: {
-   |      ^
-1055|        totalInvited: 0,
-1056|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-2:36:16 AM [vite] page reload src/App.js
-2:36:17 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1045|      ...gmOperationsResult,
-1046|      
-1047|      invitationStatsData: {
-   |      ^
-1048|        totalInvited: 0,
-1049|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-2:37:06 AM [vite] page reload src/App.js
-2:37:06 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1040|      ...gmOperationsResult,
-1041|      
-1042|      invitationStatsData: {
-   |      ^
-1043|        totalInvited: 0,
-1044|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-2:38:25 AM [vite] page reload src/App.js
-2:38:26 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1040|      ...gmOperationsResult,
-1041|      
-1042|      invitationStatsData: {
-   |      ^
-1043|        totalInvited: 0,
-1044|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-2:40:38 AM [vite] page reload src/GMOperations.js
-2:40:50 AM [vite] page reload src/App.js
-2:40:51 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-991|      ...gmOperationsResult,
-992|      
-993|      invitationStatsData: {
-   |      ^
-994|        totalInvited: 0,
-995|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-2:41:34 AM [vite] page reload src/queries.js
-2:43:49 AM [vite] page reload src/App.js
-2:43:49 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-991|      ...gmOperationsResult,
-992|      
-993|      invitationStatsData: {
-   |      ^
-994|        totalInvited: 0,
-995|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-2:43:58 AM [vite] page reload src/App.js
-2:43:58 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-991|      ...gmOperationsResult,
-992|      
-993|      invitationStatsData: {
-   |      ^
-994|        totalInvited: 0,
-995|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-2:45:38 AM [vite] page reload src/App.js
-2:45:38 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1040|      
-1041|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1042|      invitationStatsData: {
-   |      ^
-1043|        totalInvited: 0,
-1044|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-2:57:58 AM [vite] page reload src/App.js
-2:57:59 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-3:00:52 AM [vite] page reload src/App.js
-3:00:53 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-3:03:54 AM [vite] page reload src/App.js
-3:03:55 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-3:08:03 AM [vite] page reload src/App.js
-3:08:04 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-3:18:34 AM [vite] page reload src/App.js
-3:18:34 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-3:23:24 AM [vite] page reload src/GMOperations.js
-3:25:59 AM [vite] page reload src/GMOperations.js
-3:29:12 AM [vite] page reload src/App.js
-3:29:12 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-3:31:22 AM [vite] page reload src/App.js
-3:31:22 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-3:36:57 AM [vite] page reload src/GMOperations.js
-3:37:10 AM [vite] page reload src/GMOperations.js
-3:37:50 AM [vite] page reload src/GMOperations.js
-3:38:21 AM [vite] page reload src/GMOperations.js
-3:41:11 AM [vite] page reload src/App.js
-3:41:11 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-3:41:48 AM [vite] page reload src/App.js
-3:41:49 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-3:42:56 AM [vite] hmr update /src/App.css
-3:43:28 AM [vite] hmr update /src/App.css
-3:44:12 AM [vite] hmr update /src/App.css
-3:44:28 AM [vite] hmr update /src/App.css
-3:45:43 AM [vite] hmr update /src/App.css
-3:46:18 AM [vite] hmr update /src/App.css
-3:46:38 AM [vite] hmr update /src/App.css
-3:56:42 AM [vite] page reload src/queries.js
-3:57:20 AM [vite] page reload src/App.js
-3:57:20 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-3:58:25 AM [vite] page reload src/App.js
-3:58:26 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-3:58:35 AM [vite] page reload src/App.js
-3:58:36 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-4:01:24 AM [vite] page reload src/App.js
-4:01:24 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-4:03:50 AM [vite] page reload src/GMOperations.js
-4:04:43 AM [vite] page reload src/GMOperations.js
-4:05:18 AM [vite] page reload src/App.js
-4:05:19 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-4:05:52 AM [vite] page reload src/App.js
-4:05:53 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-4:05:57 AM [vite] page reload src/App.js
-4:05:58 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-4:06:07 AM [vite] page reload src/App.js
-4:06:07 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-4:06:29 AM [vite] page reload src/App.js
-4:06:30 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-4:07:17 AM [vite] page reload src/App.js
-4:07:18 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-4:09:25 AM [vite] page reload src/App.js
-4:09:26 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-4:11:56 AM [vite] page reload src/App.js
-4:11:57 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-4:12:02 AM [vite] page reload src/App.js
-4:12:02 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-4:13:28 AM [vite] page reload src/App.js
-4:13:28 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-4:14:07 AM [vite] page reload src/App.js
-4:14:08 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-4:14:21 AM [vite] page reload src/App.js
-4:14:22 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-4:15:43 AM [vite] page reload src/App.js
-4:15:44 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1051|      
-1052|      // 重新确保invitationStatsData有正确的结构，即使实际数据中没有或结构不正确
-1053|      invitationStatsData: {
-   |      ^
-1054|        totalInvited: 0,
-1055|        totalRewards: 0,
-
-  Plugin: vite:esbuild
-  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
-4:19:12 AM [vite] page reload src/GMOperations.js
-4:23:03 AM [vite] page reload src/NotificationCenter.js
-4:26:31 AM [vite] page reload src/NotificationCenter.js
-4:33:25 AM [vite] page reload src/App.js
-4:33:26 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
-1032|      formatAccountOwner: (address) => address || '',
-1033|      ...gmOperationsResult,
-1034|      invitationStatsData: {
-   |      ^
-1035|        totalInvited: 0,
-1036|        totalRewards: 0,
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
 
   Plugin: vite:esbuild
   File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js

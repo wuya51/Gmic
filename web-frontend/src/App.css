@@ -12,7 +12,23 @@ body {
   line-height: 1.6;
 }
 
-/* Error boundary styles */
+/* Dropdown Styles for Invited Users */
+.referral-stat-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.dropdown-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 8px;
+  position: relative;
+}
+
 .error-fallback {
   display: flex;
   justify-content: center;
@@ -3070,22 +3086,77 @@ body {
   padding: 0.5rem 0;
 }
 
+.invitation-list {
+  padding: 0.5rem 0;
+  width: 100%;
+  min-width: 350px;
+}
+
 .history-item {
   padding: 0.8rem 1rem;
   border-bottom: 1px solid #eee;
   font-size: 0.9rem;
 }
 
-.history-item:last-child {
+.invitation-item {
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid #eee;
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.history-item:last-child, .invitation-item:last-child {
   border-bottom: none;
 }
 
-.history-sender, .history-recipient, .history-content, .history-timestamp {
+.history-sender, .history-recipient, .history-content, .history-timestamp,
+.invitation-item > div {
   margin-bottom: 0.3rem;
   word-break: break-word;
 }
 
-.history-sender {
+/* 邀请列表特定样式 */
+.invitation-item > div {
+  width: 100%;
+  font-family: 'Courier New', monospace;
+  word-break: break-all;
+}
+
+/* 邀请列表下拉框样式 */
+.invited-users-dropdown {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  width: 100%;
+  max-width: none;
+  background-color: #fff;
+  border: 2px solid #ff8c00;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(255, 140, 0, 0.4);
+  z-index: 1000;
+  visibility: hidden;
+  opacity: 0;
+  transition: visibility 0.3s, opacity 0.3s ease;
+  max-height: 400px;
+  overflow-y: auto;
+  word-break: break-all;
+  padding: 0.5rem;
+}
+
+.invited-users-dropdown.show {
+  visibility: visible;
+  opacity: 1;
+}
+
+.invitation-loading, .invitation-empty {
+  padding: 1rem;
+  text-align: center;
+  color: #666;
+}
+
+
+.invitation-sender,.history-sender {
   font-weight: 600;
   color: #ff2a00;
 }

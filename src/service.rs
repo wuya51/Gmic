@@ -511,11 +511,11 @@ impl QueryRoot {
     async fn get_invitation_record(
         &self,
         _ctx: &async_graphql::Context<'_>,
-        invitee: AccountOwner,
-    ) -> Result<Option<InvitationRecord>, async_graphql::Error> {
+        inviter: AccountOwner,
+    ) -> Result<Vec<InvitationRecord>, async_graphql::Error> {
         let state = self.state.lock().await;
-        let record = state.get_invitation_record(invitee).await?;
-        Ok(record)
+        let records = state.get_invitation_record(inviter).await?;
+        Ok(records)
     }
     
     async fn get_user_invitation_rewards(
@@ -683,31 +683,39 @@ impl MutationRoot {
         }
         
         let state = self.state.lock().await;
-    let owner = {
-        match state.owner.get() {
-            Some(owner) => owner.clone(),
-            None => {
-                return Ok(SendGmResponse {
-                    success: false,
-                    message: "Contract owner not initialized".to_string(),
-                    timestamp: 0,
-                });
+            let owner = {
+            match state.owner.get() {
+                Some(owner) => owner.clone(),
+                None => {
+                    return Ok(SendGmResponse {
+                        success: false,
+                        message: "Contract owner not initialized".to_string(),
+                        timestamp: 0,
+                    });
+                }
             }
-        }
-    };
+        };
 
-    let default_content = Some("Gmicrochains".to_string());
-    let final_content = content.or(default_content);
-    
-    let recipient = recipient.unwrap_or(owner.clone());
-    
-    // 无论是否跨链，都只创建单一的GmOperation::Gm变体
-    let operation = GmOperation::Gm {
-        sender,
-        recipient,
-        content: final_content.clone(),
-        inviter
-    };
+        let default_content = Some("Gmicrochains".to_string());
+        let final_content = content.or(default_content);        
+        let recipient = recipient.unwrap_or(owner.clone());
+        let processed_inviter = if let Some(inviter_account) = &inviter {
+            let existing_invitation = state.invitations.get(&sender).await?;
+            if existing_invitation.is_none() && inviter_account == &sender {
+                None
+            } else {
+                inviter.clone()
+            }
+        } else {
+            inviter
+        };
+        
+        let operation = GmOperation::Gm {
+            sender,
+            recipient,
+            content: final_content.clone(),
+            inviter: processed_inviter
+        };
     
     if chain_id != current_chain_id {
         drop(state);

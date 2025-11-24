@@ -203,6 +203,32 @@ function App({ chainId, appId, ownerId, inviter, port }) {
   const [selectedMessage, setSelectedMessage] = useState('gm');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showShareReferralModal, setShowShareReferralModal] = useState(false);
+  const [showInvitedUsersDropdown, setShowInvitedUsersDropdown] = useState(false);
+  const [invitedUsersList, setInvitedUsersList] = useState([]);
+  const [invitedUsers, setInvitedUsers] = useState([]);
+  const [invitedUsersLoading, setInvitedUsersLoading] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 0);
+  const dropdownRef = useRef(null);
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  const formatAddress = (address) => {
+ 
+    const threshold = 768;
+    if (windowWidth > threshold) {
+      return address; 
+    } else {
+      return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`; // 小窗口显示短地址
+    }
+  };
 
   forceUpdateRef.current = forceUpdate;
   cooldownRemainingRef.current = cooldownRemaining;
@@ -1039,12 +1065,10 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     }
   };
   useEffect(() => {
-    if (showShareReferralModal && memoizedCurrentAccount && shareModalAdditionalData) {
-      if (shareModalAdditionalData.refetchInvitationStats) {
-        shareModalAdditionalData.refetchInvitationStats();
-      }
+    if (showShareReferralModal && memoizedCurrentAccount && shareModalAdditionalData?.refetchInvitationStats) {
+      shareModalAdditionalData.refetchInvitationStats();
     }
-  }, [showShareReferralModal, memoizedCurrentAccount, shareModalAdditionalData]);
+  }, [showShareReferralModal]);
 
   const handleHistoryToggle = useCallback(async () => {
     if (showHistoryDropdown) {
@@ -1161,6 +1185,36 @@ function App({ chainId, appId, ownerId, inviter, port }) {
       syncCooldownStatus();
     }
   }, [currentAccount, currentChainId]);
+
+  useEffect(() => {
+    const handleUpdateInvitedUsers = (event) => {
+      const { invitedUsers } = event.detail;
+      setInvitedUsers(invitedUsers);
+      setInvitedUsersLoading(false);
+    };
+
+    const handleToggleDropdown = () => {
+      setInvitedUsersLoading(true);
+    };
+
+    window.addEventListener('updateInvitedUsersDropdown', handleUpdateInvitedUsers);
+    window.addEventListener('toggleInvitedUsersDropdown', handleToggleDropdown);
+    
+      const handleClickOutsideDropdown = (event) => {
+      const dropdownContainer = document.querySelector('.dropdown-container');
+      if (dropdownContainer && !dropdownContainer.contains(event.target)) {
+        setShowInvitedUsersDropdown(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutsideDropdown);
+
+    return () => {
+      window.removeEventListener('updateInvitedUsersDropdown', handleUpdateInvitedUsers);
+      window.removeEventListener('toggleInvitedUsersDropdown', handleToggleDropdown);
+      document.removeEventListener('click', handleClickOutsideDropdown);
+    };
+  }, []);
 
   const processedEventsRef = useRef(new Set());
   const isFirstLoadRef = useRef(true);
@@ -1362,6 +1416,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
   return (
     <ErrorBoundary>
       <div>
+
         <button 
           className="referral-floating-btn"
           onClick={handleToggleShareReferral}
@@ -1388,14 +1443,46 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                       🔄 Refresh
                     </button>
                 <div className="referral-stat-item">
-                  <span className="referral-stat-label">Invited Users:</span>
-                  <span className="referral-stat-value">{(() => {
-                    try {
-                      return Number(shareModalAdditionalData?.invitationStatsData?.totalInvited) || 0;
-                    } catch (error) {
-                      return 0;
-                    }
-                  })()}</span>
+                  <div className="dropdown-container">
+                    <div 
+                      className="referral-stat-label dropdown-toggle"
+                      onClick={() => {
+                        if (!shareModalAdditionalData?.invitationStatsData?.totalInvited) return;
+                        const event = new CustomEvent('toggleInvitedUsersDropdown', {
+                          detail: { userId: currentAccount }
+                        });
+                        window.dispatchEvent(event);
+                        setShowInvitedUsersDropdown(!showInvitedUsersDropdown);
+                      }}
+                      style={{ cursor: shareModalAdditionalData?.invitationStatsData?.totalInvited > 0 ? 'pointer' : 'default' }}
+                    >
+                      Invited Users: {showInvitedUsersDropdown ? '▲' : '▼'}
+                    </div>
+                    <span className="referral-stat-value">{(() => {
+                      try {
+                        return Number(shareModalAdditionalData?.invitationStatsData?.totalInvited) || 0;
+                      } catch (error) {
+                        return 0;
+                      }
+                    })()}</span>
+                    <div className={`invited-users-dropdown ${showInvitedUsersDropdown ? 'show' : ''}`}>
+            {invitedUsersLoading ? (
+              <div className="invitation-loading">Loading...</div>
+            ) : invitedUsers.length > 0 ? (
+              <div className="invitation-list">
+                {invitedUsers.map((user, index) => (
+                    <div key={index} className="invitation-item">
+                      <div className="invitation-sender">
+                          {formatAddress(user.invitee)}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <div className="invitation-empty">No invited users found</div>
+            )}
+          </div>
+                  </div>
                 </div>
                 <div className="referral-stat-item">
                   <span className="referral-stat-label">Your Reward Points:</span>
@@ -1420,8 +1507,8 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                     return null;
                   }
                 })()}
-                  </div>
-                  <div className="referral-link-section">
+                </div>
+                <div className="referral-link-section">
                     <label>Your Referral Link:</label>
                     <div className="link-container">
                       <input 
@@ -1925,7 +2012,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                       id="historyButton"
                       onClick={handleHistoryToggle}
                     >
-                      History ▼
+                      History {showHistoryDropdown ? '▲' : '▼'}
                     </button>
                     
                     <div className={`history-dropdown ${showHistoryDropdown ? 'show' : ''}`}>

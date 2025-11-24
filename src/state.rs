@@ -445,8 +445,21 @@ impl GmState {
         self.invitation_stats.get(&user).await
     }
 
-    pub async fn get_invitation_record(&self, invitee: AccountOwner) -> Result<Option<InvitationRecord>, ViewError> {
-        self.invitations.get(&invitee).await
+    pub async fn get_invitation_record(&self, inviter: AccountOwner) -> Result<Vec<InvitationRecord>, ViewError> {
+        let mut invited_users: Vec<InvitationRecord> = Vec::new();
+        
+        self.invitations
+            .for_each_index_value(|_invitee, record| {
+                if record.inviter == inviter {
+                    invited_users.push(record.clone().into_owned());
+                }
+                Ok(())
+            })
+            .await?;
+        
+        invited_users.sort_by(|a, b| b.invited_at.cmp(&a.invited_at));
+        
+        Ok(invited_users)
     }
 
     pub async fn get_top_invitation_rewards(&self, limit: u32) -> Result<Vec<(AccountOwner, u32)>, ViewError> {

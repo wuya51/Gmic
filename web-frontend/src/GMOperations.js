@@ -12,6 +12,7 @@ import {
   IS_USER_WHITELISTED,
   GET_INVITATION_LEADERBOARD,
   GET_INVITATION_STATS,
+  GET_INVITATION_RECORD,
   SEND_GM, 
   SET_COOLDOWN_ENABLED,
   SUBSCRIBE_GM_EVENTS
@@ -320,11 +321,32 @@ const GMOperations = ({
     skip: !currentAccount,
   });
 
+  const { data: invitedUsersData, refetch: refetchInvitedUsers } = useQuery(GET_INVITATION_RECORD, {
+    variables: { 
+      user: formatAccountOwner(currentAccount) 
+    },
+    fetchPolicy: "cache-and-network",
+    skip: !currentAccount,
+  });
+
   const invitationStatsData = {
     totalInvited: Number(invitationStatsDataRaw?.getInvitationStats?.total_invited) || 0,
     totalRewards: Number(invitationStatsDataRaw?.getInvitationStats?.total_rewards) || 0,
     lastRewardTime: invitationStatsDataRaw?.getInvitationStats?.last_reward_time || null
   };
+
+  const getInvitedUsersList = useCallback(async () => {
+    if (!currentAccount) return [];
+    try {
+      const response = await refetchInvitedUsers();
+      const invitationRecords = response?.data?.getInvitationRecord || [];
+      const records = Array.isArray(invitationRecords) ? invitationRecords : [invitationRecords];
+      return records.filter(record => record && record.invitee);
+    } catch (error) {
+      console.error('Failed to get invited users list:', error);
+      return [];
+    }
+  }, [currentAccount, refetchInvitedUsers]);
 
   const { data: cooldownCheckData, refetch: refetchCooldownCheck } = useQuery(CHECK_COOLDOWN, {
     variables: { 
@@ -529,6 +551,21 @@ const GMOperations = ({
     };
   }, [invitationStatsData]);
 
+  useEffect(() => {
+    const handleToggleDropdown = async (event) => {
+      const userId = event.detail.userId;
+      const updateDropdownEvent = new CustomEvent('updateInvitedUsersDropdown', {
+        detail: { userId }
+      });
+      window.dispatchEvent(updateDropdownEvent);
+    };
+
+    window.addEventListener('toggleInvitedUsersDropdown', handleToggleDropdown);
+    return () => {
+      window.removeEventListener('toggleInvitedUsersDropdown', handleToggleDropdown);
+    };
+  }, []);
+
   return {
     data: data || {},
     walletMessagesData: walletMessagesData || {},
@@ -570,6 +607,17 @@ export const useGMAdditionalData = ({
     notifyOnNetworkStatusChange: false
   });
 
+  const { data: invitationRecordData, loading: invitationRecordLoading, error: invitationRecordError, refetch: refetchInvitationRecord } = useQuery(GET_INVITATION_RECORD, {
+    variables: { 
+      inviter: currentAccount ? formatAccountOwner(currentAccount) : null
+    },
+    skip: !currentAccount,
+    fetchPolicy: 'cache-and-network',
+    pollInterval: 0,
+    nextFetchPolicy: 'cache-first',
+    notifyOnNetworkStatusChange: false
+  });
+
   const invitationStatsData = {
     totalInvited: Number(invitationStatsDataRaw?.getInvitationStats?.totalInvited) || 0,
     totalRewards: Number(invitationStatsDataRaw?.getInvitationStats?.totalRewards) || 0,
@@ -581,6 +629,12 @@ export const useGMAdditionalData = ({
       console.error('Error fetching invitation stats:', invitationStatsError);
     }
   }, [invitationStatsError]);
+
+  useEffect(() => {
+    if (invitationRecordError) {
+      console.error('Error fetching invitation records:', invitationRecordError);
+    }
+  }, [invitationRecordError]);
   const { data: gmRecordData, loading: gmRecordLoading, error: gmRecordError, refetch: refetchGmRecord } = useQuery(GET_GM_RECORD, {
     variables: { 
       owner: currentAccount ? formatAccountOwner(currentAccount) : null,
@@ -686,8 +740,35 @@ export const useGMAdditionalData = ({
     }
   }, [cooldownCheckError]);
 
-  const loading = gmRecordLoading || leaderboardLoading || invitationLeaderboardLoading || cooldownStatusLoading || cooldownCheckLoading || whitelistLoading || invitationStatsLoading;
-  const queryError = gmRecordError || leaderboardError || invitationLeaderboardError || cooldownStatusError || cooldownCheckError || whitelistError || invitationStatsError;
+  const loading = gmRecordLoading || leaderboardLoading || invitationLeaderboardLoading || cooldownStatusLoading || cooldownCheckLoading || whitelistLoading || invitationStatsLoading || invitationRecordLoading;
+  const queryError = gmRecordError || leaderboardError || invitationLeaderboardError || cooldownStatusError || cooldownCheckError || whitelistError || invitationStatsError || invitationRecordError;
+
+  useEffect(() => {
+    const handleToggleDropdown = async (event) => {
+      const userId = event.detail.userId;
+      try {
+        const result = await refetchInvitationRecord({
+          variables: {
+            inviter: userId ? formatAccountOwner(userId) : null
+          }
+        });
+        const invitedUsers = result.data?.getInvitationRecord || [];
+        window.dispatchEvent(new CustomEvent('updateInvitedUsersDropdown', {
+          detail: { userId, invitedUsers }
+        }));
+      } catch (error) {
+        console.error('Error fetching invitation records:', error);
+        window.dispatchEvent(new CustomEvent('updateInvitedUsersDropdown', {
+          detail: { userId, invitedUsers: [] }
+        }));
+      }
+    };
+
+    window.addEventListener('toggleInvitedUsersDropdown', handleToggleDropdown);
+    return () => {
+      window.removeEventListener('toggleInvitedUsersDropdown', handleToggleDropdown);
+    };
+  }, [refetchInvitationRecord, currentAccount]);
 
   return {
     gmRecordData,
@@ -697,6 +778,7 @@ export const useGMAdditionalData = ({
     cooldownCheckData,
     whitelistData,
     invitationStatsData,
+    invitationRecordData,
     loading,
     queryError,
     refetchGmRecord,
@@ -705,7 +787,8 @@ export const useGMAdditionalData = ({
     refetchCooldownStatus,
     refetchCooldownCheck,
     refetchWhitelist,
-    refetchInvitationStats
+    refetchInvitationStats,
+    refetchInvitationRecord
   };
 };
 

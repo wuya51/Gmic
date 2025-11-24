@@ -56,6 +56,18 @@ export const GET_INVITATION_RANK = gql`
   }
 `;
 
+export const GET_INVITATION_RECORD = gql`
+  query GetInvitationRecord($inviter: AccountOwner!) {
+    getInvitationRecord(inviter: $inviter) {
+      inviter
+      invitee
+      invitedAt
+      rewarded
+      rewardedAt
+    }
+  }
+`;
+
 export const CHECK_COOLDOWN = gql`
   query CheckCooldown($user: AccountOwner!) {
     checkCooldownStatus(user: $user) {

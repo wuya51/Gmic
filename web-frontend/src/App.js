@@ -1447,7 +1447,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                     <div 
                       className="referral-stat-label dropdown-toggle"
                       onClick={() => {
-                        if (!shareModalAdditionalData?.invitationStatsData?.totalInvited) return;
+                        if (!shareModalAdditionalData?.invitationStatsData?.totalInvited || !currentAccount) return;
                         const event = new CustomEvent('toggleInvitedUsersDropdown', {
                           detail: { userId: currentAccount }
                         });
@@ -1573,7 +1573,6 @@ function App({ chainId, appId, ownerId, inviter, port }) {
               onClick={() => {
                 setActiveTab('leaderboards');
                 setShowLeaderboard(true);
-                setShowInvitationSection(true);
                 setTimeout(() => {
                   const shouldRefetch = (
                     !additionalData.leaderboardData?.getTopUsers || 

@@ -321,7 +321,7 @@ const GMOperations = ({
     skip: !currentAccount,
   });
 
-  const { data: invitedUsersData, refetch: refetchInvitedUsers } = useQuery(GET_INVITATION_RECORD, {
+  const { data: invitedUsersData, refetch: refetchInvitationRecord } = useQuery(GET_INVITATION_RECORD, {
     variables: { 
       user: formatAccountOwner(currentAccount) 
     },
@@ -338,7 +338,9 @@ const GMOperations = ({
   const getInvitedUsersList = useCallback(async () => {
     if (!currentAccount) return [];
     try {
-      const response = await refetchInvitedUsers();
+      const response = await refetchInvitationRecord({
+        inviter: formatAccountOwner(currentAccount)
+      });
       const invitationRecords = response?.data?.getInvitationRecord || [];
       const records = Array.isArray(invitationRecords) ? invitationRecords : [invitationRecords];
       return records.filter(record => record && record.invitee);
@@ -346,7 +348,7 @@ const GMOperations = ({
       console.error('Failed to get invited users list:', error);
       return [];
     }
-  }, [currentAccount, refetchInvitedUsers]);
+  }, [currentAccount, refetchInvitationRecord, formatAccountOwner]);
 
   const { data: cooldownCheckData, refetch: refetchCooldownCheck } = useQuery(CHECK_COOLDOWN, {
     variables: { 
@@ -747,10 +749,15 @@ export const useGMAdditionalData = ({
     const handleToggleDropdown = async (event) => {
       const userId = event.detail.userId;
       try {
+        if (!userId) {
+          window.dispatchEvent(new CustomEvent('updateInvitedUsersDropdown', {
+            detail: { userId, invitedUsers: [] }
+          }));
+          return;
+        }
+        
         const result = await refetchInvitationRecord({
-          variables: {
-            inviter: userId ? formatAccountOwner(userId) : null
-          }
+          inviter: formatAccountOwner(userId)
         });
         const invitedUsers = result.data?.getInvitationRecord || [];
         window.dispatchEvent(new CustomEvent('updateInvitedUsersDropdown', {

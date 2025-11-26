@@ -367,3 +367,74 @@
 
   Plugin: vite:esbuild
   File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
+The request url "/root/linera-protocol/examples/gmic-buildathon/web-frontend/.env" is outside of Vite serving allow list.
+
+- /root/linera-protocol/examples
+
+Refer to docs https://vite.dev/config/server-options.html#server-fs-allow for configurations and more details.
+
+1:24:02 AM [vite] page reload src/GMOperations.js
+1:26:34 AM [vite] page reload src/GMOperations.js
+1:27:03 AM [vite] page reload src/GMOperations.js
+1:29:13 AM [vite] page reload src/GMOperations.js
+1:30:36 AM [vite] page reload src/GMOperations.js
+1:32:48 AM [vite] page reload src/GMOperations.js
+1:40:00 AM [vite] page reload src/GMOperations.js
+1:45:12 AM [vite] page reload src/GMOperations.js
+1:45:59 AM [vite] page reload src/App.js
+1:46:00 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
+   |      ^
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
+
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
+1:47:33 AM [vite] page reload src/GMOperations.js
+1:48:01 AM [vite] page reload src/GMOperations.js
+1:54:09 AM [vite] page reload src/App.js
+1:54:10 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
+   |      ^
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
+
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
+1:54:31 AM [vite] page reload src/App.js
+1:54:32 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
+   |      ^
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
+
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
+1:54:55 AM [vite] page reload src/App.js
+1:54:56 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
+   |      ^
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
+
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js
+1:57:05 AM [vite] page reload src/App.js
+1:57:06 AM [vite] warning: Duplicate key "invitationStatsData" in object literal
+1058|      formatAccountOwner: (address) => address || '',
+1059|      ...gmOperationsResult,
+1060|      invitationStatsData: {
+   |      ^
+1061|        totalInvited: 0,
+1062|        totalRewards: 0,
+
+  Plugin: vite:esbuild
+  File: /root/linera-protocol/examples/gmic-buildathon/web-frontend/src/App.js

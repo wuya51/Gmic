@@ -99,7 +99,22 @@ function App({ chainId, appId, ownerId, inviter, port }) {
   
   const pageLoadTime = useRef(0);
   
+  // 解析URL参数中的邀请者信息
+  const [urlInviter, setUrlInviter] = useState(null);
+  
   useEffect(() => {
+    // 解析URL参数
+    const urlParams = new URLSearchParams(window.location.search);
+    const inviterParam = urlParams.get('inviter');
+    
+    if (inviterParam) {
+      const formattedInviter = formatAccountOwner(inviterParam);
+      setUrlInviter(formattedInviter);
+      console.log('Detected inviter from URL:', formattedInviter);
+      localStorage.setItem('urlInviter', formattedInviter); 
+      addNotification(`You were invited by: ${formattedInviter.slice(0, 8)}...${formattedInviter.slice(-6)}`, 'info');
+    }
+    
     const savedPageLoadTime = localStorage.getItem('pageLoadTime');
     if (!savedPageLoadTime) {
       pageLoadTime.current = Date.now();
@@ -345,7 +360,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
       alert('Please connect your wallet first');
       return;
     }
-    const referralLink = `${window.location.origin}${window.location.pathname}?app=${appId || ''}&owner=${ownerId || ''}&port=${port || '8080'}&inviter=${memoizedCurrentAccount}`;
+    const referralLink = `${window.location.origin}?inviter=${memoizedCurrentAccount}`;
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(referralLink)
         .then(() => {
@@ -1056,13 +1071,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     formatCooldown: (seconds) => `${Math.floor(seconds / 60)}m ${seconds % 60}s`,
     validateRecipientAddress: () => ({ isValid: false, error: '' }),
     formatAccountOwner: (address) => address || '',
-    ...gmOperationsResult,
-    invitationStatsData: {
-      totalInvited: 0,
-      totalRewards: 0,
-      lastRewardTime: null,
-      ...(gmOperationsResult.invitationStatsData || {})
-    }
+    ...gmOperationsResult
   };
   useEffect(() => {
     if (showShareReferralModal && memoizedCurrentAccount && shareModalAdditionalData?.refetchInvitationStats) {
@@ -1362,8 +1371,9 @@ function App({ chainId, appId, ownerId, inviter, port }) {
 
   const handleSendGMWithInvitation = useCallback(() => {
     const content = customMessageEnabled ? customMessage : "Gmicrochains";
-    gmOps.handleSendGMWithInvitation(content);
-  }, [gmOps, customMessageEnabled, customMessage]);
+    const inviter = urlInviter; // 获取解析到的邀请者地址
+    gmOps.handleSendGMWithInvitation(content, inviter); // 传递inviter参数
+  }, [gmOps, customMessageEnabled, customMessage, urlInviter]);
 
   const handleClaimInvitationRewards = useCallback(() => {
     gmOps.handleClaimInvitationRewards();
@@ -1395,7 +1405,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     }
     
     const messageContent = customMessageEnabled ? customMessage : null;
-    await gmOps.handleSendGM(messageContent, formattedRecipient);
+    await gmOps.handleSendGM(messageContent, formattedRecipient, urlInviter);
     
     setTimeout(() => {
       if (additionalData.refetchCooldownStatus) {
@@ -1411,7 +1421,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
         gmOps.refetchWalletMessages();
       }
     }, 1000);
-  }, [currentIsConnected, connectWallet, gmOps, addNotification, customMessageEnabled, customMessage, additionalData, recipientAddress, setAddressValidationError]);
+  }, [currentIsConnected, connectWallet, gmOps, addNotification, customMessageEnabled, customMessage, additionalData, recipientAddress, setAddressValidationError, urlInviter]);
 
   return (
     <ErrorBoundary>
@@ -1513,7 +1523,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                     <div className="link-container">
                       <input 
                         type="text" 
-                        value={`${window.location.origin}${window.location.pathname}?app=${appId || ''}&owner=${ownerId || ''}&port=${port || '8080'}&inviter=${memoizedCurrentAccount}`}
+                        value={`${window.location.origin}?inviter=${memoizedCurrentAccount}`}
                         readOnly
                         className="referral-link-input"
                       />
@@ -1524,7 +1534,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                     <p className="share-label">Share directly:</p>
                     <div className="social-buttons">
                       <a 
-                        href={`https://twitter.com/intent/tweet?text=Join%20GMicrochains%20and%20use%20my%20referral%20link!&url=${encodeURIComponent(window.location.origin + window.location.pathname + '?app=' + (appId || '') + '&owner=' + (ownerId || '') + '&port=' + (port || '8080') + '&inviter=' + memoizedCurrentAccount)}`}
+                        href={`https://twitter.com/intent/tweet?text=Join%20GMicrochains%20and%20use%20my%20referral%20link!&url=${encodeURIComponent(window.location.origin + '?inviter=' + memoizedCurrentAccount)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="social-btn twitter"
@@ -1532,7 +1542,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                         Twitter
                       </a>
                       <a 
-                        href={`https://t.me/share/url?url=${encodeURIComponent(window.location.origin + window.location.pathname + '?inviter=' + memoizedCurrentAccount)}&text=Join%20GMicrochains%20and%20use%20my%20referral%20link!`}
+                        href={`https://t.me/share/url?url=${encodeURIComponent(window.location.origin + '?inviter=' + memoizedCurrentAccount)}&text=Join%20GMicrochains%20and%20use%20my%20referral%20link!`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="social-btn telegram"

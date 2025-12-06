@@ -9,7 +9,6 @@ import { WalletProvider } from './WalletProvider';
 import { DynamicContextProvider } from '@dynamic-labs/sdk-react-core';
 import { EthereumWalletConnectors } from '@dynamic-labs/ethereum';
 
-// 错误边界组件
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -17,11 +16,39 @@ class ErrorBoundary extends React.Component {
   }
 
   static getDerivedStateFromError(error) {
-    return { hasError: true, error };
+    const isCriticalError = !(
+      error?.message?.includes('ApolloError') ||
+      error?.message?.includes('Network error') ||
+      error?.message?.includes('502') ||
+      error?.message?.includes('503') ||
+      error?.message?.includes('504') ||
+      error?.name?.includes('ApolloError')
+    );
+    
+    if (isCriticalError) {
+      console.error('Critical error caught by ErrorBoundary:', error);
+      return { hasError: true, error };
+    } else {
+      console.warn('Non-critical error ignored by ErrorBoundary:', error?.message);
+      return { hasError: false, error: null };
+    }
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error("Error caught by ErrorBoundary:", error, errorInfo);
+    const isCriticalError = !(
+      error?.message?.includes('ApolloError') ||
+      error?.message?.includes('Network error') ||
+      error?.message?.includes('502') ||
+      error?.message?.includes('503') ||
+      error?.message?.includes('504') ||
+      error?.name?.includes('ApolloError')
+    );
+    
+    if (isCriticalError) {
+      console.error("Critical error caught by ErrorBoundary:", error, errorInfo);
+    } else {
+      console.warn('Non-critical error ignored by ErrorBoundary:', error?.message);
+    }
   }
 
   render() {
@@ -52,7 +79,6 @@ class ErrorBoundary extends React.Component {
 const root = ReactDOM.createRoot(document.getElementById("root"));
 
 root.render(
-  <React.StrictMode>
     <ErrorBoundary>
       <BrowserRouter>
         <Routes>
@@ -61,10 +87,8 @@ root.render(
         </Routes>
       </BrowserRouter>
     </ErrorBoundary>
-  </React.StrictMode>
 );
 
-// 默认应用组件，使用默认参数加载应用
 function DefaultGraphQLApp() {
   // 使用默认参数，与nginx配置中的参数保持一致
   const CHAIN_ID = "5babbf494cbc90185102b731daa36a117dec5565497b0d80dd8bae0cb10ddaaa";
@@ -72,15 +96,9 @@ function DefaultGraphQLApp() {
   const OWNER_ID = "0xfee4148c7bd7a824b1dc6e2b4be10476cfaec92783c7db06a9b8d7559bb3f9d9";
   const PORT = "8080";
   const HOST = "gmic.top";
+  const INVITER = null;
   
   try {
-    console.log('🔧 应用配置 (默认):', {
-      chainId: CHAIN_ID,
-      applicationId: APP_ID,
-      ownerId: OWNER_ID,
-      port: PORT,
-      host: HOST
-    });
     
     return (
       <ErrorBoundary>
@@ -113,6 +131,8 @@ function DefaultGraphQLApp() {
                 ownerId={OWNER_ID} 
                 appId={APP_ID}
                 appChainId={CHAIN_ID}
+                port={PORT}
+                inviter={INVITER}
               />
             </GraphQLProvider>
           </WalletProvider>
@@ -150,14 +170,7 @@ function GraphQLApp() {
     const OWNER_ID = searchParams.get("owner") || import.meta.env.VITE_OWNER_ID;
     const PORT = searchParams.get("port") || import.meta.env.VITE_PORT || "8080";
     const HOST = searchParams.get("host") || import.meta.env.VITE_HOST || "localhost";
-    
-    console.log('🔧 应用配置:', {
-      chainId: CHAIN_ID,
-      applicationId: APP_ID,
-      ownerId: OWNER_ID,
-      port: PORT,
-      host: HOST
-    });
+    const INVITER = searchParams.get("inviter"); // 获取inviter参数
     
     return (
       <ErrorBoundary>
@@ -190,6 +203,8 @@ function GraphQLApp() {
                 ownerId={OWNER_ID} 
                 appId={APP_ID}
                 appChainId={CHAIN_ID}
+                port={PORT}
+                inviter={INVITER}
               />
             </GraphQLProvider>
           </WalletProvider>

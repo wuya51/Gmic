@@ -436,7 +436,7 @@ const GMOperations = ({
     }
   }, [setCooldownEnabledError, onMutationError]);
 
-  const handleSendGM = useCallback(async (content = "Gmicrochains", recipient = null) => {
+  const handleSendGM = useCallback(async (content = "Gmicrochains", recipient = null, inviter = null) => {
     if (!isValidAccountOwner(currentAccount)) {
       setMessage("Invalid wallet account", "error");
       setOperationStatus("error");

@@ -2,33 +2,137 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useWallet, WalletConnector } from './WalletProvider';
 import { DynamicConnectButton, useDynamicContext } from '@dynamic-labs/sdk-react-core';
 import "./App.css";
-import GMOperations from './GMOperations';
+import GMOperations, { useGMAdditionalData } from './GMOperations';
 import NotificationCenter from './NotificationCenter';
 
-function App({ chainId, appId, ownerId }) {
-  
-  const useDarkMode = () => {
-    const [isDarkMode, setIsDarkMode] = useState(() => {
-      return localStorage.getItem('darkMode') === 'true';
-    });
+// 添加全局错误处理器，记录完整的错误堆栈信息
+window.onerror = function(message, source, lineno, colno, error) {
+  console.error('Global error captured:', {
+    message,
+    source,
+    lineno,
+    colno,
+    error,
+    stack: error ? error.stack : null
+  });
+  return true;
+};
 
-    useEffect(() => {
-      if (isDarkMode) {
-        document.body.classList.add('dark-mode');
-      } else {
-        document.body.classList.remove('dark-mode');
-      }
-      localStorage.setItem('darkMode', isDarkMode);
-    }, [isDarkMode]);
+window.onunhandledrejection = function(event) {
+  console.error('Global unhandled promise rejection captured:', {
+    reason: event.reason,
+    stack: event.reason ? event.reason.stack : null,
+    promise: event.promise
+  });
+  return true;
+};
 
-    return [isDarkMode, setIsDarkMode];
+const formatAccountOwner = (address) => {
+  if (!address) return '';
+  const cleanAddress = address.trim();
+  if (cleanAddress.startsWith('0x')) {
+    return cleanAddress.toLowerCase();
+  }
+  return `0x${cleanAddress.toLowerCase()}`;
+};
+
+const formatAddressForDisplay = (address, isMobile = false, startChars = 6, endChars = 4) => {
+  if (!address) return '';
+  return isMobile 
+    ? `${address.slice(0, startChars)}...${address.slice(-endChars)}`
+    : address;
+};
+
+const isButtonDisabled = (operationStatus, currentAccount, gmOps, cooldownRemaining = 0, localCooldownEnabled = false) => {
+    return operationStatus === "processing" || 
+      (currentAccount && !gmOps.isValidAccountOwner(currentAccount)) || 
+      (currentAccount && localCooldownEnabled && cooldownRemaining > 0);
   };
+
+  const MAX_MESSAGE_LENGTH = 280;
+  const WARNING_THRESHOLD = 250;
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('React component error captured by ErrorBoundary:', {
+      error,
+      errorInfo,
+      stack: errorInfo.componentStack
+    });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="error-boundary">
+          <h2>Something went wrong.</h2>
+          <details style={{ whiteSpace: 'pre-wrap' }}>
+            {this.state.error && this.state.error.toString()}
+            <br />
+            {this.state.errorInfo && this.state.errorInfo.componentStack}
+          </details>
+          <button onClick={() => this.setState({ hasError: false })}>Try Again</button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+function App({ chainId, appId, ownerId, inviter, port }) {
+  const appRenderCountRef = useRef(0);
+  appRenderCountRef.current += 1;
   
-  const [isDarkMode, setIsDarkMode] = useDarkMode();
+  const forceUpdateRef = useRef(0);
+  const cooldownRemainingRef = useRef(0);
+  const activeTabRef = useRef('unknown');
+  
+  const pageLoadTime = useRef(0);
+  
+  useEffect(() => {
+    const savedPageLoadTime = localStorage.getItem('pageLoadTime');
+    if (!savedPageLoadTime) {
+      pageLoadTime.current = Date.now();
+      localStorage.setItem('pageLoadTime', pageLoadTime.current.toString());
+    } else {
+      pageLoadTime.current = parseInt(savedPageLoadTime);
+    }
+    
+    pageLoadTimestampRef.current = pageLoadTime.current;
+  }, []);
+  
+  const [connectionError, setConnectionError] = useState("");
   
   let walletState = {};
   try {
+    if (typeof useWallet !== 'function') {
+      throw new Error('useWallet is not available - WalletProvider may not be properly configured');
+    }
+    
     walletState = useWallet();
+    
+    if (!walletState || typeof walletState !== 'object') {
+      throw new Error('Invalid wallet state returned from useWallet hook');
+    }
+    
+    if (typeof walletState.connectWallet !== 'function') {
+      walletState.connectWallet = () => Promise.reject(new Error('Wallet connection not available'));
+    }
+    
+    if (typeof walletState.disconnectWallet !== 'function') {
+      walletState.disconnectWallet = () => Promise.resolve();
+    }
+    
   } catch (error) {
     walletState = {
       account: null,
@@ -37,10 +141,18 @@ function App({ chainId, appId, ownerId }) {
       walletChainId: null,
       walletType: null,
       isLoading: false,
-      error: null,
-      connectWallet: () => {},
-      disconnectWallet: () => {}
+      error: error.message || 'Wallet initialization failed',
+      connectWallet: () => {
+        return Promise.reject(new Error('Wallet is in error state'));
+      },
+      disconnectWallet: () => {
+        return Promise.resolve();
+      },
+      isValidAccountOwner: () => false,
+      formatCooldown: (seconds) => `${Math.floor(seconds / 60)}m ${seconds % 60}s`
     };
+    
+    setConnectionError(error.message || 'Wallet connection failed');
   }
   
   const { 
@@ -64,105 +176,63 @@ function App({ chainId, appId, ownerId }) {
   const [operationStatus, setOperationStatus] = useState(null);
   const [claimStatus, setClaimStatus] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
-  const [connectionError, setConnectionError] = useState("");
   const [queryRetryCount, setQueryRetryCount] = useState(0);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [addressValidationError, setAddressValidationError] = useState("");
-  
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-  
-  const [showPlusOne, setShowPlusOne] = useState(false);
   const [previousTotalMessages, setPreviousTotalMessages] = useState(null);
-  const plusOneTimer = useRef(null);
-  
-  const [showInvitationSection, setShowInvitationSection] = useState(false);
+  const [forceUpdate, setForceUpdate] = useState(0);
   const [showLeaderboard, setShowLeaderboard] = useState(true);
-  
-  const [activeTab, setActiveTab] = useState('messages');
-  
+  const getInitialActiveTab = () => {
+    const savedActiveTab = localStorage.getItem('activeTab');
+    return savedActiveTab || 'messages';
+  };
+  const [activeTab, setActiveTab] = useState(getInitialActiveTab());
   const [cooldownStatus, setCooldownStatus] = useState(null);
-  
   const [localCooldownEnabled, setLocalCooldownEnabled] = useState(false);
-  
   const [notifications, setNotifications] = useState([]);
-  
   const [gmRecords, setGmRecords] = useState([]);
   const previousEventCountRef = useRef(0);
-  
-  // History states
+  const previousLatestTimestampRef = useRef(0);
+  const pageLoadTimestampRef = useRef(0);
   const [historyRecords, setHistoryRecords] = useState([]);
   const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
-  
-  // Custom message states
-  const [customMessageEnabled, setCustomMessageEnabled] = useState(false);
+  const [customMessageEnabled, setCustomMessageEnabled] = useState(true);
   const [customMessage, setCustomMessage] = useState('');
   const [selectedMessage, setSelectedMessage] = useState('gm');
-  
-  // Custom message handlers
-  const handleCustomMessageToggle = useCallback(() => {
-    setCustomMessageEnabled(!customMessageEnabled);
-    if (!customMessageEnabled) {
-      setSelectedMessage(customMessage || 'gm');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showShareReferralModal, setShowShareReferralModal] = useState(false);
+  const [showInvitedUsersDropdown, setShowInvitedUsersDropdown] = useState(false);
+  const [invitedUsersList, setInvitedUsersList] = useState([]);
+  const [invitedUsers, setInvitedUsers] = useState([]);
+  const [invitedUsersLoading, setInvitedUsersLoading] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 0);
+  const dropdownRef = useRef(null);
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  const formatAddress = (address) => {
+ 
+    const threshold = 768;
+    if (windowWidth > threshold) {
+      return address; 
     } else {
-      setSelectedMessage('gm');
-    }
-  }, [customMessageEnabled, customMessage]);
-
-  const handleCustomMessageChange = useCallback((e) => {
-    const value = e.target.value;
-    setCustomMessage(value);
-    if (customMessageEnabled) {
-      setSelectedMessage(value || 'gm');
-    }
-  }, [customMessageEnabled]);
-
-  const currentAccount = connectedAccount;
-  const currentChainId = connectedChainId;
-  const currentIsConnected = isConnected;
-  
-  const { primaryWallet, handleLogOut } = useDynamicContext();
-  const isDynamicConnected = primaryWallet && primaryWallet.address && walletType === 'dynamic';
-  const dynamicAccount = isDynamicConnected ? primaryWallet.address : null;
-  const isActiveDynamicWallet = isConnected && walletType === 'dynamic' && currentAccount;
-  
-  const [isDynamicLoading, setIsDynamicLoading] = useState(false);
-  
-  useEffect(() => {
-    if (primaryWallet && primaryWallet.address) {
-      setIsDynamicLoading(false);
-    }
-  }, [primaryWallet]);
-
-  useEffect(() => {
-    if (walletType === 'dynamic') {
-      isManualTargetChainChange.current = false;
-      setTargetChainId(chainId);
-    } else if (walletType === 'linera' && connectedWalletChainId) {
-      if (!localStorage.getItem('targetChainId')) {
-        isManualTargetChainChange.current = false;
-        setTargetChainId(connectedWalletChainId);
-      }
-    }
-  }, [walletType, connectedWalletChainId, chainId]);
-  
-  const disconnectDynamicWallet = async () => {
-    try {
-      // 先调用Dynamic钱包的登出方法
-      if (handleLogOut) {
-        await handleLogOut();
-      }
-      
-      // 确保调用通用的断开连接函数清理状态
-      await disconnectWallet();
-      
-      // 添加额外的延迟，确保所有状态都完全清理
-      await new Promise(resolve => setTimeout(resolve, 500));
-    } catch (error) {
-      console.error('Error disconnecting Dynamic wallet:', error);
-      throw error; // 重新抛出错误，以便调用者能够处理
+      return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`; // 小窗口显示短地址
     }
   };
+
+  forceUpdateRef.current = forceUpdate;
+  cooldownRemainingRef.current = cooldownRemaining;
+  activeTabRef.current = activeTab;
   
   const addNotification = useCallback((message, type = 'info') => {
     const id = Date.now().toString();
@@ -184,83 +254,349 @@ function App({ chainId, appId, ownerId }) {
     setNotifications(prev => prev.filter(notif => notif.id !== id));
   }, []);
   
-  const WalletConnectionSection = React.memo(({
-    isDynamicConnected,
-    isActiveDynamicWallet,
-    currentAccount,
-    isDynamicLoading,
-    currentIsConnected,
-    disconnectDynamicWallet,
-    setMessage,
-    dynamicAccount,
-    connectWallet,
-    disconnectWallet,
-    walletType,
-    isLoading
-  }) => {
+  const handleCustomMessageToggle = useCallback(() => {
+    setCustomMessageEnabled(!customMessageEnabled);
+    if (!customMessageEnabled) {
+      setSelectedMessage(customMessage || 'gm');
+    } else {
+      setSelectedMessage('gm');
+    }
+  }, [customMessageEnabled, customMessage]);
+
+  const isMessageContentValid = useCallback((content) => {
+    if (content.length > 280) {
+      addNotification("Message too long. Maximum 280 characters allowed.", "error");
+      return false;
+    }
+    
+    if (content.includes('<script') || content.includes('</script>') || 
+       content.includes('<iframe') || content.includes('javascript:')) {
+      addNotification("Invalid content. HTML tags and scripts are not allowed.", "error");
+      return false;
+    }
+    
+    const sensitiveWords = [
+      "spam", "abuse", "hate", "violence", "illegal", "scam", "fraud"
+    ];
+    
+    const contentLower = content.toLowerCase();
+    for (const word of sensitiveWords) {
+      if (contentLower.includes(word)) {
+        addNotification(`Invalid content. Please remove inappropriate words like "${word}".`, "error");
+        return false;
+      }
+    }
+    
+    return true;
+  }, [addNotification]);
+
+  const handleCustomMessageChange = useCallback((e) => {
+    const value = e.target.value;
+    setCustomMessage(value);
+    if (customMessageEnabled) {
+      setSelectedMessage(value || 'gm');
+      
+      if (value && !isMessageContentValid(value)) {
+      }
+    }
+  }, [customMessageEnabled, isMessageContentValid]);
+  
+  const addEmojiToMessage = useCallback((emoji) => {
+    const newMessage = customMessage + emoji;
+    if (newMessage.length <= 280) {
+      setCustomMessage(newMessage);
+      if (customMessageEnabled) {
+        setSelectedMessage(newMessage || 'gm');
+      }
+    } else {
+      addNotification("Cannot add emoji. Message would exceed the 280 character limit.", "error");
+    }
+  }, [customMessage, customMessageEnabled, addNotification]);
+  
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showEmojiPicker && 
+          !event.target.closest('.emoji-picker') && 
+          !event.target.closest('.emoji-picker-button')) {
+        setShowEmojiPicker(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showEmojiPicker]);
+
+  const currentAccount = connectedAccount ? formatAccountOwner(connectedAccount) : null;
+  const currentChainId = connectedChainId;
+  const currentIsConnected = isConnected;
+
+  const memoizedCurrentAccount = useMemo(() => currentAccount, [currentAccount]);
+  const memoizedIsMobile = useMemo(() => isMobile, [isMobile]);
+  
+  const handleToggleShareReferral = useCallback(() => {
+    setShowShareReferralModal(!showShareReferralModal);
+  }, [showShareReferralModal]);
+
+  const copyReferralLink = useCallback(() => {
+    if (!memoizedCurrentAccount) {
+      console.error('No account found');
+      alert('Please connect your wallet first');
+      return;
+    }
+    const referralLink = `${window.location.origin}${window.location.pathname}?app=${appId || ''}&owner=${ownerId || ''}&port=${port || '8080'}&inviter=${memoizedCurrentAccount}`;
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(referralLink)
+        .then(() => {
+          const btn = document.querySelector('.copy-btn');
+          if (btn) {
+            const originalText = btn.textContent;
+            btn.textContent = 'Copied!';
+            btn.style.backgroundColor = '#4CAF50';
+            setTimeout(() => {
+              btn.textContent = originalText;
+              btn.style.backgroundColor = '';
+            }, 2000);
+          }
+          console.log('Referral link copied to clipboard using Clipboard API!');
+        })
+        .catch(err => {
+          console.error('Failed to copy using Clipboard API:', err);
+          fallbackCopyTextToClipboard(referralLink);
+        });
+    } else {
+      fallbackCopyTextToClipboard(referralLink);
+    }
+  }, [memoizedCurrentAccount]);
+  
+  const fallbackCopyTextToClipboard = useCallback((text) => {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+      const successful = document.execCommand('copy');
+      if (successful) {
+        const btn = document.querySelector('.copy-btn');
+        if (btn) {
+          const originalText = btn.textContent;
+          btn.textContent = 'Copied!';
+          btn.style.backgroundColor = '#4CAF50';
+          setTimeout(() => {
+            btn.textContent = originalText;
+            btn.style.backgroundColor = '';
+          }, 2000);
+        }
+        console.log('Referral link copied to clipboard using fallback method!');
+      } else {
+        throw new Error('Copy command failed');
+      }
+    } catch (err) {
+      console.error('Failed to copy using fallback method:', err);
+      alert('Failed to copy referral link');
+    } finally {
+      document.body.removeChild(textArea);
+    }
+  }, []);
+  
+  const { primaryWallet, handleLogOut } = useDynamicContext();
+  
+  const isDynamicConnected = (primaryWallet && primaryWallet.address) || (walletType === 'dynamic' && isConnected);
+  const dynamicAccount = isDynamicConnected ? formatAccountOwner(primaryWallet?.address || currentAccount) : null;
+  const isActiveDynamicWallet = (isConnected && walletType === 'dynamic' && currentAccount) || (primaryWallet && primaryWallet.address && walletType === 'dynamic');
+  
+  useEffect(() => {
+    if (primaryWallet && primaryWallet.address && !isActiveDynamicWallet) {
+      const timer = setTimeout(() => {
+        if (primaryWallet && primaryWallet.address && !isActiveDynamicWallet) {
+          connectWallet('dynamic');
+        }
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [primaryWallet, isActiveDynamicWallet, connectWallet]);
+  
+  const [isDynamicLoading, setIsDynamicLoading] = useState(false);
+  
+  useEffect(() => {
+    if (primaryWallet && primaryWallet.address) {
+      setIsDynamicLoading(false);
+    }
+  }, [primaryWallet]);
+
+  useEffect(() => {
+    if (walletType === 'dynamic') {
+      isManualTargetChainChange.current = false;
+      setTargetChainId(chainId);
+    } else if (walletType === 'linera' && connectedWalletChainId) {
+      if (!localStorage.getItem('targetChainId')) {
+        isManualTargetChainChange.current = false;
+        setTargetChainId(connectedWalletChainId);
+      }
+    }
+  }, [walletType, connectedWalletChainId, chainId]);
+  
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+    activeTabRef.current = activeTab;
+    
+    const saveTimeout = setTimeout(() => {
+      const currentSaved = localStorage.getItem('activeTab');
+      if (currentSaved !== activeTab) {
+        localStorage.setItem('activeTab', activeTab);
+      }
+    }, 100);
+    
+    return () => clearTimeout(saveTimeout);
+  }, [activeTab]);
+
+  useEffect(() => {
+    const checkAndRestoreActiveTab = () => {
+      try {
+        const saved = localStorage.getItem('activeTab');
+        if (saved && saved !== activeTab && ['messages', 'leaderboards', 'settings'].includes(saved)) {
+          setActiveTab(saved);
+        }
+      } catch (error) {
+        console.error('[activeTab] Restoration error:', error);
+      }
+    };
+
+    checkAndRestoreActiveTab();
+    
+    const handleErrorBoundaryRecovery = () => {
+      setTimeout(checkAndRestoreActiveTab, 100);
+    };
+
+    window.addEventListener('error', handleErrorBoundaryRecovery);
+    window.addEventListener('unhandledrejection', handleErrorBoundaryRecovery);
+    
+    return () => {
+      window.removeEventListener('error', handleErrorBoundaryRecovery);
+      window.removeEventListener('unhandledrejection', handleErrorBoundaryRecovery);
+    };
+  }, [activeTab]);
+
+  useEffect(() => {
+    const tabCheckInterval = setInterval(() => {
+      try {
+        const saved = localStorage.getItem('activeTab');
+        const isValidTab = ['messages', 'leaderboards', 'settings'].includes(activeTab);
+        const isSavedValid = saved && ['messages', 'leaderboards', 'settings'].includes(saved);
+        
+        if (!isValidTab && isSavedValid) {
+          setActiveTab(saved);
+          activeTabRef.current = saved;
+        }
+      } catch (error) {
+        console.warn('[activeTab] Stability check error:', error);
+      }
+    }, 10000);
+
+    return () => clearInterval(tabCheckInterval);
+  }, [activeTab]);
+  
+  const disconnectDynamicWallet = async (disconnectWalletFn) => {
+    try {
+      if (handleLogOut) {
+        await handleLogOut();
+      }
+      await disconnectWalletFn();
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+      throw error;
+    }
+  };
+  
+  const WalletConnectionSection = React.memo((props) => {
+    const {
+      isDynamicConnected,
+      isActiveDynamicWallet,
+      currentAccount,
+      isDynamicLoading,
+      currentIsConnected,
+      disconnectDynamicWallet,
+      addNotification,
+      dynamicAccount,
+      connectWallet,
+      disconnectWallet,
+      walletType,
+      isLoading,
+      primaryWallet
+    } = props;
+    
     const isLineraConnected = currentIsConnected && walletType === 'linera';
     const lineraAccount = isLineraConnected ? currentAccount : null;
     
     const handleConnectLineraWallet = async () => {
       try {
         if (!window.linera) {
-          setMessage("Linera wallet not installed, please visit https://github.com/respeer-ai/linera-wallet to download and install", "warning");
+          addNotification("Linera wallet not installed, please visit https://github.com/respeer-ai/linera-wallet to download and install", "warning");
           return;
         }
-        
-        if (currentIsConnected && walletType && walletType !== 'linera') {
-          // 如果当前连接的是Dynamic钱包，需要先断开Dynamic钱包
+        if (currentIsConnected && walletType) {
           if (walletType === 'dynamic') {
-            await disconnectDynamicWallet();
-            setMessage('Dynamic wallet disconnected', 'info');
-            
-            // 添加延迟，确保Dynamic钱包状态完全清理
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          } else {
-            await disconnectWallet();
+            await props.disconnectDynamicWallet();
+            addNotification('Dynamic wallet disconnected', 'info');
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } else if (walletType === 'linera') {
+            await props.disconnectWallet();
+            addNotification('Linera wallet disconnected successfully', 'success');
+            return;
           }
         }
         
         await connectWallet('linera');
-        setMessage('Linera wallet connected successfully!', 'success');
+        addNotification('Linera wallet connected successfully!', 'success');
       } catch (error) {
-        setMessage(`Failed to connect Linera wallet: ${error.message}`, 'error');
+        addNotification(`Failed to connect Linera wallet: ${error.message}`, 'error');
       }
     };
     
     const handleDisconnectLineraWallet = async () => {
       try {
-        await disconnectWallet();
-        setMessage('Linera wallet disconnected successfully', 'success');
+        await props.disconnectWallet();
+        addNotification('Linera wallet disconnected successfully', 'success');
       } catch (error) {
-        setMessage(`Failed to disconnect Linera wallet: ${error.message}`, 'error');
+        addNotification(`Failed to disconnect Linera wallet: ${error.message}`, 'error');
       }
     };
     
     const handleConnectDynamicWallet = async () => {
       try {
-        // 如果已连接Linera钱包，先断开
-        if (isLineraConnected) {
-          await disconnectWallet();
-          setMessage('Linera wallet disconnected', 'info');
-          
-          // 添加延迟，确保Linera钱包状态完全清理
-          await new Promise(resolve => setTimeout(resolve, 1000));
+        if (isDynamicConnected || isActiveDynamicWallet) {
+          await props.disconnectDynamicWallet();
+          addNotification('Dynamic wallet disconnected successfully', 'success');
+          return;
         }
-        
-        // DynamicConnectButton会处理连接逻辑
-        // 这里不需要额外的连接代码
+        if (isLineraConnected) {
+          await props.disconnectWallet();
+          addNotification('Linera wallet disconnected', 'info');
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        if (!isDynamicConnected && !isActiveDynamicWallet) {
+          await props.connectWallet('dynamic');
+        }
       } catch (error) {
-        setMessage(`Failed to connect Dynamic wallet: ${error.message}`, 'error');
+        addNotification(`Failed to handle Dynamic wallet: ${error.message}`, 'error');
       }
     };
     
-    const handleDisconnectDynamicWallet = async () => {
+    const handleDisconnectDynamicWalletClick = async () => {
       try {
-        await disconnectDynamicWallet();
-        setMessage('Dynamic wallet disconnected successfully', 'success');
+        await props.disconnectDynamicWallet();
+        addNotification('Dynamic wallet disconnected successfully', 'success');
       } catch (error) {
-        setMessage(`Failed to disconnect Dynamic wallet: ${error.message}`, 'error');
+        addNotification(`Failed to disconnect Dynamic wallet: ${error.message}`, 'error');
       }
     };
     
@@ -275,7 +611,8 @@ function App({ chainId, appId, ownerId }) {
             >
               <div className="wallet-address">
                 <span className="status-dot"></span>
-                {lineraAccount ? `${lineraAccount.slice(0, 6)}...${lineraAccount.slice(-4)}` : 'Connected'}
+                {lineraAccount ? `${lineraAccount.slice(0, 6)}...${lineraAccount.slice(-4)}` : 
+                 currentAccount ? `${currentAccount.slice(0, 6)}...${currentAccount.slice(-4)}` : 'Connected'}
               </div>
             </div>
           ) : (
@@ -290,15 +627,17 @@ function App({ chainId, appId, ownerId }) {
         </div>
         
         <div className="wallet-button-container">
-          {isDynamicConnected ? (
+          {(currentIsConnected && walletType === 'dynamic') || (primaryWallet && primaryWallet.address) || isDynamicConnected || isActiveDynamicWallet ? (
             <div 
               className="wallet-info-card dynamic clickable"
-              onClick={handleDisconnectDynamicWallet}
+              onClick={handleDisconnectDynamicWalletClick}
               title="Click to disconnect Dynamic wallet"
             >
               <div className="wallet-address">
                 <span className="status-dot"></span>
-                {dynamicAccount ? `${dynamicAccount.slice(0, 6)}...${dynamicAccount.slice(-4)}` : 'Connected'}
+                {primaryWallet?.address ? `${formatAccountOwner(primaryWallet.address).slice(0, 6)}...${formatAccountOwner(primaryWallet.address).slice(-4)}` : 
+                 (currentAccount && (walletType === 'dynamic' || isDynamicConnected || isActiveDynamicWallet)) ? `${currentAccount.slice(0, 6)}...${currentAccount.slice(-4)}` : 
+                 'Connected'}
               </div>
             </div>
           ) : (
@@ -306,7 +645,6 @@ function App({ chainId, appId, ownerId }) {
               <DynamicConnectButton>
                 <button 
                   className="connect-btn dynamic"
-                  onClick={handleConnectDynamicWallet}
                 >
                   Dynamic Wallet
                 </button>
@@ -322,12 +660,45 @@ function App({ chainId, appId, ownerId }) {
     showLeaderboard,
     setShowLeaderboard,
     leaderboardData,
+    invitationLeaderboardData,
     currentAccount,
     isMobile,
     copyToClipboard,
-    refetchLeaderboard
+    refetchLeaderboard,
+    refetchInvitationLeaderboard,
+    onTabChange
   }) => {
-    const leaderboardItems = useMemo(() => {
+    const renderCountRef = useRef(0);
+    renderCountRef.current += 1;
+    
+    const getCallStack = () => {
+      try {
+        const stack = new Error().stack;
+        const stackLines = stack.split('\n').slice(3, 8);
+        return stackLines.map(line => line.trim()).join(' <- ');
+      } catch (e) {
+        return 'Stack trace unavailable';
+      }
+    };
+    
+    const propsChanged = {};
+    if (renderCountRef.current > 1) {
+      propsChanged.showLeaderboard = showLeaderboard !== undefined;
+      propsChanged.leaderboardData = leaderboardData !== undefined;
+      propsChanged.currentAccount = currentAccount !== undefined;
+      propsChanged.isMobile = isMobile !== undefined;
+    }
+    
+    const hasFetchedRef = useRef(false);
+    
+    useEffect(() => {
+      return () => {
+      };
+    }, []);
+    
+    const mountTimeRef = useRef(Date.now());
+
+    const gmLeaderboardItems = useMemo(() => {
       if (!leaderboardData?.getTopUsers || leaderboardData.getTopUsers.length === 0) {
         return null;
       }
@@ -338,7 +709,11 @@ function App({ chainId, appId, ownerId }) {
           <td>
             <span 
               className="address-simple" 
-              onClick={(e) => copyToClipboard(entry.user, e)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                copyToClipboard(entry.user, e);
+              }}
             >
               {isMobile ? `${entry.user.slice(0, 6)}...${entry.user.slice(-4)}` : entry.user}
             </span>
@@ -347,6 +722,31 @@ function App({ chainId, appId, ownerId }) {
         </tr>
       ));
     }, [leaderboardData?.getTopUsers, currentAccount, isMobile, copyToClipboard]);
+    
+    const invitationLeaderboardItems = useMemo(() => {
+      if (!invitationLeaderboardData?.getTopInvitors || invitationLeaderboardData.getTopInvitors.length === 0) {
+        return null;
+      }
+      
+      return invitationLeaderboardData.getTopInvitors.map((entry, index) => (
+        <tr key={`${entry.user}-${index}`} className={entry.user === currentAccount ? "current-user" : ""}>
+          <td>{index + 1}</td>
+          <td>
+            <span 
+              className="address-simple" 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                copyToClipboard(entry.user, e);
+              }}
+            >
+              {isMobile ? `${entry.user.slice(0, 6)}...${entry.user.slice(-4)}` : entry.user}
+            </span>
+          </td>
+          <td>{entry.count}</td>
+        </tr>
+      ));
+    }, [invitationLeaderboardData?.getTopInvitors, currentAccount, isMobile, copyToClipboard]);
 
     return (
       <div className="card leaderboard-card">
@@ -361,49 +761,96 @@ function App({ chainId, appId, ownerId }) {
         </div>
         {showLeaderboard && (
           <div className="leaderboard-content">
-            <div className="stats-header">
-              <h4>Top GMicrochains Senders</h4>
-              <button 
-                className="refresh-btn"
-                onClick={() => {
-                  refetchLeaderboard && refetchLeaderboard();
-                }}
-                title="Refresh leaderboard"
-              >
-                🔄 Refresh
-              </button>
+            <div className="leaderboard-tabs">
+              <div className="stats-header">
+                <h4>Top GMicrochains Senders</h4>
+                <button 
+                  className="refresh-btn"
+                  onClick={() => {
+                    refetchLeaderboard && refetchLeaderboard();
+                  }}
+                  title="Refresh leaderboard"
+                >
+                  🔄 Refresh
+                </button>
+              </div>
+              {gmLeaderboardItems ? (
+                <div className="leaderboard-list">
+                  <table className="leaderboard-table">
+                    <thead>
+                      <tr>
+                        <th>Rank</th>
+                        <th>User</th>
+                        <th>Count</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {gmLeaderboardItems}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="no-leaderboard-data">
+                  <p>No leaderboard data available yet.</p>
+                </div>
+              )}
             </div>
-            {leaderboardItems ? (
-              <div className="leaderboard-list">
-                <table className="leaderboard-table">
-                  <thead>
-                    <tr>
-                      <th>Rank</th>
-                      <th>User</th>
-                      <th>Count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {leaderboardItems}
-                  </tbody>
-                </table>
+            
+            <div className="leaderboard-tabs invitation-leaderboard-tab">
+              <div className="stats-header">
+                <h4>Top Invitors</h4>
+                <button 
+                  className="refresh-btn"
+                  onClick={() => {
+                    refetchInvitationLeaderboard && refetchInvitationLeaderboard();
+                  }}
+                  title="Refresh invitation leaderboard"
+                >
+                  🔄 Refresh
+                </button>
               </div>
-            ) : (
-              <div className="no-leaderboard-data">
-                <p>No leaderboard data available yet.</p>
-              </div>
-            )}
+              {invitationLeaderboardItems ? (
+                <div className="leaderboard-list">
+                  <table className="leaderboard-table">
+                    <thead>
+                      <tr>
+                        <th>Rank</th>
+                        <th>User</th>
+                        <th>Points</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {invitationLeaderboardItems}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="no-leaderboard-data">
+                  <p>No invitation leaderboard data available yet.</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
     );
   }, (prevProps, nextProps) => {
-    return (
-      prevProps.showLeaderboard === nextProps.showLeaderboard &&
-      prevProps.leaderboardData === nextProps.leaderboardData &&
-      prevProps.currentAccount === nextProps.currentAccount &&
-      prevProps.isMobile === nextProps.isMobile
-    );
+    const leaderboardDataChanged = 
+      prevProps.leaderboardData?.getTopUsers?.length !== nextProps.leaderboardData?.getTopUsers?.length ||
+      JSON.stringify(prevProps.leaderboardData?.getTopUsers) !== JSON.stringify(nextProps.leaderboardData?.getTopUsers);
+    
+    const showLeaderboardChanged = prevProps.showLeaderboard !== nextProps.showLeaderboard;
+    const currentAccountChanged = prevProps.currentAccount !== nextProps.currentAccount;
+    const isMobileChanged = prevProps.isMobile !== nextProps.isMobile;
+    const invitationLeaderboardDataChanged = 
+      prevProps.invitationLeaderboardData?.getTopInvitors?.length !== nextProps.invitationLeaderboardData?.getTopInvitors?.length ||
+      JSON.stringify(prevProps.invitationLeaderboardData?.getTopInvitors) !== JSON.stringify(nextProps.invitationLeaderboardData?.getTopInvitors);
+    
+    if (leaderboardDataChanged || invitationLeaderboardDataChanged || showLeaderboardChanged || currentAccountChanged || isMobileChanged) {
+      return false;
+    }
+    
+    return true;
   });
   
   const handleConnectWallet = useCallback(async (newWalletType) => {
@@ -432,6 +879,10 @@ function App({ chainId, appId, ownerId }) {
     addNotification(message, type);
   }, [addNotification]);
   
+  const memoizedSetShowLeaderboard = useCallback((value) => {
+    setShowLeaderboard(value);
+  }, []);
+
   const copyToClipboard = useCallback((text, event) => {
     const copyText = async (textToCopy) => {
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -508,8 +959,6 @@ function App({ chainId, appId, ownerId }) {
     setTimeout(() => {
       if (gmOps) {
         gmOps.refetchWalletMessages && gmOps.refetchWalletMessages();
-        gmOps.refetch && gmOps.refetch();
-        gmOps.refetchGmRecord && gmOps.refetchGmRecord();
         gmOps.refetchInvitationStats && gmOps.refetchInvitationStats();
         
         if (mutationType === 'sendGM') {
@@ -517,55 +966,130 @@ function App({ chainId, appId, ownerId }) {
           gmOps.refetchStreamEvents && gmOps.refetchStreamEvents();
         }
       }
+      
+      if (additionalData) {
+        additionalData.refetchGmRecord && additionalData.refetchGmRecord();
+      }
     }, 1000);
   }, [addNotification]);
-
-  const previousLatestTimestampRef = useRef(0);
-  const pageLoadTimestampRef = useRef(Date.now() * 1000);
   
-  const gmOps = GMOperations({
-    chainId: currentChainId || chainId,
+  const additionalData = useGMAdditionalData({
+    chainId,
     currentAccount,
-    currentChainId,
-    walletMode: 'connected',
+    currentChainId: connectedWalletChainId,
+    walletType,
     queryRetryCount,
-    setQueryRetryCount,
-    setOperationStatus,
-    setClaimStatus,
-    setMessage,
-    targetChainId,
-    recipientAddress,
-    onMutationComplete: handleMutationComplete,
-
-    cooldownStatus: { enabled: localCooldownEnabled }
+    setQueryRetryCount
   });
 
-  // History toggle handler
+  const shareModalAdditionalData = useGMAdditionalData({
+    chainId,
+    currentAccount,
+    currentChainId: connectedWalletChainId,
+    walletType,
+    queryRetryCount,
+    setQueryRetryCount
+  });
+
+  const memoizedLeaderboardData = useMemo(() => additionalData.leaderboardData, [additionalData.leaderboardData]);
+
+  useEffect(() => {
+    if (activeTab === 'leaderboards') {
+      if (additionalData.refetchLeaderboard) {
+        additionalData.refetchLeaderboard();
+      }
+      if (additionalData.refetchInvitationLeaderboard) {
+        additionalData.refetchInvitationLeaderboard();
+      }
+    }
+  }, [activeTab, additionalData.refetchLeaderboard, additionalData.refetchInvitationLeaderboard]);
+
+
+  const gmOperationsResult = GMOperations({
+    chainId,
+    currentAccount,
+    currentChainId: connectedWalletChainId,
+    targetChainId,
+    appId,
+    ownerId,
+    addNotification,
+    setMessage,
+    setOperationStatus,
+    setClaimStatus,
+    onMutationComplete: handleMutationComplete,
+    onMutationError: (error) => {
+      console.error('Mutation error:', error);
+      setOperationStatus("error");
+      setTimeout(() => setOperationStatus(null), 5000);
+      addNotification(`Operation failed: ${error.message}`, "error");
+    },
+    inviter,
+    queryRetryCount,
+    setQueryRetryCount
+  }) || {};
+  const gmOps = {
+    walletMessagesData: { walletMessages: 0 },
+    subscriptionStatus: {},
+    streamEventsData: [],
+    gmEventsData: {},
+    loading: false,
+    error: null,
+    data: { totalMessages: 0 },
+    queryError: null,
+    invitationStatsData: {
+      totalInvited: 0,
+      totalRewards: 0,
+      lastRewardTime: null
+    },
+    refetchInvitationRewards: () => Promise.resolve({}),
+    refetchLeaderboard: () => Promise.resolve({}),
+    refetchGmEvents: () => Promise.resolve({}),
+    refetchWalletMessages: () => Promise.resolve({}),
+    refetchInvitationStats: () => Promise.resolve({}),
+    refetchStreamEvents: () => Promise.resolve({}),
+    handleSendGM: () => Promise.resolve({}),
+    handleSendGMToWithAddress: () => Promise.resolve({}),
+    handleSendGMWithInvitation: () => Promise.resolve({}),
+    handleClaimInvitationRewards: () => Promise.resolve({}),
+    handleSetCooldownEnabled: () => Promise.resolve({}),
+    isValidAccountOwner: () => false,
+    formatCooldown: (seconds) => `${Math.floor(seconds / 60)}m ${seconds % 60}s`,
+    validateRecipientAddress: () => ({ isValid: false, error: '' }),
+    formatAccountOwner: (address) => address || '',
+    ...gmOperationsResult,
+    invitationStatsData: {
+      totalInvited: 0,
+      totalRewards: 0,
+      lastRewardTime: null,
+      ...(gmOperationsResult.invitationStatsData || {})
+    }
+  };
+  useEffect(() => {
+    if (showShareReferralModal && memoizedCurrentAccount && shareModalAdditionalData?.refetchInvitationStats) {
+      shareModalAdditionalData.refetchInvitationStats();
+    }
+  }, [showShareReferralModal]);
+
   const handleHistoryToggle = useCallback(async () => {
-    // If dropdown is already open, just close it
     if (showHistoryDropdown) {
       setShowHistoryDropdown(false);
       return;
     }
     
-    // If no account is connected, just show the dropdown with empty state
     if (!currentAccount) {
       setShowHistoryDropdown(true);
       return;
     }
     
-    // Otherwise, fetch history and then show dropdown
     try {
       setHistoryLoading(true);
       const { data } = await gmOps.refetchGmEvents();
       
       if (data && data.getGmEvents) {
-        // Sort by timestamp in descending order (newest first)
         const sortedRecords = [...data.getGmEvents].sort((a, b) => 
           parseInt(b.timestamp) - parseInt(a.timestamp)
         );
         
-        // Limit to 15 records
         setHistoryRecords(sortedRecords.slice(0, 15));
       } else {
         setHistoryRecords([]);
@@ -579,10 +1103,12 @@ function App({ chainId, appId, ownerId }) {
     }
   }, [showHistoryDropdown, currentAccount, gmOps]);
   
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (showHistoryDropdown && !event.target.closest('.send-action-card')) {
+      if (showHistoryDropdown && 
+          !event.target.closest('.send-action-card') && 
+          !event.target.closest('.history-button') &&
+          !event.target.closest('.history-dropdown')) {
         setShowHistoryDropdown(false);
       }
     };
@@ -602,24 +1128,25 @@ function App({ chainId, appId, ownerId }) {
     setOperationStatus("processing");
     
     try {
-      setLocalCooldownEnabled(enabled);
-      
       await gmOps.handleSetCooldownEnabled(enabled);
-      
-      gmOps.refetchCooldownStatus && gmOps.refetchCooldownStatus();
-      gmOps.refetchCooldownCheck && gmOps.refetchCooldownCheck();
-      
+      const statusResult = await (additionalData?.refetchCooldownStatus && additionalData.refetchCooldownStatus());
+      const remoteEnabled = statusResult?.data?.getCooldownStatus?.enabled;
+      if (typeof remoteEnabled === 'boolean') {
+        setLocalCooldownEnabled(remoteEnabled);
+      } else {
+        setLocalCooldownEnabled(enabled);
+      }
+      await (additionalData?.refetchCooldownCheck && additionalData.refetchCooldownCheck());
       setOperationStatus("success");
       setTimeout(() => setOperationStatus(null), 3000);
     } catch (error) {
-      setLocalCooldownEnabled(!enabled);
       addNotification(
         `Failed to ${enabled ? 'enable' : 'disable'} 24-hour limit: ${error.message}`,
         "error"
       );
       setOperationStatus("error");
     }
-  }, [currentAccount, setMessage, gmOps, addNotification]);
+  }, [currentAccount, setMessage, addNotification]);
 
 
 
@@ -637,171 +1164,188 @@ function App({ chainId, appId, ownerId }) {
   
   useEffect(() => {
     if (currentAccount && currentChainId) {
-      setTimeout(() => {
-        gmOps.refetchInvitationStats && gmOps.refetchInvitationStats();
-      }, 100);
-    }
-  }, [currentAccount, currentChainId]);
-  
-  useEffect(() => {
-    if (currentAccount && currentChainId) {
-      setTimeout(() => {
-        if (gmOps.refetchCooldownStatus) {
-          gmOps.refetchCooldownStatus().then(() => {
-            const currentCooldownStatus = gmOps.cooldownStatusData?.getCooldownStatus?.enabled;
-            if (currentCooldownStatus !== undefined) {
+      const syncCooldownStatus = () => {
+        if (additionalData?.refetchCooldownStatus) {
+          additionalData.refetchCooldownStatus().then((res) => {
+            const currentCooldownStatus = res?.data?.getCooldownStatus?.enabled ?? additionalData.cooldownStatusData?.getCooldownStatus?.enabled;
+            if (typeof currentCooldownStatus === 'boolean') {
               setLocalCooldownEnabled(currentCooldownStatus);
+              console.log('Syncing 24-hour limit status:', currentCooldownStatus ? 'ENABLED' : 'DISABLED');
+            }
+          }).catch(error => {
+            console.warn('Failed to sync 24-hour limit status (non-critical):', error.message);
+            const cachedCooldownStatus = additionalData.cooldownStatusData?.getCooldownStatus?.enabled;
+            if (typeof cachedCooldownStatus === 'boolean') {
+              setLocalCooldownEnabled(cachedCooldownStatus);
             }
           });
         }
-      }, 200);
+      };
+
+      syncCooldownStatus();
     }
   }, [currentAccount, currentChainId]);
 
   useEffect(() => {
-    const events = gmOps.streamEventsData?.getStreamEvents;
+    const handleUpdateInvitedUsers = (event) => {
+      const { invitedUsers } = event.detail;
+      setInvitedUsers(invitedUsers);
+      setInvitedUsersLoading(false);
+    };
+
+    const handleToggleDropdown = () => {
+      setInvitedUsersLoading(true);
+    };
+
+    window.addEventListener('updateInvitedUsersDropdown', handleUpdateInvitedUsers);
+    window.addEventListener('toggleInvitedUsersDropdown', handleToggleDropdown);
     
-    if (events && events.length > 0) {
-      const currentEventCount = events.length;
-      const previousEventCount = previousEventCountRef.current || 0;
-      
-      const latestEvent = events[0];
-      const latestTimestamp = latestEvent ? Number(latestEvent.timestamp) : 0;
-      const previousLatestTimestamp = previousLatestTimestampRef.current || 0;
-      
-      if (currentEventCount !== previousEventCount || latestTimestamp !== previousLatestTimestamp) {
-        const newRecords = events.map(event => ({
-          sender: event.sender,
-          recipient: event.recipient,
-          timestamp: event.timestamp,
-          content: event.content
-        })).filter(event => {
-          let eventTime = Number(event.timestamp);
-          if (eventTime < Date.now()) {
-            eventTime = eventTime * 1000;
-          }
-          return eventTime > pageLoadTimestampRef.current;
-        });   
-        
-        setGmRecords(newRecords);
-        previousEventCountRef.current = currentEventCount;
-        previousLatestTimestampRef.current = latestTimestamp;
+      const handleClickOutsideDropdown = (event) => {
+      const dropdownContainer = document.querySelector('.dropdown-container');
+      if (dropdownContainer && !dropdownContainer.contains(event.target)) {
+        setShowInvitedUsersDropdown(false);
       }
-    }
-  }, [gmOps.streamEventsData]);
+    };
 
+    document.addEventListener('click', handleClickOutsideDropdown);
+
+    return () => {
+      window.removeEventListener('updateInvitedUsersDropdown', handleUpdateInvitedUsers);
+      window.removeEventListener('toggleInvitedUsersDropdown', handleToggleDropdown);
+      document.removeEventListener('click', handleClickOutsideDropdown);
+    };
+  }, []);
+
+  const processedEventsRef = useRef(new Set());
+  const isFirstLoadRef = useRef(true);
+  
   useEffect(() => {
-    const subscriptionEvents = gmOps.subscriptionData?.gmEvents;
+    const streamEvents = gmOps.streamEventsData || [];
+    const gmEvents = gmOps.gmEventsData || [];
+
+    const allEvents = streamEvents;
     
-    if (subscriptionEvents && subscriptionEvents.length > 0) {
-      const newRecords = subscriptionEvents.map(event => ({
-        sender: event.sender,
-        recipient: event.recipient,
-        timestamp: event.timestamp,
-        content: event.content
-      }));
+    if (allEvents.length > 0) {
+      const eventIds = allEvents.map(event => 
+        `${event.sender}-${event.recipient}-${event.timestamp}`
+      );
       
-      setGmRecords(prev => {
-        const existingTimestamps = new Set(prev.map(r => r.timestamp));
-        const filteredNewRecords = newRecords.filter(r => !existingTimestamps.has(r.timestamp));
+      if (isFirstLoadRef.current) {
+        isFirstLoadRef.current = false;
         
-        if (filteredNewRecords.length > 0) {
-          const updatedRecords = [...prev, ...filteredNewRecords];
-
-          if (gmOps) {
-            gmOps.refetch && gmOps.refetch();
-
-            gmOps.refetchStreamEvents && gmOps.refetchStreamEvents();
-
-            gmOps.refetchLeaderboard && gmOps.refetchLeaderboard();
-
-            const isCurrentUserInvolved = filteredNewRecords.some(
-              record => record.sender === currentAccount || record.recipient === currentAccount
-            );
-            
-            if (isCurrentUserInvolved && currentAccount) {
-              gmOps.refetchWalletMessages && gmOps.refetchWalletMessages();
-              gmOps.refetchGmRecord && gmOps.refetchGmRecord();
-              gmOps.refetchCooldownCheck && gmOps.refetchCooldownCheck();
-            }
-            
-            // 显示通知，告知用户有新消息
-            const lastEvent = filteredNewRecords[filteredNewRecords.length - 1];
-            if (lastEvent) {
-              const isFromCurrentUser = lastEvent.sender === currentAccount;
-              const isToCurrentUser = lastEvent.recipient === currentAccount;
-              
-              if (!isFromCurrentUser && isToCurrentUser) {
-                addNotification(`You received a new GM from ${lastEvent.sender.slice(0, 8)}...${lastEvent.sender.slice(-6)}`, 'info');
-              } else if (!isFromCurrentUser && !isToCurrentUser) {
-                addNotification(`New GM sent between ${lastEvent.sender.slice(0, 8)}... and ${lastEvent.recipient.slice(0, 8)}...`, 'info');
-              }
-            }
-          }
+        eventIds.forEach(eventId => {
+          processedEventsRef.current.add(eventId);
+        });
+        
+        setGmRecords([]);
+      } else {
+        const newEvents = allEvents.filter((event, index) => {
+          const eventId = eventIds[index];
+          const isProcessed = processedEventsRef.current.has(eventId);
           
-          return updatedRecords;
-        } else {
-          return prev;
+          return !isProcessed;
+        });
+        
+        if (newEvents.length > 0) {
+          newEvents.forEach((event, index) => {
+            const eventIndex = allEvents.indexOf(event);
+            const eventId = eventIds[eventIndex];
+            processedEventsRef.current.add(eventId);
+          });
+          
+          const newRecords = newEvents.map(event => ({
+            sender: event.sender,
+            recipient: event.recipient,
+            timestamp: event.timestamp,
+            content: event.content || 'Gmicrochains'
+          }));
+          
+          setGmRecords(prev => {
+            const existingTimestamps = new Set(prev.map(r => r.timestamp));
+            const filteredNewRecords = newRecords.filter(r => !existingTimestamps.has(r.timestamp));
+            
+            if (filteredNewRecords.length > 0) {
+              return [...prev, ...filteredNewRecords];
+            } else {
+              return prev;
+            }
+          });
         }
-      });
+      }
     }
-  }, [gmOps.subscriptionData, currentAccount, gmOps, addNotification]);
+  }, [gmOps.streamEventsData, gmRecords.length]);
 
   useEffect(() => {
-    if (operationStatus === "success") {
-      setTimeout(() => {
-        if (gmOps) {
-          gmOps.refetchStreamEvents && gmOps.refetchStreamEvents();
+    if (gmOps.subscriptionStatus?.gmEvents?.lastUpdate) {
+      const refreshTimeout = setTimeout(() => {
+        console.groupCollapsed('[cause] subscription-update');
+        if (gmOps.refetchGmEvents) {
+          gmOps.refetchGmEvents();
         }
+        console.groupEnd();
+      }, 30000);
+      
+      return () => clearTimeout(refreshTimeout);
+    }
+  }, [gmOps.subscriptionStatus?.gmEvents?.lastUpdate, gmOps.refetchGmEvents]);
+
+  useEffect(() => {
+    if (gmOps.subscriptionStatus?.gmEvents?.lastUpdate) {
+      const refreshTimeout = setTimeout(() => {
+        console.groupCollapsed('[cause] subscription-event-received');
+        if (additionalData.refetchCooldownStatus) {
+          additionalData.refetchCooldownStatus({
+            fetchPolicy: 'network-only',
+            nextFetchPolicy: 'cache-first'
+          });
+        }
+        if (additionalData.refetchGmRecord) {
+          additionalData.refetchGmRecord({
+            fetchPolicy: 'network-only',
+            nextFetchPolicy: 'cache-and-network'
+          });
+        }
+        console.groupEnd();
       }, 1000);
+      
+      return () => clearTimeout(refreshTimeout);
     }
-  }, [operationStatus, gmOps]);
+  }, [gmOps.subscriptionStatus?.gmEvents?.lastUpdate, additionalData.refetchCooldownStatus, additionalData.refetchGmRecord]);
 
+  const [lastProcessedSubscriptionTime, setLastProcessedSubscriptionTime] = useState(null);
+  
   useEffect(() => {
-    if (gmOps.data) {
-      if (
-        typeof previousTotalMessages === 'number' && 
-        typeof gmOps.data?.totalMessages === 'number' && 
-        gmOps.data.totalMessages > previousTotalMessages
-      ) {
-        setShowPlusOne(true);
-        if (plusOneTimer.current) {
-          clearTimeout(plusOneTimer.current);
-        }
-        plusOneTimer.current = setTimeout(() => {
-          setShowPlusOne(false);
-        }, 1000);
-      }
-      if (typeof gmOps.data?.totalMessages === 'number') {
-        setPreviousTotalMessages(gmOps.data.totalMessages);
-      }
-    }
-  }, [gmOps.data, previousTotalMessages, currentAccount, currentChainId, chainId]);
-
+    const isCooldownEnabled = additionalData.cooldownStatusData?.getCooldownStatus?.enabled;
+    setLocalCooldownEnabled(!!isCooldownEnabled);
+  }, [additionalData.cooldownStatusData]);
+  
   useEffect(() => {
-    const COOLDOWN_MS = 86_400_000_000;
-    let intervalId;
-
-    if (gmOps.gmRecordData?.getGmRecord?.timestamp) {
-      const lastGm = Number(gmOps.gmRecordData?.getGmRecord?.timestamp);
-      const updateCooldown = () => {
-        const currentTs = Date.now() * 1000;
-        if (currentTs < lastGm + COOLDOWN_MS) {
-          setCooldownRemaining(lastGm + COOLDOWN_MS - currentTs);
-        } else {
-          setCooldownRemaining(0);
-          clearInterval(intervalId);
-        }
-      };
-
-      updateCooldown();
-      intervalId = setInterval(updateCooldown, 1000);
+    const COOLDOWN_MS = 86_400_000;
+    
+    const isCooldownEnabled = additionalData.cooldownStatusData?.getCooldownStatus?.enabled;
+    const hasValidTimestamp = additionalData.gmRecordData?.getGmRecord?.timestamp;
+    
+    if (isCooldownEnabled && hasValidTimestamp) {
+      const timestamp = Number(additionalData.gmRecordData.getGmRecord.timestamp);
+      let lastGm;
+      if (timestamp > 1e12) {
+        lastGm = timestamp / 1000;
+      } else if (timestamp > 1e9) {
+        lastGm = timestamp * 1000;
+      } else {
+        lastGm = timestamp;
+      }
+      
+      const currentTs = Date.now();
+      if (currentTs < lastGm + COOLDOWN_MS) {
+        setCooldownRemaining(lastGm + COOLDOWN_MS - currentTs);
+      } else {
+        setCooldownRemaining(0);
+      }
     } else {
       setCooldownRemaining(0);
     }
-
-    return () => clearInterval(intervalId);
-  }, [gmOps.gmRecordData]);
+  }, [additionalData.gmRecordData, additionalData.cooldownStatusData]);
 
   const isManualTargetChainChange = useRef(false);
   
@@ -812,81 +1356,263 @@ function App({ chainId, appId, ownerId }) {
     }
   }, [targetChainId]);
 
-  const validateRecipientAddress = useCallback((address) => {
-    const validation = gmOps.validateRecipientAddress(address);
-    setAddressValidationError(validation.error);
-    return validation.isValid;
-  }, [gmOps.validateRecipientAddress, currentAccount]);
+
 
   const countdown = gmOps.formatCooldown(cooldownRemaining, true);
 
   const handleSendGMWithInvitation = useCallback(() => {
-    gmOps.handleSendGMWithInvitation();
-  }, [gmOps]);
+    const content = customMessageEnabled ? customMessage : "Gmicrochains";
+    gmOps.handleSendGMWithInvitation(content);
+  }, [gmOps, customMessageEnabled, customMessage]);
 
   const handleClaimInvitationRewards = useCallback(() => {
     gmOps.handleClaimInvitationRewards();
   }, [gmOps]);
 
-  const handleSendGM = useCallback(() => {
+  const handleSendGM = useCallback(async () => {
     if (!currentIsConnected) {
       if (window.linera) {
         connectWallet('linera');
-        setMessage('Connecting Linera wallet...', 'info');
+        addNotification('Connecting Linera wallet...', 'info');
       } else {
-        setMessage('Linera wallet not installed, please click the Dynamic Wallet button in the top right corner to connect', 'info');
+        addNotification('Please connect your wallet first using the wallet connection buttons above', 'info');
+        const walletSection = document.querySelector('.wallet-connection-section');
+        if (walletSection) {
+          walletSection.scrollIntoView({ behavior: 'smooth' });
+        }
       }
       return;
     }
     
-    gmOps.handleSendGM();
-  }, [currentIsConnected, connectWallet, gmOps, setMessage]);
-
-  const handleSendGMTo = useCallback(() => {
-    gmOps.handleSendGMTo();
-  }, [gmOps]);
+    let formattedRecipient = null;
+    if (recipientAddress && recipientAddress.trim() !== '') {
+      formattedRecipient = gmOps.formatAccountOwner(recipientAddress);
+      const validation = gmOps.validateRecipientAddress(formattedRecipient);
+      if (!validation.isValid) {
+        setAddressValidationError(validation.error);
+        return;
+      }
+    }
+    
+    const messageContent = customMessageEnabled ? customMessage : null;
+    await gmOps.handleSendGM(messageContent, formattedRecipient);
+    
+    setTimeout(() => {
+      if (additionalData.refetchCooldownStatus) {
+        additionalData.refetchCooldownStatus();
+      }
+      if (additionalData.refetchGmRecord) {
+        additionalData.refetchGmRecord();
+      }
+      if (additionalData.refetchCooldownCheck) {
+        additionalData.refetchCooldownCheck();
+      }
+      if (gmOps.refetchWalletMessages) {
+        gmOps.refetchWalletMessages();
+      }
+    }, 1000);
+  }, [currentIsConnected, connectWallet, gmOps, addNotification, customMessageEnabled, customMessage, additionalData, recipientAddress, setAddressValidationError]);
 
   return (
     <ErrorBoundary>
+      <div>
+
+        <button 
+          className="referral-floating-btn"
+          onClick={handleToggleShareReferral}
+          title="Share your referral link"
+        >
+          🔗 Share Referral
+        </button>
+        {showShareReferralModal && (
+          <div className="modal-overlay" onClick={handleToggleShareReferral}>
+            <div className="referral-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Share Your Referral Link ✨</h3>
+              <button className="modal-close" onClick={handleToggleShareReferral}>×</button>
+            </div>
+            <div className="modal-content">
+              {memoizedCurrentAccount && (
+                <>
+                  <div className="referral-stats">
+                    <button 
+                      className="refresh-btn" 
+                      onClick={() => shareModalAdditionalData?.refetchInvitationStats && shareModalAdditionalData.refetchInvitationStats()}
+                      title="Refresh invitation stats"
+                    >
+                      🔄 Refresh
+                    </button>
+                <div className="referral-stat-item">
+                  <div className="dropdown-container">
+                    <div 
+                      className="referral-stat-label dropdown-toggle"
+                      onClick={() => {
+                        if (!shareModalAdditionalData?.invitationStatsData?.totalInvited || !currentAccount) return;
+                        const event = new CustomEvent('toggleInvitedUsersDropdown', {
+                          detail: { userId: currentAccount }
+                        });
+                        window.dispatchEvent(event);
+                        setShowInvitedUsersDropdown(!showInvitedUsersDropdown);
+                      }}
+                      style={{ cursor: shareModalAdditionalData?.invitationStatsData?.totalInvited > 0 ? 'pointer' : 'default' }}
+                    >
+                      Invited Users: {showInvitedUsersDropdown ? '▲' : '▼'}
+                    </div>
+                    <span className="referral-stat-value">{(() => {
+                      try {
+                        return Number(shareModalAdditionalData?.invitationStatsData?.totalInvited) || 0;
+                      } catch (error) {
+                        return 0;
+                      }
+                    })()}</span>
+                    <div className={`invited-users-dropdown ${showInvitedUsersDropdown ? 'show' : ''}`}>
+            {invitedUsersLoading ? (
+              <div className="invitation-loading">Loading...</div>
+            ) : invitedUsers.length > 0 ? (
+              <div className="invitation-list">
+                {invitedUsers.map((user, index) => (
+                    <div key={index} className="invitation-item">
+                      <div className="invitation-sender">
+                          {formatAddress(user.invitee)}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <div className="invitation-empty">No invited users found</div>
+            )}
+          </div>
+                  </div>
+                </div>
+                <div className="referral-stat-item">
+                  <span className="referral-stat-label">Your Reward Points:</span>
+                  <span className="referral-stat-value">{(() => {
+                    try {
+                      return Number(shareModalAdditionalData?.invitationStatsData?.totalRewards) || 0;
+                    } catch (error) {
+                      return 0;
+                    }
+                  })()}</span>
+                </div>
+                {(() => {
+                  try {
+                    const lastRewardTime = shareModalAdditionalData?.invitationStatsData?.lastRewardTime;
+                    return lastRewardTime ? (
+                      <div className="referral-stat-item">
+                        <span className="referral-stat-label">Last Reward:</span>
+                        <span className="referral-stat-value">{new Date(Number(lastRewardTime) / 1000).toLocaleString()}</span>
+                      </div>
+                    ) : null;
+                  } catch (error) {
+                    return null;
+                  }
+                })()}
+                </div>
+                <div className="referral-link-section">
+                    <label>Your Referral Link:</label>
+                    <div className="link-container">
+                      <input 
+                        type="text" 
+                        value={`${window.location.origin}${window.location.pathname}?app=${appId || ''}&owner=${ownerId || ''}&port=${port || '8080'}&inviter=${memoizedCurrentAccount}`}
+                        readOnly
+                        className="referral-link-input"
+                      />
+                      <button onClick={copyReferralLink} className="copy-btn">Copy</button>
+                    </div>
+                  </div>
+                  <div className="share-options">
+                    <p className="share-label">Share directly:</p>
+                    <div className="social-buttons">
+                      <a 
+                        href={`https://twitter.com/intent/tweet?text=Join%20GMicrochains%20and%20use%20my%20referral%20link!&url=${encodeURIComponent(window.location.origin + window.location.pathname + '?app=' + (appId || '') + '&owner=' + (ownerId || '') + '&port=' + (port || '8080') + '&inviter=' + memoizedCurrentAccount)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="social-btn twitter"
+                      >
+                        Twitter
+                      </a>
+                      <a 
+                        href={`https://t.me/share/url?url=${encodeURIComponent(window.location.origin + window.location.pathname + '?inviter=' + memoizedCurrentAccount)}&text=Join%20GMicrochains%20and%20use%20my%20referral%20link!`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="social-btn telegram"
+                      >
+                        Telegram
+                      </a>
+                    </div>
+                  </div>
+                  <div className="referral-rewards-info">
+                    <p>Invite a user to send their first GMIC → 30 points</p>
+                    <p>Each GMIC they send after → +10 points</p>
+                  </div>
+                </>
+              )}
+              {!memoizedCurrentAccount && (
+                <div className="no-wallet-message">
+                  <p>Please connect your wallet to access your referral link</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       <header className="top-navbar">
         <div className="navbar-container">
           <div className="logo">
             <img src="/GMic.png" alt="GMIC Logo" className="logo-img" />
           </div>
           <nav className="nav-links">
-          <button 
-            className={`nav-tab ${activeTab === 'messages' ? 'active' : ''}`}
-            onClick={() => setActiveTab('messages')}
-          >
-            Messages
-          </button>
-          <button 
-            className={`nav-tab ${activeTab === 'leaderboards' ? 'active' : ''}`}
-            onClick={() => setActiveTab('leaderboards')}
-          >
-            Leaderboards
-          </button>
-          <button 
-            className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('settings')}
-          >
-            Settings
-          </button>
-        </nav>
-          
+            <button 
+              className={`nav-tab ${activeTab === 'messages' ? 'active' : ''}`}
+              onClick={() => setActiveTab('messages')}
+            >
+              Messages
+            </button>
+            <button 
+              className={`nav-tab ${activeTab === 'leaderboards' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('leaderboards');
+                setShowLeaderboard(true);
+                setTimeout(() => {
+                  const shouldRefetch = (
+                    !additionalData.leaderboardData?.getTopUsers || 
+                    additionalData.leaderboardData.getTopUsers.length === 0 ||
+                    (additionalData.leaderboardData && !additionalData.leaderboardData.getTopUsers) ||
+                    additionalData.leaderboardError
+                  );
+                  
+                  if (shouldRefetch && additionalData.refetchLeaderboard) {
+                    additionalData.refetchLeaderboard();
+                  }
+                  if (additionalData.refetchInvitationLeaderboard) {
+                    additionalData.refetchInvitationLeaderboard();
+                  }
+                }, 0);
+              }}
+            >
+              Leaderboards
+            </button>
+            <button 
+              className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
+              onClick={() => setActiveTab('settings')}
+            >
+              Settings
+            </button>
+          </nav>
           <WalletConnectionSection 
             isDynamicConnected={isDynamicConnected}
             isActiveDynamicWallet={isActiveDynamicWallet}
             currentAccount={currentAccount}
             isDynamicLoading={isDynamicLoading}
             currentIsConnected={currentIsConnected}
-            disconnectDynamicWallet={disconnectDynamicWallet}
-            setMessage={setMessage}
+            disconnectDynamicWallet={() => disconnectDynamicWallet(disconnectWallet)}
+            addNotification={addNotification}
             dynamicAccount={dynamicAccount}
             connectWallet={connectWallet}
             disconnectWallet={disconnectWallet}
             walletType={walletType}
             isLoading={walletLoading}
+            primaryWallet={primaryWallet}
           />
         </div>
       </header>
@@ -938,33 +1664,10 @@ function App({ chainId, appId, ownerId }) {
             )}
 
             {connectionError && <div className="alert error">{connectionError}</div>}
-            {gmOps.queryError && (
+            {gmOps.queryError && !gmOps.queryError.message.includes('Failed to parse') && (
               <div className="alert error">
                 Error: {gmOps.queryError.message}
                 {queryRetryCount < 3 && <span> (Retrying... {queryRetryCount}/3)</span>}
-              </div>
-            )}
-
-            {activeTab === 'settings' && (
-              <div className="card theme-settings-card">
-                <div className="theme-settings-content">
-                  <div className="theme-option">
-                    <div className="theme-info">
-                      <h4>Dark Mode</h4>
-                      <p>Toggle between light and dark theme</p>
-                    </div>
-                    <div className="theme-toggle-container">
-                      <button 
-                        className={`theme-toggle-btn ${isDarkMode ? 'active' : ''}`}
-                        onClick={() => setIsDarkMode(!isDarkMode)}
-                      >
-                        <span className="toggle-slider"></span>
-                        <span className="toggle-icon">{isDarkMode ? "🌙" : "☀️"}</span>
-                      </button>
-                      <span className="toggle-label">{isDarkMode ? "Dark" : "Light"}</span>
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
 
@@ -992,36 +1695,26 @@ function App({ chainId, appId, ownerId }) {
                       </div>
                     </div>
                   </div>
-                  
-                  {/* 24-hour cooldown timer */}
+
                   <div className="cooldown-timer-container">
                     <div className="cooldown-timer-header">
                       <div className="cooldown-timer-label">Cooldown Timer</div>
-                      <div className="cooldown-timer-status" data-status={gmOps.cooldownStatusData?.getCooldownStatus?.enabled ? 'enabled' : 'disabled'}>
-                        {gmOps.cooldownStatusData?.getCooldownStatus?.enabled ? 'Enabled' : 'Disabled'}
+                      <div className="cooldown-timer-status" data-status={localCooldownEnabled ? 'enabled' : 'disabled'}>
+                        {localCooldownEnabled ? 'Enabled' : 'Disabled'}
                       </div>
                     </div>
                     <div className="cooldown-timer-bar">
                       <div className="cooldown-timer-track"></div>
                       <div 
-                        className={`cooldown-timer-fill ${gmOps.cooldownStatusData?.getCooldownStatus?.enabled ? 'active' : 'inactive'}`}
-                        style={{
-                          width: gmOps.cooldownStatusData?.getCooldownStatus?.enabled 
-                            ? `${Math.max(0, Math.min(100, (cooldownRemaining / 86_400_000_000) * 100))}%`
-                            : '100%',
-                          background: gmOps.cooldownStatusData?.getCooldownStatus?.enabled 
-                            ? 'linear-gradient(90deg, #ff2a00, #ff6b6b)'
-                            : '#4ade80'
-                        }}
+                        className={`cooldown-timer-fill ${localCooldownEnabled ? 'active' : 'inactive'} ${cooldownRemaining > 0 ? 'cooldown-remaining' : 'cooldown-complete'}`}
                       ></div>
                     </div>
                   </div>
                 </div>
               </>
             )}
-
-            
-            {gmOps.whitelistData?.isUserWhitelisted && activeTab === 'settings' && (
+        
+            {(additionalData.whitelistData?.isUserWhitelisted === true) && activeTab === 'settings' && (
               <div className="card cooldown-control-card">
                 <div className="section-header">
                   <h3>24-Hour Limit Control</h3>
@@ -1030,12 +1723,12 @@ function App({ chainId, appId, ownerId }) {
                 <div className="cooldown-control-content">
                   <div className="cooldown-status-info">
                     <p className="cooldown-status-text">
-                      Current Status: <span className={`status ${gmOps.cooldownStatusData?.getCooldownStatus?.enabled ? 'enabled' : 'disabled'}`}>
-                        {gmOps.cooldownStatusData?.getCooldownStatus?.enabled ? 'ENABLED' : 'DISABLED'}
+                      Current Status: <span className={`status ${additionalData.cooldownStatusData?.getCooldownStatus?.enabled ? 'enabled' : 'disabled'}`}>
+                        {additionalData.cooldownStatusData?.getCooldownStatus?.enabled ? 'ENABLED' : 'DISABLED'}
                       </span>
                     </p>
                     <p className="cooldown-description">
-                      {gmOps.cooldownStatusData?.getCooldownStatus?.enabled 
+                      {additionalData.cooldownStatusData?.getCooldownStatus?.enabled 
                         ? '24-hour cooldown is currently active for all users' 
                         : '24-hour cooldown is currently disabled'
                       }
@@ -1043,15 +1736,15 @@ function App({ chainId, appId, ownerId }) {
                   </div>
                   <div className="cooldown-control-actions">
                     <button
-                      className={`action-btn ${gmOps.cooldownStatusData?.getCooldownStatus?.enabled ? 'danger' : 'primary'}`}
-                      onClick={() => handleToggleCooldown(!gmOps.cooldownStatusData?.getCooldownStatus?.enabled)}
+                      className={`action-btn ${additionalData.cooldownStatusData?.getCooldownStatus?.enabled ? 'danger' : 'primary'}`}
+                      onClick={() => handleToggleCooldown(!additionalData.cooldownStatusData?.getCooldownStatus?.enabled)}
                       disabled={operationStatus === "processing"}
                     >
                       {operationStatus === "processing" ? (
                         <span className="button-loading">
                           <span className="spinner">⏳</span> Updating...
                         </span>
-                      ) : gmOps.cooldownStatusData?.getCooldownStatus?.enabled ? (
+                      ) : additionalData.cooldownStatusData?.getCooldownStatus?.enabled ? (
                         "🔓 Disable 24-Hour Limit"
                       ) : (
                         "🔒 Enable 24-Hour Limit"
@@ -1080,9 +1773,9 @@ function App({ chainId, appId, ownerId }) {
                           disabled={true}
                         />
                         <label htmlFor="contract-chain" className="chain-label">
-                          <span className="chain-name">Contract Chain</span>
+                          <span className="chain-name">Contract Chain：</span>
                           <span className="chain-address">
-                            {isMobile ? `${chainId.slice(0, 8)}...${chainId.slice(-6)}` : chainId}
+                            {formatAddressForDisplay(chainId, isMobile, 8, 6)}
                           </span>
                         </label>
                       </div>
@@ -1102,9 +1795,9 @@ function App({ chainId, appId, ownerId }) {
                               }}
                             />
                             <label htmlFor="wallet-chain" className="chain-label">
-                              <span className="chain-name">Wallet Chain</span>
+                              <span className="chain-name">Wallet Chain：</span>
                               <span className="chain-address">
-                                {isMobile ? `${connectedWalletChainId.slice(0, 8)}...${connectedWalletChainId.slice(-6)}` : connectedWalletChainId}
+                                {formatAddressForDisplay(connectedWalletChainId, isMobile, 8, 6)}
                               </span>
                             </label>
                           </div>
@@ -1124,7 +1817,7 @@ function App({ chainId, appId, ownerId }) {
                           <label htmlFor="contract-chain" className="chain-label">
                             <span className="chain-name">Contract Chain</span>
                             <span className="chain-address">
-                              {isMobile ? `${chainId.slice(0, 8)}...${chainId.slice(-6)}` : chainId}
+                              {formatAddressForDisplay(chainId, isMobile, 8, 6)}
                             </span>
                           </label>
                         </div>
@@ -1132,12 +1825,49 @@ function App({ chainId, appId, ownerId }) {
                     )}
                   </div>
                 </div>
+                
+                <div className="card chain-info-card">
+                  <div className="section-header">
+                    <h3>Chain Information</h3>
+                  </div>
+                  <div className="chain-info">
+                    <p>
+                      <span className="label">Application ID:</span>
+                      <span 
+                        className="address-simple"
+                        onClick={(e) => copyToClipboard(appId, e)}
+                        title="Click to copy Application ID"
+                      >
+                        {formatAddressForDisplay(appId, isMobile, 8, 6)}
+                      </span>
+                    </p>
+                    <p>
+                      <span className="label">Contract Chain:</span>
+                      <span 
+                        className="address-simple"
+                        onClick={(e) => copyToClipboard(chainId, e)}
+                        title="Click to copy Contract chain"
+                      >
+                        {formatAddressForDisplay(chainId, isMobile, 8, 6)}
+                      </span>
+                    </p>
+                    <p>
+                      <span className="label">Contract Owner:</span>
+                      <span 
+                        className="address-simple"
+                        onClick={(e) => copyToClipboard(ownerId, e)}
+                        title="Click to copy contract owner"
+                      >
+                        {formatAddressForDisplay(ownerId, isMobile, 8, 6)}
+                      </span>
+                    </p>
+                  </div>
+                </div>
               </>
             )}
 
             {activeTab === 'messages' && (
               <>
-                {/* Custom Message Card */}
                 <div className="card custom-message-card">
                   <div className="custom-message-header">
                     <label>Custom Message</label>
@@ -1145,30 +1875,96 @@ function App({ chainId, appId, ownerId }) {
                       <div className="toggle-switch-thumb"></div>
                     </div>
                   </div>
-                  <div className="message-editor" id="messageEditor" style={{display: customMessageEnabled ? 'block' : 'none'}}>
-                    <textarea 
-                      id="customMessage" 
-                      placeholder="Enter your custom GMicrochains message..."
-                      value={customMessage}
-                      onChange={handleCustomMessageChange}
-                    ></textarea>
-                    <div className="message-preview" id="messagePreview">
-                    Preview: {customMessageEnabled && customMessage ? selectedMessage : 'Custom message unavailable.'}
-                  </div>
+                  <div className={`message-editor ${customMessageEnabled ? 'visible' : 'hidden'}`} id="messageEditor">
+                    <div className="message-input-container">
+                      <textarea 
+                        id="customMessage" 
+                        placeholder="● Default: GMicrochains"
+                        value={customMessage}
+                        onChange={handleCustomMessageChange}
+                        maxLength={MAX_MESSAGE_LENGTH}
+                      ></textarea>
+                      <button 
+                        className="emoji-picker-button"
+                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                        title="Add emoji"
+                      >
+                        😊
+                      </button>
+                    </div>
+                    
+                    {showEmojiPicker && (
+                      <div className="emoji-picker">
+                        <div className="emoji-category">
+                          <span className="emoji-category-title">Frequently Used</span>
+                          <div className="emoji-grid">
+                            {['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐'].map(emoji => (
+                              <span 
+                                key={emoji} 
+                                className="emoji-item"
+                                onClick={() => addEmojiToMessage(emoji)}
+                              >
+                                {emoji}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        <div className="emoji-category">
+                          <span className="emoji-category-title">Gestures</span>
+                          <div className="emoji-grid">
+                            {['👍', '👎', '👌', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '👇', '☝️', '✋', '🤚', '🖐️', '🖖', '👋', '🤙', '💪', '🙏', '👏', '👐', '🤲', '🙌'].map(emoji => (
+                              <span 
+                                key={emoji} 
+                                className="emoji-item"
+                                onClick={() => addEmojiToMessage(emoji)}
+                              >
+                                {emoji}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        <div className="emoji-category">
+                          <span className="emoji-category-title">Crypto & Tech</span>
+                          <div className="emoji-grid">
+                            {['🚀', '💰', '💎', '🔥', '🌙', '⭐', '✨', '💫', '🌟', '💯', '🔮', '💻', '📱', '⚡', '🔧', '⚙️', '🛠️', '🔗', '📊', '📈', '📉', '💹', '🏦', '💳', '💵', '💴', '💶', '💷', '🪙'].map(emoji => (
+                              <span 
+                                key={emoji} 
+                                className="emoji-item"
+                                onClick={() => addEmojiToMessage(emoji)}
+                              >
+                                {emoji}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="message-info">
+                      <div className="char-count">
+                        {customMessage.length}/{MAX_MESSAGE_LENGTH} characters
+                    </div>
+                    {customMessage.length > WARNING_THRESHOLD && (
+                        <div className="char-warning">
+                          Approaching character limit
+                        </div>
+                      )}
+                    </div>
+
                   </div>
                 </div>
 
-                {/* Send Action Card */}
                 <div className="card send-action-card">
-                  {/* Recipient Address */}
                   <div className="input-group">
                     <label>Recipient Wallet Address (Optional)</label>
                     <div className="input-wrapper">
                       <input 
                         type="text" 
                         id="recipientAddress" 
-                        placeholder="0x..., leave empty to interact with Contract Owner"
-                        value={recipientAddress}
+                        placeholder="0x..., Default to Contract Owner"
+                        value={formatAccountOwner(recipientAddress)}
                         onChange={(e) => {
                           setRecipientAddress(e.target.value);
                           if (addressValidationError) {
@@ -1187,15 +1983,12 @@ function App({ chainId, appId, ownerId }) {
                   </div>
 
                   <div className="send-actions">
-                    {/* Send Button */}
                     <button 
                       className="send-button" 
                       id="sendButton"
-                      onClick={recipientAddress ? handleSendGMTo : handleSendGM}
+                      onClick={handleSendGM}
                       disabled={
-                        operationStatus === "processing" || 
-                        (currentIsConnected && !gmOps.isValidAccountOwner(currentAccount)) || 
-                        (currentIsConnected && localCooldownEnabled && cooldownRemaining > 0)
+                        isButtonDisabled(operationStatus, currentAccount, gmOps, cooldownRemaining, localCooldownEnabled)
                       }
                     >
                       {operationStatus === "processing" ? (
@@ -1207,183 +2000,102 @@ function App({ chainId, appId, ownerId }) {
                       ) : !gmOps.isValidAccountOwner(currentAccount) ? (
                         "🔒 Invalid account"
                       ) : localCooldownEnabled && cooldownRemaining > 0 ? (
-                        `⏳ ${gmOps.formatCooldown(cooldownRemaining)}`
+                        `🔓 ${gmOps.formatCooldown(cooldownRemaining)}`
                       ) : (
                         "Send GMicrochains ✨"
                       )}
                     </button>
                     
-                    {/* History Button */}
                     <button 
                       className="history-button" 
                       id="historyButton"
                       onClick={handleHistoryToggle}
                     >
-                      History ▼
+                      History {showHistoryDropdown ? '▲' : '▼'}
                     </button>
                     
-                    {/* History Dropdown */}
-                    {showHistoryDropdown && (
-                      <div className="history-dropdown">
-                        {historyLoading ? (
-                          <div className="history-loading">
-                            <span className="spinner">⏳</span> Loading...
-                          </div>
-                        ) : currentAccount ? (
-                          historyRecords.length > 0 ? (
-                            <div className="history-list">
-                              {historyRecords.map((record, index) => (
-                                <div key={index} className="history-item">
-                                  <div className="history-sender">
-                                    From: {record.sender ? (isMobile ? `${record.sender.slice(0, 6)}...${record.sender.slice(-4)}` : record.sender) : 'Unknown'}
-                                  </div>
-                                  {record.recipient && (
-                                    <div className="history-recipient">
-                                      To: {isMobile ? `${record.recipient.slice(0, 6)}...${record.recipient.slice(-4)}` : record.recipient}
-                                    </div>
-                                  )}
-                                  <div className="history-content">
-                                    Content: {record.content || 'Gmicrochains'}
-                                  </div>
-                                  <div className="history-timestamp">
-                                    Time: {new Date(record.timestamp / 1000).toLocaleString()}
-                                  </div>
-                                </div>
-                              ))}
+                    <div className={`history-dropdown ${showHistoryDropdown ? 'show' : ''}`}>
+                      {currentAccount ? (
+                        <div className="history-list">
+                          {historyLoading ? (
+                            <div className="history-loading">
+                              <span className="spinner">⏳</span> Loading...
                             </div>
+                          ) : historyRecords.length > 0 ? (
+                            historyRecords.map((record, index) => (
+                              <div key={index} className="history-item">
+                                <div className="history-sender">
+                                  From: {record.sender ? formatAddressForDisplay(record.sender, isMobile) : 'Unknown'}
+                                </div>
+                                {record.recipient && (
+                                  <div className="history-recipient">
+                                    To: {formatAddressForDisplay(record.recipient, isMobile)}
+                                  </div>
+                                )}
+                                <div className="history-content">
+                                  Content: {record.content || 'Gmicrochains'}
+                                </div>
+                                <div className="history-timestamp">
+                                  Time: {(() => {
+                                    const timestamp = Number(record.timestamp);
+                                    const timestampStr = timestamp.toString();
+                                    const timestampLength = timestampStr.length;                                   
+                                    let recordTime = timestamp;
+                                    if (timestampLength <= 12) {
+                                      recordTime = recordTime * 1000;
+                                    } else if (timestampLength >= 13 && timestampLength <= 16) {
+                                      recordTime = recordTime / 1000;  
+                                    }                                 
+                                    const date = new Date(recordTime);
+                                    return date.toLocaleString('zh-CN', {
+                                      year: 'numeric',
+                                      month: '2-digit',
+                                      day: '2-digit',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                      second: '2-digit'
+                                    });
+                                  })()}
+                                </div>
+                              </div>
+                            ))
                           ) : (
                             <div className="history-empty">
                               No history records
                             </div>
-                          )
-                        ) : (
-                          <div className="history-empty">
-                            Please connect your wallet first
-                          </div>
-                        )}
-                      </div>
-                    )}
+                          )}
+                        </div>
+                      ) : (
+                        <div className="history-empty">
+                          Please connect your wallet first
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </>
             )}
 
         {activeTab === 'leaderboards' && (
-          <LeaderboardSection
-            showLeaderboard={showLeaderboard}
-            setShowLeaderboard={setShowLeaderboard}
-            leaderboardData={gmOps.leaderboardData}
-            currentAccount={currentAccount}
-            isMobile={isMobile}
-            copyToClipboard={copyToClipboard}
-            refetchLeaderboard={gmOps.refetchLeaderboard}
-          />
-        )}
-       {activeTab === 'messages' && (
-          <div className="card invitation-card">
-            <div className="section-header">
-              <h3>Invitation System</h3>
-              <button 
-                className="toggle-btn"
-                onClick={() => setShowInvitationSection(!showInvitationSection)}
-              >
-                {showInvitationSection ? "▼" : "▶"}
-              </button>
-            </div>
-            
-            {showInvitationSection && (
-              <div className="invitation-content">
-                {gmOps.invitationStatsData?.getInvitationStats && (
-                  <div className="invitation-stats">
-                    <p className="stats-item">
-                      <span className="label">Invited Users:</span> 
-                      <span className="stats-value">{gmOps.invitationStatsData.getInvitationStats.totalInvited}</span>
-                    </p>
-                    <p className="stats-item">
-                      <span className="label">Total Rewards:</span> 
-                      <span className="stats-value">{gmOps.invitationStatsData.getInvitationStats.totalRewards}</span>
-                    </p>
-                  </div>
-                )}
-                
-                <div className="invitation-actions">
-                  <button
-                    className="action-btn secondary"
-                    onClick={handleSendGMWithInvitation}
-                    disabled={
-                      operationStatus === "processing" ||
-                      (currentIsConnected && !gmOps.isValidAccountOwner(currentAccount)) ||
-                      (currentIsConnected && !recipientAddress) ||
-                      (currentIsConnected && localCooldownEnabled && cooldownRemaining > 0)
-                    }
-                  >
-                    {operationStatus === "processing" ? (
-                      <span className="button-loading">
-                        <span className="spinner">⏳</span> Sending...
-                      </span>
-                    ) : localCooldownEnabled && cooldownRemaining > 0 ? (
-                      `⏳ ${gmOps.formatCooldown(cooldownRemaining)}`
-                    ) : (
-                      "🎁 Send with Invitation"
-                    )}
-                  </button>
-                  
-                  <button
-                    className="action-btn secondary"
-                    onClick={handleClaimInvitationRewards}
-                    disabled={claimStatus === "processing" || !gmOps.isValidAccountOwner(currentAccount)}
-                  >
-                    {claimStatus === "processing" ? (
-                      <span className="button-loading">
-                        <span className="spinner">⏳</span> Claiming...
-                      </span>
-                    ) : (
-                      "💰 Claim Rewards"
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
+          <div className="leaderboards-container">
+            <LeaderboardSection
+                    showLeaderboard={showLeaderboard}
+                    setShowLeaderboard={setShowLeaderboard}
+                    leaderboardData={additionalData.leaderboardData}
+                    invitationLeaderboardData={additionalData.invitationLeaderboardData}
+                    currentAccount={currentAccount}
+                    isMobile={isMobile}
+                    copyToClipboard={copyToClipboard}
+                    refetchLeaderboard={additionalData.refetchLeaderboard}
+                    refetchInvitationLeaderboard={additionalData.refetchInvitationLeaderboard}
+                  />
           </div>
         )}
-        <div className="card chain-info-card">
-            <div className="chain-info">
-              <p><span className="label">Contract Address:</span> 
-                <span 
-                  className="address-simple" 
-                  onClick={(e) => copyToClipboard(appId, e)}
-                  title="Click to copy contract address"
-                >
-                  {isMobile ? `${appId.slice(0, 8)}...${appId.slice(-6)}` : appId}
-                </span>
-              </p>
-              <p><span className="label">Contract Chain:</span> 
-                <span 
-                  className="address-simple"
-                  onClick={(e) => copyToClipboard(chainId, e)}
-                  title="Click to copy contract chain"
-                >
-                  {isMobile ? `${chainId.slice(0, 8)}...${chainId.slice(-6)}` : chainId}
-                </span>
-              </p>
-              <p><span className="label">Contract Owner:</span> 
-                <span 
-                  className="address-simple"
-                  onClick={(e) => copyToClipboard(gmOps.formatAccountOwner(ownerId), e)}
-                  title="Click to copy contract owner"
-                >
-                  {isMobile ? `${gmOps.formatAccountOwner(ownerId).slice(0, 8)}...${gmOps.formatAccountOwner(ownerId).slice(-6)}` : gmOps.formatAccountOwner(ownerId)}
-                </span>
-              </p>
-            </div>
-          </div>
-
 
       </header>
     </div>
   </div>
   
-  {/* Notification Center */}
   <NotificationCenter 
     notifications={notifications}
     onRemoveNotification={removeNotification}
@@ -1392,78 +2104,9 @@ function App({ chainId, appId, ownerId }) {
     gmOperations={gmOps}
     chainId={chainId}
   />
-</ErrorBoundary>
+</div>
+  </ErrorBoundary>
   );
-}
-
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { 
-      hasError: false,
-      error: null,
-      errorInfo: null
-    };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { 
-      hasError: true,
-      error: error
-    };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    this.setState({
-      error: error,
-      errorInfo: errorInfo
-    });
-  }
-
-  render() {
-    if (this.state.hasError) {
-      const userLang = navigator.language || navigator.userLanguage;
-      const isEnglish = userLang.startsWith('en');
-      
-      return (
-        <div className="error-fallback">
-          <div className="error-container">
-            <h2 className="error-title">
-              Application Error
-            </h2>
-            <p className="error-message">
-              Sorry, the application encountered an error:
-            </p>
-            <div className="error-details">
-              {this.state.error && (
-                <div className="error-text">
-                  {this.state.error.toString()}
-                </div>
-              )}
-              {this.state.errorInfo && (
-                <details className="error-stack">
-                  <summary>
-                    Error Details
-                  </summary>
-                  <pre>{this.state.errorInfo.componentStack}</pre>
-                </details>
-              )}
-            </div>
-            <p className="error-suggestion">
-              Please refresh the page to try again, or check if the URL parameters are correct.
-            </p>
-            <button 
-              className="error-retry-button"
-              onClick={() => window.location.reload()}
-            >
-              Refresh Page
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
 }
 
 export default App;

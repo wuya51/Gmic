@@ -1,6 +1,5 @@
 import { gql } from '@apollo/client';
 
-// Queries
 export const GET_GM_STATS = gql`
   query GetGmStats($chainId: ChainId!) {
     totalMessages: getTotalMessages
@@ -23,6 +22,15 @@ export const GET_GM_RECORD = gql`
   }
 `;
 
+export const GET_LEADERBOARD = gql`
+  query GetLeaderboard($limit: Int) {
+    getTopUsers(limit: $limit) {
+      user
+      count
+    }
+  }
+`;
+
 export const GET_INVITATION_STATS = gql`
   query GetInvitationStats($user: AccountOwner!) {
     getInvitationStats(user: $user) {
@@ -33,11 +41,29 @@ export const GET_INVITATION_STATS = gql`
   }
 `;
 
-export const GET_LEADERBOARD = gql`
-  query GetLeaderboard($limit: Int) {
-    getTopUsers(limit: $limit) {
+export const GET_INVITATION_LEADERBOARD = gql`
+  query GetInvitationLeaderboard($limit: Int) {
+    getTopInvitors(limit: $limit) {
       user
       count
+    }
+  }
+`;
+
+export const GET_INVITATION_RANK = gql`
+  query GetInvitationRank($user: AccountOwner!) {
+    getInvitationRank(user: $user)
+  }
+`;
+
+export const GET_INVITATION_RECORD = gql`
+  query GetInvitationRecord($inviter: AccountOwner!) {
+    getInvitationRecord(inviter: $inviter) {
+      inviter
+      invitee
+      invitedAt
+      rewarded
+      rewardedAt
     }
   }
 `;
@@ -88,47 +114,15 @@ export const GET_STREAM_EVENTS = gql`
   }
 `;
 
-// 订阅查询 - 应用服务使用智能轮询策略
 export const SUBSCRIBE_GM_EVENTS = gql`
   subscription SubscribeGmEvents($chainId: ChainId!) {
     notifications(chainId: $chainId)
   }
 `;
 
-// Mutations
 export const SEND_GM = gql`
-  mutation SendGm($chainId: ChainId!, $sender: AccountOwner!, $content: String) {
-    sendGm(chainId: $chainId, sender: $sender, content: $content) {
-      success
-      message
-      timestamp
-    }
-  }
-`;
-
-export const SEND_GM_TO = gql`
-  mutation SendGmTo($chainId: ChainId!, $sender: AccountOwner!, $recipient: AccountOwner!, $content: String) {
-    sendGmTo(chainId: $chainId, sender: $sender, recipient: $recipient, content: $content) {
-      success
-      message
-      timestamp
-    }
-  }
-`;
-
-export const SEND_GM_WITH_INVITATION = gql`
-  mutation SendGmWithInvitation($chainId: ChainId!, $sender: AccountOwner!, $recipient: AccountOwner!, $inviter: AccountOwner, $content: String) {
-    sendGmWithInvitation(chainId: $chainId, sender: $sender, recipient: $recipient, inviter: $inviter, content: $content) {
-      success
-      message
-      timestamp
-    }
-  }
-`;
-
-export const CLAIM_INVITATION_REWARDS = gql`
-  mutation ClaimInvitationRewards($user: AccountOwner!) {
-    claimInvitationRewards(user: $user) {
+  mutation SendGm($chainId: ChainId!, $sender: AccountOwner!, $recipient: AccountOwner, $content: String, $inviter: AccountOwner) {
+    sendGm(chainId: $chainId, sender: $sender, recipient: $recipient, content: $content, inviter: $inviter) {
       success
       message
       timestamp

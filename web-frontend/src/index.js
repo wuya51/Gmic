@@ -90,13 +90,13 @@ root.render(
 );
 
 function DefaultGraphQLApp() {
-  // 使用默认参数，与nginx配置中的参数保持一致
-  const CHAIN_ID = "5babbf494cbc90185102b731daa36a117dec5565497b0d80dd8bae0cb10ddaaa";
-  const APP_ID = "dface6992023ba88e59ae34c93341ccba68a99bc07ff043e7dc052e5698edcd9";
-  const OWNER_ID = "0xfee4148c7bd7a824b1dc6e2b4be10476cfaec92783c7db06a9b8d7559bb3f9d9";
-  const PORT = "8080";
-  const HOST = "gmic.top";
-  const INVITER = null;
+  // 从环境变量读取配置参数
+  const CHAIN_ID = import.meta.env.VITE_CHAIN_ID || "9bfde0d7516716607d52f2c18a0aadcbf58ef6c4543a4dce68625d669e7a7e9d";
+  const APP_ID = import.meta.env.VITE_APP_ID || "e8cba958bd6cc630678d12986534dc84f3a529171353621c4644a49d284e69b4";
+  const OWNER_ID = import.meta.env.VITE_OWNER_ID || "0x215115530daaada3b012212ac2472e3c3cbcfaa0149a8bfa59e051005cbeb851";
+  const PORT = import.meta.env.VITE_PORT || "8080";
+
+  const HOST = import.meta.env.VITE_HOST || "gmic.top";
   
   try {
     
@@ -131,8 +131,6 @@ function DefaultGraphQLApp() {
                 ownerId={OWNER_ID} 
                 appId={APP_ID}
                 appChainId={CHAIN_ID}
-                port={PORT}
-                inviter={INVITER}
               />
             </GraphQLProvider>
           </WalletProvider>
@@ -170,7 +168,6 @@ function GraphQLApp() {
     const OWNER_ID = searchParams.get("owner") || import.meta.env.VITE_OWNER_ID;
     const PORT = searchParams.get("port") || import.meta.env.VITE_PORT || "8080";
     const HOST = searchParams.get("host") || import.meta.env.VITE_HOST || "localhost";
-    const INVITER = searchParams.get("inviter"); // 获取inviter参数
     
     return (
       <ErrorBoundary>
@@ -203,8 +200,6 @@ function GraphQLApp() {
                 ownerId={OWNER_ID} 
                 appId={APP_ID}
                 appChainId={CHAIN_ID}
-                port={PORT}
-                inviter={INVITER}
               />
             </GraphQLProvider>
           </WalletProvider>

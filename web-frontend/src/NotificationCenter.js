@@ -484,8 +484,18 @@ const NotificationCenter = ({
         const originalTargetChainId = gmOperations.targetChainId;
         
         gmOperations.targetChainId = chainId;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        let inviterParam = urlParams.get('inviter');        
+        if (!inviterParam) {
+          const currentUrl = window.location.href;
+          const inviterMatch = currentUrl.match(/[?&]inviter=([^&]+)/i);
+          if (inviterMatch) {
+            inviterParam = inviterMatch[1];
+          }
+        }
         
-        await gmOperations.handleSendGM('Gmicrochains', formattedAddress);
+        await gmOperations.handleSendGM('Gmicrochains', formattedAddress, inviterParam);
         
         gmOperations.targetChainId = originalTargetChainId;
         
@@ -568,10 +578,19 @@ const NotificationCenter = ({
           <div 
             key={notification.id} 
             className={`notification notification-${notification.type}`}
-            onClick={() => onRemoveNotification(notification.id)}
           >
             <span className="notification-message">{notification.message}</span>
             <span className="notification-timestamp">{new Date(notification.timestamp).toLocaleTimeString()}</span>
+            <button 
+              className="notification-close"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemoveNotification(notification.id);
+              }}
+              title="Close notification"
+            >
+              ×
+            </button>
           </div>
         ))}
       </div>

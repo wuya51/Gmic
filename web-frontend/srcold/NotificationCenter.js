@@ -16,6 +16,29 @@ const NotificationCenter = ({
   
   const [centerNotification, setCenterNotification] = useState(null);
   const [notificationQueue, setNotificationQueue] = useState([]);
+  const notificationTimersRef = useRef({});
+  const currentTimerStateRef = useRef({
+    remainingTime: 8000,
+    startTime: Date.now(),
+    isPaused: false,
+    autoHideTimer: null,
+    countdownInterval: null
+  });
+  
+  const [lastQueryTime, setLastQueryTime] = useState(0);
+  const [queryInterval, setQueryInterval] = useState(null);
+  const [lastBlockHeight, setLastBlockHeight] = useState(0);
+  
+  const [pageLoadTime, setPageLoadTime] = useState(() => {
+    const savedPageLoadTime = localStorage.getItem('pageLoadTime');
+    if (savedPageLoadTime) {
+      return parseInt(savedPageLoadTime);
+    } else {
+      const currentTime = Date.now();
+      localStorage.setItem('pageLoadTime', currentTime.toString());
+      return currentTime;
+    }
+  });
   
   const memoizedNotifications = useMemo(() => {
     return Array.isArray(notifications) ? notifications : [];
@@ -48,43 +71,111 @@ const NotificationCenter = ({
     
     return hasChange;
   }, [notifications]);
-  
 
-  
   const prevGmRecordsRef = useRef([]);
   const lastProcessedTimeRef = useRef(0);
-  const componentInitTimeRef = useRef(Date.now() * 1000);
+
+  useEffect(() => {
+    return () => {
+      activeBalls.forEach(ball => {
+        if (ball.removeTimer) {
+          clearTimeout(ball.removeTimer);
+        }
+      });
+      
+      if (queryInterval) {
+        clearInterval(queryInterval);
+      }
+    };
+  }, [activeBalls, queryInterval]);
+
+  useEffect(() => {
+    if (!gmOperations || !currentAccount) {
+      return;
+    }
+
+    const handleSubscriptionEvent = () => {
+      const currentTime = Date.now();
+      
+      if (currentTime - lastQueryTime < 5000) {
+        return;
+      }
+
+      setLastQueryTime(currentTime);
+
+      if (gmOperations.refetchGmEvents) {
+        gmOperations.refetchGmEvents().catch(error => {
+          console.error('GM events data query failed:', error);
+        });
+      }
+
+      if (gmOperations.refetchStreamEvents) {
+        gmOperations.refetchStreamEvents().catch(error => {
+          console.error('Stream events data query failed:', error);
+        });
+      }
+
+      if (gmOperations.refetchWalletMessages) {
+        gmOperations.refetchWalletMessages().catch(error => {
+          console.error('Wallet messages data query failed:', error);
+        });
+      }
+    };
+
+    // 设置10秒定时器
+    const interval = setInterval(handleSubscriptionEvent, 10000);
+    setQueryInterval(interval);
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+      if (queryInterval) {
+        clearInterval(queryInterval);
+      }
+    };
+  }, [gmOperations, currentAccount, lastQueryTime]);
 
   useEffect(() => {
     if (gmRecords && gmRecords.length > 0) {
       
-      const newRecords = gmRecords.filter((record, index) => {
+      const savedPageLoadTime = localStorage.getItem('pageLoadTime');
+      const pageLoadTime = savedPageLoadTime ? parseInt(savedPageLoadTime) : 0;
+      
+      const recentRecords = gmRecords.filter(record => {
         let recordTime = Number(record.timestamp);
-        const currentTime = Date.now() * 1000;
+        const timestampStr = record.timestamp.toString();
+        const timestampLength = timestampStr.length;
         
-        if (recordTime < Date.now()) {
+        if (timestampLength > 16) {
+          recordTime = recordTime / 1000000;
+        } else if (timestampLength <= 12) {
           recordTime = recordTime * 1000;
+        } else if (timestampLength >= 13 && timestampLength <= 16) {
+          recordTime = recordTime / 1000;
         }
         
-        const lastProcessedTime = lastProcessedTimeRef.current;
+        const isRecent = recordTime > pageLoadTime;
         
-        const isNewRecord = recordTime > lastProcessedTime;
-        
-        const isAfterInit = recordTime > componentInitTimeRef.current;
-        
-        const isDuplicate = prevGmRecordsRef.current.some(prevRecord => {
-          let prevRecordTime = Number(prevRecord.timestamp);
-          if (prevRecordTime < Date.now()) {
-            prevRecordTime = prevRecordTime * 1000;
-          }
-          return prevRecord.sender === record.sender && prevRecordTime === recordTime;
-        });
-               
-        const shouldProcess = isNewRecord && !isDuplicate && isAfterInit;
-        return shouldProcess;
+        return isRecent;
       });
       
-    newRecords.forEach(newRecord => {
+      const currentRecordIds = new Set(recentRecords.map(record => 
+        `${record.sender}-${record.timestamp}`
+      ));
+      
+      const prevRecordIds = new Set(prevGmRecordsRef.current.map(record => 
+        `${record.sender}-${record.timestamp}`
+      ));
+      
+      const newRecords = recentRecords.filter(record => {
+        const recordId = `${record.sender}-${record.timestamp}`;
+        return !prevRecordIds.has(recordId);
+      });
+      
+      prevGmRecordsRef.current = [...recentRecords];
+      
+      newRecords.forEach(newRecord => {
         
         const getRandomPosition = () => {
           const minLeft = 20;
@@ -100,50 +191,68 @@ const NotificationCenter = ({
 
         const position = getRandomPosition();
         
+        const recordId = `${newRecord.sender}-${newRecord.timestamp}`;
         const newBall = {
-          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${performance.now()}`,
+          id: recordId,
           sender: newRecord.sender,
           timestamp: new Date().toLocaleTimeString(),
           position: position,
-          visible: true
+          visible: true,
+          removeTimer: null
         };
 
         setActiveBalls(prev => {
-        const updated = [...prev, newBall];
-        return updated;
-      });
-
-      setTimeout(() => {
-        setActiveBalls(prev => {
-          const updated = prev.filter(ball => ball.id !== newBall.id);
+          const existingBall = prev.find(ball => ball.id === recordId);
+          if (existingBall) {
+            return prev;
+          }
+          
+          if (newBall.removeTimer) {
+            clearTimeout(newBall.removeTimer);
+          }
+          const removeTimer = setTimeout(() => {
+            setActiveBalls(prev => {
+              const updated = prev.filter(ball => ball.id !== recordId);
+              return updated;
+            });
+          }, 5000);
+          
+          const ballWithTimer = {
+            ...newBall,
+            removeTimer: removeTimer
+          };
+          
+          const updated = [...prev, ballWithTimer];
           return updated;
         });
-      }, 5000);
       });
       
       const recipientRecords = newRecords.filter(record => {
         const normalizedCurrentAccount = currentAccount ? currentAccount.toLowerCase().trim() : '';
         const normalizedRecipient = record.recipient ? record.recipient.toLowerCase().trim() : '';
         const isRecipient = normalizedRecipient && normalizedRecipient === normalizedCurrentAccount;
-       
      
         return isRecipient;
       }).map(record => ({
         sender: record.recipient,
         recipient: record.sender,
-        timestamp: record.timestamp
+        timestamp: record.timestamp,
+        content: record.content || 'Gmicrochains'
       }));
            
       recipientRecords.forEach(recipientRecord => {
         if (centerNotification) {
           const notificationId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${performance.now()}`;
           
-          setNotificationQueue(prev => [...prev, {
-            id: notificationId,
-            sender: recipientRecord.recipient,
-            recipientRecord: recipientRecord,
-            timestamp: new Date().toLocaleTimeString()
-          }]);
+          setNotificationQueue(prev => {
+            const updated = [...prev, {
+              id: notificationId,
+              sender: recipientRecord.recipient,
+              recipientRecord: recipientRecord,
+              timestamp: formatTimestamp(recipientRecord.timestamp)
+            }];
+            return updated;
+          });
           
           return;
         }
@@ -155,19 +264,32 @@ const NotificationCenter = ({
       if (newRecords.length > 0) {
         const latestRecordTime = Math.max(...newRecords.map(record => {
           let recordTime = Number(record.timestamp);
-          if (recordTime < Date.now()) {
+          const timestampStr = record.timestamp.toString();
+          const timestampLength = timestampStr.length;
+          
+          if (timestampLength <= 12) {
             recordTime = recordTime * 1000;
+          } else if (timestampLength >= 13 && timestampLength <= 16) {
+            recordTime = recordTime / 1000;
           }
           return recordTime;
         }));
-        lastProcessedTimeRef.current = latestRecordTime;
+        
+        if (latestRecordTime > lastProcessedTimeRef.current) {
+          lastProcessedTimeRef.current = latestRecordTime;
+        }
       }
       
       if (gmRecords && gmRecords.length > 0) {
         const allLatestTime = Math.max(...gmRecords.map(record => {
           let recordTime = Number(record.timestamp);
-          if (recordTime < Date.now()) {
+          const timestampStr = record.timestamp.toString();
+          const timestampLength = timestampStr.length;
+          
+          if (timestampLength <= 12) {
             recordTime = recordTime * 1000;
+          } else if (timestampLength >= 13 && timestampLength <= 16) {
+            recordTime = recordTime / 1000;
           }
           return recordTime;
         }));
@@ -182,65 +304,163 @@ const NotificationCenter = ({
   }, [gmRecords]);
 
   const showNotification = (recipientRecord, notificationId) => {
-    let autoHideTimer = null;
-    let remainingTime = 8;
-    let countdownInterval = null;
+    // 清理之前可能存在的计时器状态
+    if (notificationTimersRef.current[notificationId]) {
+      const oldTimerState = notificationTimersRef.current[notificationId];
+      if (oldTimerState.autoHideTimer) {
+        clearTimeout(oldTimerState.autoHideTimer);
+      }
+      if (oldTimerState.countdownInterval) {
+        clearInterval(oldTimerState.countdownInterval);
+      }
+      delete notificationTimersRef.current[notificationId];
+    }
+    
+    // 为每个通知创建独立的计时器状态
+    const timerState = {
+      remainingTime: 8000,
+      startTime: Date.now(),
+      isPaused: false,
+      autoHideTimer: null,
+      countdownInterval: null
+    };
+    
+    notificationTimersRef.current[notificationId] = timerState;
+    
+    // 创建独立的倒计时函数，绑定到当前通知ID
+    const executeCountdown = () => {
+      const currentTimerState = notificationTimersRef.current[notificationId];
+      if (!currentTimerState || currentTimerState.isPaused) return;
+      
+      const elapsedTime = Date.now() - currentTimerState.startTime;
+      const newRemainingTime = Math.max(0, currentTimerState.remainingTime - elapsedTime);
+      currentTimerState.remainingTime = newRemainingTime;
+      const newCountdown = Math.ceil(newRemainingTime / 1000);
+      
+      // 更新UI显示
+      setCenterNotification(prev => {
+        if (prev && prev.id === notificationId) {
+          return {
+            ...prev,
+            countdown: newCountdown
+          };
+        }
+        return prev;
+      });
+      
+      if (newRemainingTime <= 0) {
+        clearInterval(currentTimerState.countdownInterval);
+        
+        // 自动隐藏当前通知
+        delete notificationTimersRef.current[notificationId];
+        setCenterNotification(prev => {
+          if (prev && prev.id === notificationId) {
+            return null;
+          }
+          return prev;
+        });
+        
+        // 处理队列中的下一个通知
+        setNotificationQueue(prev => {
+          if (prev.length > 0) {
+            const nextNotification = prev[0];
+            const remainingQueue = prev.slice(1);
+            
+            setTimeout(() => {
+              showNotification(nextNotification.recipientRecord, nextNotification.id);
+            }, 500);
+            
+            return remainingQueue;
+          }
+          return prev;
+        });
+      }
+    };
     
     const startAutoHideTimer = () => {
-      if (autoHideTimer) {
-        clearTimeout(autoHideTimer);
-      }
-      if (countdownInterval) {
-        clearInterval(countdownInterval);
+      const currentTimerState = notificationTimersRef.current[notificationId];
+      if (!currentTimerState) return;
+      
+      if (currentTimerState.isPaused) {
+        currentTimerState.isPaused = false;
       }
       
-      setCenterNotification(prev => prev ? {
-        ...prev,
-        countdown: remainingTime
-      } : null);
+      // 使用剩余时间而不是总是重置为8秒
+      const remainingTime = currentTimerState.remainingTime || 8000;
+      currentTimerState.startTime = Date.now();
       
-      countdownInterval = setInterval(() => {
-        remainingTime--;
-        setCenterNotification(prev => prev ? {
-          ...prev,
-          countdown: remainingTime
-        } : null);
+      // 清理之前的计时器
+      if (currentTimerState.autoHideTimer) {
+        clearTimeout(currentTimerState.autoHideTimer);
+      }
+      if (currentTimerState.countdownInterval) {
+        clearInterval(currentTimerState.countdownInterval);
+      }
+      
+      // 立即执行一次倒计时更新
+      executeCountdown();
+      
+      // 设置每秒更新
+      currentTimerState.countdownInterval = setInterval(executeCountdown, 1000);
+      
+      // 设置自动隐藏计时器（使用剩余时间）
+      currentTimerState.autoHideTimer = setTimeout(() => {
+        const finalTimerState = notificationTimersRef.current[notificationId];
+        if (!finalTimerState || finalTimerState.isPaused) return;
         
-        if (remainingTime <= 0) {
-          clearInterval(countdownInterval);
-        }
-      }, 1000);
-      
-      autoHideTimer = setTimeout(() => {
-        setCenterNotification(null);
-        if (notificationQueue.length > 0) {
-          const nextNotification = notificationQueue[0];
-          setNotificationQueue(prev => prev.slice(1));
-          
-          setTimeout(() => {
-            showNotification(nextNotification.recipientRecord, nextNotification.id);
-          }, 500);
-        }
-      }, remainingTime * 1000);
+        // 清理计时器状态
+        delete notificationTimersRef.current[notificationId];
+        
+        // 隐藏当前通知
+        setCenterNotification(prev => {
+          if (prev && prev.id === notificationId) {
+            return null;
+          }
+          return prev;
+        });
+        
+        // 处理队列中的下一个通知
+        setNotificationQueue(prev => {
+          if (prev.length > 0) {
+            const nextNotification = prev[0];
+            const remainingQueue = prev.slice(1);
+            
+            setTimeout(() => {
+              showNotification(nextNotification.recipientRecord, nextNotification.id);
+            }, 500);
+            
+            return remainingQueue;
+          }
+          return prev;
+        });
+      }, remainingTime);
     };
     
     const pauseAutoHide = () => {
-      if (autoHideTimer) {
-        clearTimeout(autoHideTimer);
+      const currentTimerState = notificationTimersRef.current[notificationId];
+      if (!currentTimerState) return;
+      
+      currentTimerState.isPaused = true;
+      
+      // 清理计时器
+      if (currentTimerState.autoHideTimer) {
+        clearTimeout(currentTimerState.autoHideTimer);
       }
-      if (countdownInterval) {
-        clearInterval(countdownInterval);
+      if (currentTimerState.countdownInterval) {
+        clearInterval(currentTimerState.countdownInterval);
       }
+      
+      // 正确计算剩余时间
+      const elapsedTime = Date.now() - currentTimerState.startTime;
+      currentTimerState.remainingTime = Math.max(0, currentTimerState.remainingTime - elapsedTime);
     };
     
     const handleReply = async () => {
-      if (!gmOperations || !gmOperations.handleSendGMTo || !gmOperations.formatAccountOwner || !gmOperations.isValidAccountOwner) {
-        console.error('GM operations not available for reply');
+      if (!gmOperations || !gmOperations.handleSendGM || !gmOperations.formatAccountOwner || !gmOperations.isValidAccountOwner) {
         return;
       }
       
       if (!recipientRecord.recipient) {
-        console.error('Recipient address is null or undefined in notification');
         if (gmOperations.setMessage) {
           gmOperations.setMessage('Reply target address is empty, cannot reply', 'error');
         }
@@ -250,12 +470,7 @@ const NotificationCenter = ({
       let formattedAddress = gmOperations.formatAccountOwner(recipientRecord.recipient);
       
       if (!gmOperations.isValidAccountOwner(formattedAddress)) {
-        console.error('Formatted address is invalid:', formattedAddress);
-        console.error('Original recipient address:', recipientRecord.recipient);
-        console.error('Address type:', typeof recipientRecord.recipient);
-        
         if (!gmOperations.isValidAccountOwner(recipientRecord.recipient)) {
-          console.error('Original address is also invalid');
           if (gmOperations.setMessage) {
           gmOperations.setMessage('Invalid reply target address format, cannot reply', 'error');
         }
@@ -270,7 +485,7 @@ const NotificationCenter = ({
         
         gmOperations.targetChainId = chainId;
         
-        await gmOperations.handleSendGMToWithAddress(formattedAddress);
+        await gmOperations.handleSendGM('Gmicrochains', formattedAddress);
         
         gmOperations.targetChainId = originalTargetChainId;
         
@@ -280,7 +495,6 @@ const NotificationCenter = ({
           gmOperations.setMessage(`Replied GMIC to ${formatShortAddress(recipientRecord.recipient)}`, 'success');
         }
       } catch (error) {
-        // Reply GMIC failed
         if (gmOperations.setMessage) {
           gmOperations.setMessage('Failed to reply GMIC, please try again later', 'error');
         }
@@ -290,14 +504,39 @@ const NotificationCenter = ({
     setCenterNotification({
       id: notificationId,
       sender: recipientRecord.recipient,
-      timestamp: new Date().toLocaleTimeString(),
-      countdown: 5,
+      timestamp: formatTimestamp(recipientRecord.timestamp),
+      content: recipientRecord.content || 'Gmicrochains',
+      countdown: 8, 
       visible: true,
       startAutoHideTimer,
       pauseAutoHide,
       handleReply
     });
     startAutoHideTimer();
+  };
+
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return '';
+    
+    let recordTime = Number(timestamp);
+    const timestampStr = timestamp.toString();
+    const timestampLength = timestampStr.length;
+
+    if (timestampLength <= 12) {
+      recordTime = recordTime * 1000;  
+    } else if (timestampLength >= 13 && timestampLength <= 16) {
+      recordTime = recordTime / 1000; 
+    }
+    
+    const date = new Date(recordTime);
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
   };
 
   const formatShortAddress = (address) => {
@@ -332,9 +571,7 @@ const NotificationCenter = ({
             onClick={() => onRemoveNotification(notification.id)}
           >
             <span className="notification-message">{notification.message}</span>
-            <span className="notification-timestamp">
-              {new Date(notification.timestamp).toLocaleTimeString()}
-            </span>
+            <span className="notification-timestamp">{new Date(notification.timestamp).toLocaleTimeString()}</span>
           </div>
         ))}
       </div>
@@ -370,7 +607,26 @@ const NotificationCenter = ({
               <div className="notification-title">New GMIC Received!</div>
               <button 
                 className="notification-close"
-                onClick={() => setCenterNotification(null)}
+                onClick={() => {
+                  if (centerNotification && centerNotification.id) {
+                    delete notificationTimersRef.current[centerNotification.id];
+                  }
+                  setCenterNotification(null);
+                  
+                  setNotificationQueue(prev => {
+                    if (prev.length > 0) {
+                      const nextNotification = prev[0];
+                      const remainingQueue = prev.slice(1);
+                      
+                      setTimeout(() => {
+                        showNotification(nextNotification.recipientRecord, nextNotification.id);
+                      }, 500);
+                      
+                      return remainingQueue;
+                    }
+                    return prev;
+                  });
+                }}
                 title="Close notification"
               >
                 ×
@@ -380,6 +636,10 @@ const NotificationCenter = ({
               <div className="notification-message">
                 <span className="sender-label">From:</span>
                 <span className="sender-address">{formatShortAddress(centerNotification.sender)}</span>
+              </div>
+              <div className="notification-message-content">
+                <span className="message-label">Message:</span>
+                <span className="message-text">{centerNotification.content}</span>
               </div>
               <div className="notification-time">
                 {centerNotification.timestamp}
@@ -398,7 +658,26 @@ const NotificationCenter = ({
               </button>
               <button 
                 className="action-btn dismiss-btn" 
-                onClick={() => setCenterNotification(null)}
+                onClick={() => {
+                  if (centerNotification && centerNotification.id) {
+                    delete notificationTimersRef.current[centerNotification.id];
+                  }
+                  setCenterNotification(null);
+                  
+                  setNotificationQueue(prev => {
+                    if (prev.length > 0) {
+                      const nextNotification = prev[0];
+                      const remainingQueue = prev.slice(1);
+                      
+                      setTimeout(() => {
+                        showNotification(nextNotification.recipientRecord, nextNotification.id);
+                      }, 500);
+                      
+                      return remainingQueue;
+                    }
+                    return prev;
+                  });
+                }}
               >
                 Close
               </button>

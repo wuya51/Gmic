@@ -116,12 +116,12 @@ function apolloClient(chainId, applicationId, port, host = 'localhost') {
     defaultOptions: {
       watchQuery: {
         errorPolicy: 'all',
-        notifyOnNetworkStatusChange: true,
-        fetchPolicy: 'no-cache',
+        notifyOnNetworkStatusChange: false, 
+        fetchPolicy: 'cache-first',
       },
       query: {
         errorPolicy: 'all',
-        fetchPolicy: 'no-cache',
+        fetchPolicy: 'cache-first',
       },
       mutate: {
         errorPolicy: 'ignore',

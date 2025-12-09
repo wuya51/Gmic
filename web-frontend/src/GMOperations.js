@@ -258,8 +258,11 @@ const GMOperations = ({
 
   const { data, refetch, error: queryError, loading } = useQuery(GET_GM_STATS, {
     variables: { chainId: queryChainId, owner: currentAccount ? formatAccountOwner(currentAccount) : null },
-    fetchPolicy: "no-cache",
+    fetchPolicy: "cache-first",
     skip: !isValidChainId(queryChainId),
+    notifyOnNetworkStatusChange: false,
+    pollInterval: 0,
+    nextFetchPolicy: "cache-first",
   });
 
    useEffect(() => {
@@ -285,32 +288,48 @@ const GMOperations = ({
   const { data: gmRecordData, refetch: refetchGmRecord } = useQuery(GET_GM_RECORD, {
     variables: { owner: formatAccountOwner(currentAccount) },
     skip: !currentAccount,
-    fetchPolicy: "no-cache",
+    fetchPolicy: "cache-first",
+    notifyOnNetworkStatusChange: false,
+    pollInterval: 0,
+    nextFetchPolicy: "cache-first",
   });
 
   const { data: walletMessagesData, refetch: refetchWalletMessages } = useQuery(GET_WALLET_MESSAGES, {
     variables: { owner: formatAccountOwner(currentAccount) },
     skip: !currentAccount,
-    fetchPolicy: "no-cache",
-  });
-
-  const { data: leaderboardData, refetch: refetchLeaderboard } = useQuery(GET_LEADERBOARD, {
-    variables: { limit: 15 },
-    fetchPolicy: "cache-and-network",
-    pollInterval: 0, 
+    fetchPolicy: "cache-first",
+    notifyOnNetworkStatusChange: false,
+    pollInterval: 0,
     nextFetchPolicy: "cache-first",
   });
 
+  const { data: leaderboardData, refetch: refetchLeaderboard } = useQuery(GET_LEADERBOARD, {
+    variables: { 
+      limit: 15 
+    },
+    skip: false,
+    fetchPolicy: 'cache-first',
+    notifyOnNetworkStatusChange: false,
+    pollInterval: 0,
+    nextFetchPolicy: 'cache-first',
+  });
+
   const { data: cooldownStatusData, refetch: refetchCooldownStatus } = useQuery(GET_COOLDOWN_STATUS, {
-    fetchPolicy: "network-only",
+    fetchPolicy: "cache-first",
+    notifyOnNetworkStatusChange: false,
+    pollInterval: 0,
+    nextFetchPolicy: "cache-first",
   });
 
   const { data: whitelistData, refetch: refetchWhitelist } = useQuery(IS_USER_WHITELISTED, {
     variables: { 
       user: formatAccountOwner(currentAccount) 
     },
-    fetchPolicy: "no-cache",
+    fetchPolicy: "cache-first",
     skip: !currentAccount,
+    notifyOnNetworkStatusChange: false,
+    pollInterval: 0,
+    nextFetchPolicy: "cache-first",
   });
 
   const { data: invitationStatsDataRaw, refetch: refetchInvitationRewards } = useQuery(GET_INVITATION_STATS, {
@@ -590,84 +609,16 @@ const GMOperations = ({
   };
 };
 
-export const useGMAdditionalData = ({
-  chainId,
-  currentAccount,
-  currentChainId,
-  walletMode,
-  queryRetryCount,
-  setQueryRetryCount
-}) => {
-  const { data: invitationStatsDataRaw, loading: invitationStatsLoading, error: invitationStatsError, refetch: refetchInvitationStats } = useQuery(GET_INVITATION_STATS, {
-    variables: { 
-      user: currentAccount ? formatAccountOwner(currentAccount) : null
-    },
-    skip: !currentAccount,
-    fetchPolicy: 'cache-and-network',
-    pollInterval: 0,
-    nextFetchPolicy: 'cache-first',
-    notifyOnNetworkStatusChange: false
-  });
-
-  const { data: invitationRecordData, loading: invitationRecordLoading, error: invitationRecordError, refetch: refetchInvitationRecord } = useQuery(GET_INVITATION_RECORD, {
-    variables: { 
-      inviter: currentAccount ? formatAccountOwner(currentAccount) : null
-    },
-    skip: !currentAccount,
-    fetchPolicy: 'cache-and-network',
-    pollInterval: 0,
-    nextFetchPolicy: 'cache-first',
-    notifyOnNetworkStatusChange: false
-  });
-
-  const invitationStatsData = {
-    totalInvited: Number(invitationStatsDataRaw?.getInvitationStats?.totalInvited) || 0,
-    totalRewards: Number(invitationStatsDataRaw?.getInvitationStats?.totalRewards) || 0,
-    lastRewardTime: invitationStatsDataRaw?.getInvitationStats?.lastRewardTime || null
-  };
-  
-  useEffect(() => {
-    if (invitationStatsError) {
-      console.error('Error fetching invitation stats:', invitationStatsError);
-    }
-  }, [invitationStatsError]);
-
-  useEffect(() => {
-    if (invitationRecordError) {
-      console.error('Error fetching invitation records:', invitationRecordError);
-    }
-  }, [invitationRecordError]);
-  const { data: gmRecordData, loading: gmRecordLoading, error: gmRecordError, refetch: refetchGmRecord } = useQuery(GET_GM_RECORD, {
-    variables: { 
-      owner: currentAccount ? formatAccountOwner(currentAccount) : null,
-      chainId: chainId 
-    },
-    skip: !currentAccount || !chainId,
-    fetchPolicy: 'cache-and-network',
-    notifyOnNetworkStatusChange: false,
-    pollInterval: 0,
-    nextFetchPolicy: 'cache-first'
-  });
-
-  useEffect(() => {
-    if (gmRecordError) {
-      console.error('Error fetching GM record:', gmRecordError);
-      if (queryRetryCount < 3) {
-        setTimeout(() => {
-          setQueryRetryCount(prev => prev + 1);
-          refetchGmRecord();
-        }, 1000);
-      }
-    }
-  }, [gmRecordError, queryRetryCount, setQueryRetryCount, refetchGmRecord]);
-
+// 专门的排行榜数据钩子，只包含与排行榜直接相关的数据和函数
+// 这样24小时开关状态变化时不会影响排行榜组件渲染
+export const useLeaderboardData = () => {
   const { data: leaderboardData, loading: leaderboardLoading, error: leaderboardError, refetch: refetchLeaderboard } = useQuery(GET_LEADERBOARD, {
     variables: { 
       limit: 15 
     },
     skip: false,
-    fetchPolicy: 'cache-and-network',
-    notifyOnNetworkStatusChange: true,
+    fetchPolicy: 'cache-first',
+    notifyOnNetworkStatusChange: false,
     pollInterval: 0,
     nextFetchPolicy: 'cache-first',
   });
@@ -683,12 +634,46 @@ export const useGMAdditionalData = ({
     nextFetchPolicy: 'cache-first',
   });
 
+  const loading = leaderboardLoading || invitationLeaderboardLoading;
+  const queryError = leaderboardError || invitationLeaderboardError;
+
   useEffect(() => {
+    if (leaderboardError) {
+      console.error('Error fetching leaderboard:', leaderboardError);
+    }
     if (invitationLeaderboardError) {
       console.error('Error fetching invitation leaderboard:', invitationLeaderboardError);
     }
-  }, [invitationLeaderboardError]);
+  }, [leaderboardError, invitationLeaderboardError]);
 
+  // 使用空依赖数组的useCallback确保refetch函数引用绝对稳定
+  const stableRefetchLeaderboard = useCallback(() => {
+    refetchLeaderboard && refetchLeaderboard();
+  }, []);
+  
+  const stableRefetchInvitationLeaderboard = useCallback(() => {
+    refetchInvitationLeaderboard && refetchInvitationLeaderboard();
+  }, []);
+  
+  // 使用JSON.stringify深度比较数据，确保只有数据内容变化时才更新引用
+  return useMemo(() => ({  
+    leaderboardData,
+    invitationLeaderboardData,
+    loading,
+    queryError,
+    refetchLeaderboard: stableRefetchLeaderboard,
+    refetchInvitationLeaderboard: stableRefetchInvitationLeaderboard
+  }), [
+    JSON.stringify(leaderboardData),
+    JSON.stringify(invitationLeaderboardData),
+    loading,
+    queryError,
+    stableRefetchLeaderboard,
+    stableRefetchInvitationLeaderboard
+  ]);
+};
+
+export const useCooldownData = ({ currentAccount, queryRetryCount, setQueryRetryCount }) => {
   const { data: cooldownStatusData, loading: cooldownStatusLoading, error: cooldownStatusError, refetch: refetchCooldownStatus } = useQuery(GET_COOLDOWN_STATUS, {
     fetchPolicy: 'cache-first',
     notifyOnNetworkStatusChange: false,
@@ -711,9 +696,14 @@ export const useGMAdditionalData = ({
       user: currentAccount ? formatAccountOwner(currentAccount) : null
     },
     skip: !currentAccount,
-    fetchPolicy: 'network-only',
-    notifyOnNetworkStatusChange: true
+    fetchPolicy: 'cache-first',
+    notifyOnNetworkStatusChange: false,
+    pollInterval: 0,
+    nextFetchPolicy: 'cache-first'
   });
+
+  const loading = cooldownStatusLoading || cooldownCheckLoading || whitelistLoading;
+  const queryError = cooldownStatusError || cooldownCheckError || whitelistError;
 
   useEffect(() => {
     if (whitelistError) {
@@ -725,25 +715,93 @@ export const useGMAdditionalData = ({
         }, 1000);
       }
     }
-  }, [whitelistError, queryRetryCount, setQueryRetryCount, refetchWhitelist]);
-  useEffect(() => {
-    if (leaderboardError) {
-      console.error('Error fetching leaderboard:', leaderboardError);
-    }
-  }, [leaderboardError]);
-  useEffect(() => {
     if (cooldownStatusError) {
       console.error('Error fetching cooldown status:', cooldownStatusError);
     }
-  }, [cooldownStatusError]);
-  useEffect(() => {
     if (cooldownCheckError) {
       console.error('Error checking cooldown:', cooldownCheckError);
     }
-  }, [cooldownCheckError]);
+  }, [whitelistError, cooldownStatusError, cooldownCheckError, queryRetryCount, setQueryRetryCount, refetchWhitelist]);
 
-  const loading = gmRecordLoading || leaderboardLoading || invitationLeaderboardLoading || cooldownStatusLoading || cooldownCheckLoading || whitelistLoading || invitationStatsLoading || invitationRecordLoading;
-  const queryError = gmRecordError || leaderboardError || invitationLeaderboardError || cooldownStatusError || cooldownCheckError || whitelistError || invitationStatsError || invitationRecordError;
+  return useMemo(() => ({
+    cooldownStatusData,
+    cooldownCheckData,
+    whitelistData,
+    loading,
+    queryError,
+    refetchCooldownStatus,
+    refetchCooldownCheck,
+    refetchWhitelist
+  }), [
+    cooldownStatusData,
+    cooldownCheckData,
+    whitelistData,
+    loading,
+    queryError
+  ]);
+};
+
+export const useUserData = ({ chainId, currentAccount, queryRetryCount, setQueryRetryCount }) => {
+  const { data: invitationStatsDataRaw, loading: invitationStatsLoading, error: invitationStatsError, refetch: refetchInvitationStats } = useQuery(GET_INVITATION_STATS, {
+    variables: { 
+      user: currentAccount ? formatAccountOwner(currentAccount) : null
+    },
+    skip: !currentAccount,
+    fetchPolicy: 'cache-first',
+    pollInterval: 0,
+    nextFetchPolicy: 'cache-first',
+    notifyOnNetworkStatusChange: false
+  });
+
+  const { data: invitationRecordData, loading: invitationRecordLoading, error: invitationRecordError, refetch: refetchInvitationRecord } = useQuery(GET_INVITATION_RECORD, {
+    variables: { 
+      inviter: currentAccount ? formatAccountOwner(currentAccount) : null
+    },
+    skip: !currentAccount,
+    fetchPolicy: 'cache-first',
+    pollInterval: 0,
+    nextFetchPolicy: 'cache-first',
+    notifyOnNetworkStatusChange: false
+  });
+
+  const { data: gmRecordData, loading: gmRecordLoading, error: gmRecordError, refetch: refetchGmRecord } = useQuery(GET_GM_RECORD, {
+    variables: { 
+      owner: currentAccount ? formatAccountOwner(currentAccount) : null,
+      chainId: chainId 
+    },
+    skip: !currentAccount || !chainId,
+    fetchPolicy: 'cache-first',
+    notifyOnNetworkStatusChange: false,
+    pollInterval: 0,
+    nextFetchPolicy: 'cache-first'
+  });
+
+  const invitationStatsData = {
+    totalInvited: Number(invitationStatsDataRaw?.getInvitationStats?.totalInvited) || 0,
+    totalRewards: Number(invitationStatsDataRaw?.getInvitationStats?.totalRewards) || 0,
+    lastRewardTime: invitationStatsDataRaw?.getInvitationStats?.lastRewardTime || null
+  };
+  
+  const loading = invitationStatsLoading || invitationRecordLoading || gmRecordLoading;
+  const queryError = invitationStatsError || invitationRecordError || gmRecordError;
+
+  useEffect(() => {
+    if (invitationStatsError) {
+      console.error('Error fetching invitation stats:', invitationStatsError);
+    }
+    if (invitationRecordError) {
+      console.error('Error fetching invitation records:', invitationRecordError);
+    }
+    if (gmRecordError) {
+      console.error('Error fetching GM record:', gmRecordError);
+      if (queryRetryCount < 3) {
+        setTimeout(() => {
+          setQueryRetryCount(prev => prev + 1);
+          refetchGmRecord();
+        }, 1000);
+      }
+    }
+  }, [invitationStatsError, invitationRecordError, gmRecordError, queryRetryCount, setQueryRetryCount, refetchGmRecord]);
 
   useEffect(() => {
     const handleToggleDropdown = async (event) => {
@@ -777,26 +835,37 @@ export const useGMAdditionalData = ({
     };
   }, [refetchInvitationRecord, currentAccount]);
 
-  return {
+  // 使用useMemo稳定返回的对象引用
+  return useMemo(() => ({
     gmRecordData,
-    leaderboardData,
-    invitationLeaderboardData,
-    cooldownStatusData,
-    cooldownCheckData,
-    whitelistData,
     invitationStatsData,
     invitationRecordData,
     loading,
     queryError,
     refetchGmRecord,
-    refetchLeaderboard,
-    refetchInvitationLeaderboard,
-    refetchCooldownStatus,
-    refetchCooldownCheck,
-    refetchWhitelist,
     refetchInvitationStats,
     refetchInvitationRecord
-  };
+  }), [
+    gmRecordData,
+    invitationStatsData,
+    invitationRecordData,
+    loading,
+    queryError
+  ]);
+};
+
+// 保留原始的useGMAdditionalData钩子以保持向后兼容性
+export const useGMAdditionalData = ({ chainId, currentAccount, currentChainId, walletMode, queryRetryCount, setQueryRetryCount }) => {
+  const leaderboardData = useLeaderboardData();
+  const cooldownData = useCooldownData({ currentAccount, queryRetryCount, setQueryRetryCount });
+  const userData = useUserData({ chainId, currentAccount, queryRetryCount, setQueryRetryCount });
+
+  // 合并所有数据，使用useMemo确保只有当子钩子返回的数据变化时，才会更新合并后的对象引用
+  return useMemo(() => ({
+    ...leaderboardData,
+    ...cooldownData,
+    ...userData
+  }), [leaderboardData, cooldownData, userData]);
 };
 
 export default GMOperations;

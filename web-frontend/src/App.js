@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useWallet, WalletConnector } from './WalletProvider';
 import { DynamicConnectButton, useDynamicContext } from '@dynamic-labs/sdk-react-core';
 import "./App.css";
-import GMOperations, { useGMAdditionalData } from './GMOperations';
+import GMOperations, { useGMAdditionalData, useLeaderboardData, useCooldownData, useUserData } from './GMOperations';
 import NotificationCenter from './NotificationCenter';
+import defaultAdSettings from './adSettings.json';
+import Leaderboard from './Leaderboard';
 
-// 添加全局错误处理器，记录完整的错误堆栈信息
 window.onerror = function(message, source, lineno, colno, error) {
   console.error('Global error captured:', {
     message,
@@ -38,7 +39,8 @@ const formatAccountOwner = (address) => {
 
 const formatAddressForDisplay = (address, isMobile = false, startChars = 6, endChars = 4) => {
   if (!address) return '';
-  return isMobile 
+  const isMobileView = isMobile || window.innerWidth <= 768;  
+  return isMobileView 
     ? `${address.slice(0, startChars)}...${address.slice(-endChars)}`
     : address;
 };
@@ -98,12 +100,9 @@ function App({ chainId, appId, ownerId, inviter, port }) {
   const activeTabRef = useRef('unknown');
   
   const pageLoadTime = useRef(0);
-  
-  // 解析URL参数中的邀请者信息
   const [urlInviter, setUrlInviter] = useState(null);
   
   useEffect(() => {
-    // 解析URL参数
     const urlParams = new URLSearchParams(window.location.search);
     const inviterParam = urlParams.get('inviter');
     
@@ -222,6 +221,130 @@ function App({ chainId, appId, ownerId, inviter, port }) {
   const [invitedUsersList, setInvitedUsersList] = useState([]);
   const [invitedUsers, setInvitedUsers] = useState([]);
   const [invitedUsersLoading, setInvitedUsersLoading] = useState(false);
+  const [adSettings, setAdSettings] = useState(defaultAdSettings);
+  const [showAllAds, setShowAllAds] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const marqueeRef = useRef(null);
+
+  const loadAdSettings = () => {
+    setAdSettings(defaultAdSettings);
+  };
+  
+  useEffect(() => {
+    loadAdSettings();
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'messages' || adSettings.length <= 5 || !marqueeRef.current) return;
+
+    const marqueeElement = marqueeRef.current;
+    let scrollPosition = 0;
+    let animationFrameId;
+    const originalAds = Array.from(marqueeElement.children);
+    originalAds.forEach(ad => {
+      const clone = ad.cloneNode(true);
+      marqueeElement.appendChild(clone);
+    });
+
+    const scroll = () => {
+      scrollPosition += 1;
+      marqueeElement.style.transform = `translateX(-${scrollPosition}px)`;
+      if (scrollPosition >= marqueeElement.scrollWidth / 2) {
+        scrollPosition = 0;
+        marqueeElement.style.transform = `translateX(0)`;
+      }
+
+      animationFrameId = requestAnimationFrame(scroll);
+    };
+    animationFrameId = requestAnimationFrame(scroll);
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      const clonedAds = Array.from(marqueeElement.children).slice(originalAds.length);
+      clonedAds.forEach(ad => marqueeElement.removeChild(ad));
+    };
+  }, [adSettings, activeTab]);
+  
+  const handleAdChange = (index, field, value) => {
+    setAdSettings(prev => {
+      const updated = [...prev];
+      updated[index][field] = value;
+      return updated;
+    });
+  };
+  
+  const handleAddAd = () => {
+    if (adSettings.length < 10) {
+      setAdSettings(prev => [...prev, { url: '', imageUrl: '' }]);
+    }
+  };
+  
+  const handleRemoveAd = (index) => {
+    if (adSettings.length > 1) {
+      setAdSettings(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+  
+  const handleSaveAds = () => {
+    try {
+      const dataStr = JSON.stringify(adSettings, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'adSettings.json';
+      link.click();
+      URL.revokeObjectURL(url);
+      
+      addNotification('Ad settings exported as adSettings.json. Please manually save to src/adSettings.json.', 'success');
+    } catch (error) {
+      console.error('Failed to export ad settings:', error);
+      addNotification('Failed to save ad settings. Please try again.', 'error');
+    }
+  };
+  
+  const handleExportAds = () => {
+    try {
+      const dataStr = JSON.stringify(adSettings, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'adSettings.json';
+      link.click();
+      URL.revokeObjectURL(url);
+      addNotification('Ad settings exported successfully!', 'success');
+    } catch (error) {
+      console.error('Failed to export ad settings:', error);
+      addNotification('Failed to export ad settings. Please try again.', 'error');
+    }
+  };
+  
+  const handleImportAds = (event) => {
+    try {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const importedSettings = JSON.parse(e.target.result);
+          if (Array.isArray(importedSettings) && importedSettings.every(ad => 
+            typeof ad === 'object' && ad !== null && 
+            typeof ad.url === 'string' && 
+            typeof ad.imageUrl === 'string'
+          )) {
+            setAdSettings(importedSettings.slice(0, 10));
+            addNotification('Ad settings imported successfully!', 'success');
+          } else {
+            addNotification('Invalid ad settings file. Please check the format.', 'error');
+          }
+        };
+        reader.readAsText(file);
+      }
+    } catch (error) {
+      console.error('Failed to import ad settings:', error);
+      addNotification('Failed to import ad settings. Please try again.', 'error');
+    }
+    event.target.value = '';
+  };
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 0);
   const dropdownRef = useRef(null);
   useEffect(() => {
@@ -235,15 +358,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     };
   }, []);
 
-  const formatAddress = (address) => {
- 
-    const threshold = 768;
-    if (windowWidth > threshold) {
-      return address; 
-    } else {
-      return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`; // 小窗口显示短地址
-    }
-  };
+
 
   forceUpdateRef.current = forceUpdate;
   cooldownRemainingRef.current = cooldownRemaining;
@@ -343,7 +458,17 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     };
   }, [showEmojiPicker]);
 
-  const currentAccount = connectedAccount ? formatAccountOwner(connectedAccount) : null;
+  const cachedAccountRef = useRef(null);
+  useEffect(() => {
+    if (connectedAccount) {
+      const formattedAccount = formatAccountOwner(connectedAccount);
+      cachedAccountRef.current = formattedAccount;
+    } else {
+      cachedAccountRef.current = null;
+    }
+  }, [connectedAccount]);
+  
+  const currentAccount = cachedAccountRef.current;
   const currentChainId = connectedChainId;
   const currentIsConnected = isConnected;
 
@@ -353,37 +478,6 @@ function App({ chainId, appId, ownerId, inviter, port }) {
   const handleToggleShareReferral = useCallback(() => {
     setShowShareReferralModal(!showShareReferralModal);
   }, [showShareReferralModal]);
-
-  const copyReferralLink = useCallback(() => {
-    if (!memoizedCurrentAccount) {
-      console.error('No account found');
-      alert('Please connect your wallet first');
-      return;
-    }
-    const referralLink = `${window.location.origin}?inviter=${memoizedCurrentAccount}`;
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(referralLink)
-        .then(() => {
-          const btn = document.querySelector('.copy-btn');
-          if (btn) {
-            const originalText = btn.textContent;
-            btn.textContent = 'Copied!';
-            btn.style.backgroundColor = '#4CAF50';
-            setTimeout(() => {
-              btn.textContent = originalText;
-              btn.style.backgroundColor = '';
-            }, 2000);
-          }
-          console.log('Referral link copied to clipboard using Clipboard API!');
-        })
-        .catch(err => {
-          console.error('Failed to copy using Clipboard API:', err);
-          fallbackCopyTextToClipboard(referralLink);
-        });
-    } else {
-      fallbackCopyTextToClipboard(referralLink);
-    }
-  }, [memoizedCurrentAccount]);
   
   const fallbackCopyTextToClipboard = useCallback((text) => {
     const textArea = document.createElement('textarea');
@@ -669,235 +763,51 @@ function App({ chainId, appId, ownerId, inviter, port }) {
         </div>
       </div>
     );
-  });
-  
-  const LeaderboardSection = React.memo(({
-    showLeaderboard,
-    setShowLeaderboard,
-    leaderboardData,
-    invitationLeaderboardData,
-    currentAccount,
-    isMobile,
-    copyToClipboard,
-    refetchLeaderboard,
-    refetchInvitationLeaderboard,
-    onTabChange
-  }) => {
-    const renderCountRef = useRef(0);
-    renderCountRef.current += 1;
-    
-    const getCallStack = () => {
-      try {
-        const stack = new Error().stack;
-        const stackLines = stack.split('\n').slice(3, 8);
-        return stackLines.map(line => line.trim()).join(' <- ');
-      } catch (e) {
-        return 'Stack trace unavailable';
-      }
-    };
-    
-    const propsChanged = {};
-    if (renderCountRef.current > 1) {
-      propsChanged.showLeaderboard = showLeaderboard !== undefined;
-      propsChanged.leaderboardData = leaderboardData !== undefined;
-      propsChanged.currentAccount = currentAccount !== undefined;
-      propsChanged.isMobile = isMobile !== undefined;
-    }
-    
-    const hasFetchedRef = useRef(false);
-    
-    useEffect(() => {
-      return () => {
-      };
-    }, []);
-    
-    const mountTimeRef = useRef(Date.now());
-
-    const gmLeaderboardItems = useMemo(() => {
-      if (!leaderboardData?.getTopUsers || leaderboardData.getTopUsers.length === 0) {
-        return null;
-      }
-      
-      return leaderboardData.getTopUsers.map((entry, index) => (
-        <tr key={`${entry.user}-${index}`} className={entry.user === currentAccount ? "current-user" : ""}>
-          <td>{index + 1}</td>
-          <td>
-            <span 
-              className="address-simple" 
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                copyToClipboard(entry.user, e);
-              }}
-            >
-              {isMobile ? `${entry.user.slice(0, 6)}...${entry.user.slice(-4)}` : entry.user}
-            </span>
-          </td>
-          <td>{entry.count}</td>
-        </tr>
-      ));
-    }, [leaderboardData?.getTopUsers, currentAccount, isMobile, copyToClipboard]);
-    
-    const invitationLeaderboardItems = useMemo(() => {
-      if (!invitationLeaderboardData?.getTopInvitors || invitationLeaderboardData.getTopInvitors.length === 0) {
-        return null;
-      }
-      
-      return invitationLeaderboardData.getTopInvitors.map((entry, index) => (
-        <tr key={`${entry.user}-${index}`} className={entry.user === currentAccount ? "current-user" : ""}>
-          <td>{index + 1}</td>
-          <td>
-            <span 
-              className="address-simple" 
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                copyToClipboard(entry.user, e);
-              }}
-            >
-              {isMobile ? `${entry.user.slice(0, 6)}...${entry.user.slice(-4)}` : entry.user}
-            </span>
-          </td>
-          <td>{entry.count}</td>
-        </tr>
-      ));
-    }, [invitationLeaderboardData?.getTopInvitors, currentAccount, isMobile, copyToClipboard]);
-
-    return (
-      <div className="card leaderboard-card">
-        <div className="section-header">
-          <h3>Leaderboard</h3>
-          <button 
-            className="toggle-btn"
-            onClick={() => setShowLeaderboard(!showLeaderboard)}
-          >
-            {showLeaderboard ? "▼" : "▶"}
-          </button>
-        </div>
-        {showLeaderboard && (
-          <div className="leaderboard-content">
-            <div className="leaderboard-tabs">
-              <div className="stats-header">
-                <h4>Top GMicrochains Senders</h4>
-                <button 
-                  className="refresh-btn"
-                  onClick={() => {
-                    refetchLeaderboard && refetchLeaderboard();
-                  }}
-                  title="Refresh leaderboard"
-                >
-                  🔄 Refresh
-                </button>
-              </div>
-              {gmLeaderboardItems ? (
-                <div className="leaderboard-list">
-                  <table className="leaderboard-table">
-                    <thead>
-                      <tr>
-                        <th>Rank</th>
-                        <th>User</th>
-                        <th>Count</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {gmLeaderboardItems}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="no-leaderboard-data">
-                  <p>No leaderboard data available yet.</p>
-                </div>
-              )}
-            </div>
-            
-            <div className="leaderboard-tabs invitation-leaderboard-tab">
-              <div className="stats-header">
-                <h4>Top Invitors</h4>
-                <button 
-                  className="refresh-btn"
-                  onClick={() => {
-                    refetchInvitationLeaderboard && refetchInvitationLeaderboard();
-                  }}
-                  title="Refresh invitation leaderboard"
-                >
-                  🔄 Refresh
-                </button>
-              </div>
-              {invitationLeaderboardItems ? (
-                <div className="leaderboard-list">
-                  <table className="leaderboard-table">
-                    <thead>
-                      <tr>
-                        <th>Rank</th>
-                        <th>User</th>
-                        <th>Points</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {invitationLeaderboardItems}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="no-leaderboard-data">
-                  <p>No invitation leaderboard data available yet.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    );
   }, (prevProps, nextProps) => {
-    const leaderboardDataChanged = 
-      prevProps.leaderboardData?.getTopUsers?.length !== nextProps.leaderboardData?.getTopUsers?.length ||
-      JSON.stringify(prevProps.leaderboardData?.getTopUsers) !== JSON.stringify(nextProps.leaderboardData?.getTopUsers);
-    
-    const showLeaderboardChanged = prevProps.showLeaderboard !== nextProps.showLeaderboard;
-    const currentAccountChanged = prevProps.currentAccount !== nextProps.currentAccount;
-    const isMobileChanged = prevProps.isMobile !== nextProps.isMobile;
-    const invitationLeaderboardDataChanged = 
-      prevProps.invitationLeaderboardData?.getTopInvitors?.length !== nextProps.invitationLeaderboardData?.getTopInvitors?.length ||
-      JSON.stringify(prevProps.invitationLeaderboardData?.getTopInvitors) !== JSON.stringify(nextProps.invitationLeaderboardData?.getTopInvitors);
-    
-    if (leaderboardDataChanged || invitationLeaderboardDataChanged || showLeaderboardChanged || currentAccountChanged || isMobileChanged) {
+    if (prevProps.showLeaderboard !== nextProps.showLeaderboard) {
       return false;
     }
+    const prevLeaderboardData = prevProps.leaderboardData?.getTopUsers;
+    const nextLeaderboardData = nextProps.leaderboardData?.getTopUsers;
     
+    if (prevLeaderboardData?.length !== nextLeaderboardData?.length) {
+      return false;
+    }
+    if (prevLeaderboardData && nextLeaderboardData) {
+      for (let i = 0; i < prevLeaderboardData.length; i++) {
+        if (prevLeaderboardData[i]?.count !== nextLeaderboardData[i]?.count || 
+            prevLeaderboardData[i]?.user !== nextLeaderboardData[i]?.user) {
+          return false;
+        }
+      }
+    }
+    const prevInvitationData = prevProps.invitationLeaderboardData?.getTopInvitors;
+    const nextInvitationData = nextProps.invitationLeaderboardData?.getTopInvitors;
+    
+    if (prevInvitationData?.length !== nextInvitationData?.length) {
+      return false;
+    }
+    if (prevInvitationData && nextInvitationData) {
+      for (let i = 0; i < prevInvitationData.length; i++) {
+        if (prevInvitationData[i]?.count !== nextInvitationData[i]?.count || 
+            prevInvitationData[i]?.user !== nextInvitationData[i]?.user) {
+          return false;
+        }
+      }
+    }
+    if (prevProps.currentAccount !== nextProps.currentAccount) {
+      return false;
+    }
+    if (prevProps.isMobile !== nextProps.isMobile) {
+      return false;
+    }
     return true;
   });
-  
-  const handleConnectWallet = useCallback(async (newWalletType) => {
-    try {
-      if (currentIsConnected && walletType && newWalletType !== walletType) {
-        await disconnectWallet();
-      }
-      
-      await connectWallet(newWalletType);
-      addNotification(`${newWalletType === 'linera' ? 'Linera' : 'Dynamic'} wallet connected successfully!`, 'success');
-    } catch (error) {
-      addNotification(`Failed to connect ${newWalletType === 'linera' ? 'Linera' : 'Dynamic'} wallet: ${error.message}`, 'error');
-    }
-  }, [connectWallet, disconnectWallet, currentIsConnected, walletType, addNotification]);
-  
-  const handleDisconnectWallet = useCallback(async () => {
-    try {
-      await disconnectWallet();
-      addNotification('Wallet disconnected successfully!', 'success');
-    } catch (error) {
-      addNotification(`Failed to disconnect wallet: ${error.message}`, 'error');
-    }
-  }, [disconnectWallet, addNotification]);
   
   const setMessage = useCallback((message, type = 'error') => {
     addNotification(message, type);
   }, [addNotification]);
   
-  const memoizedSetShowLeaderboard = useCallback((value) => {
-    setShowLeaderboard(value);
-  }, []);
-
   const copyToClipboard = useCallback((text, event) => {
     const copyText = async (textToCopy) => {
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -951,6 +861,22 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     });
   }, []);
 
+  const copyReferralLink = useCallback(() => {
+    if (!memoizedCurrentAccount) {
+      console.error('No account found');
+      alert('Please connect your wallet first');
+      return;
+    }
+    const referralLink = `${window.location.origin}?inviter=${memoizedCurrentAccount}`;
+    copyToClipboard(referralLink);
+    
+    setCopySuccess(true);
+    
+    setTimeout(() => {
+      setCopySuccess(false);
+    }, 3000);
+  }, [memoizedCurrentAccount, copyToClipboard]);
+
   const handleMutationComplete = useCallback((data, mutationType) => {
     if (mutationType === 'invitation') {
       setClaimStatus("success");
@@ -987,7 +913,19 @@ function App({ chainId, appId, ownerId, inviter, port }) {
       }
     }, 1000);
   }, [addNotification]);
-  
+
+  const leaderboardData = useLeaderboardData();
+  const cooldownData = useCooldownData({
+    currentAccount,
+    queryRetryCount,
+    setQueryRetryCount
+  });
+  const userData = useUserData({
+    chainId,
+    currentAccount,
+    queryRetryCount,
+    setQueryRetryCount
+  });
   const additionalData = useGMAdditionalData({
     chainId,
     currentAccount,
@@ -996,30 +934,29 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     queryRetryCount,
     setQueryRetryCount
   });
+  const stableLeaderboardData = useMemo(() => ({
+    getTopUsers: [...(leaderboardData.leaderboardData?.getTopUsers || [])]
+  }), [JSON.stringify(leaderboardData.leaderboardData?.getTopUsers)]);
 
-  const shareModalAdditionalData = useGMAdditionalData({
-    chainId,
-    currentAccount,
-    currentChainId: connectedWalletChainId,
-    walletType,
-    queryRetryCount,
-    setQueryRetryCount
-  });
+  const stableInvitationLeaderboardData = useMemo(() => ({
+    getTopInvitors: [...(leaderboardData.invitationLeaderboardData?.getTopInvitors || [])]
+  }), [JSON.stringify(leaderboardData.invitationLeaderboardData?.getTopInvitors)]);
+  const stableRefetchLeaderboard = useCallback(() => {
+    leaderboardData.refetchLeaderboard && leaderboardData.refetchLeaderboard();
+  }, [leaderboardData.refetchLeaderboard]);
 
-  const memoizedLeaderboardData = useMemo(() => additionalData.leaderboardData, [additionalData.leaderboardData]);
+  const stableRefetchInvitationLeaderboard = useCallback(() => {
+    leaderboardData.refetchInvitationLeaderboard && leaderboardData.refetchInvitationLeaderboard();
+  }, [leaderboardData.refetchInvitationLeaderboard]);
+  const memoizedLeaderboardData = useMemo(() => leaderboardData.leaderboardData, [leaderboardData.leaderboardData]);
+  const shareModalAdditionalData = userData;
 
   useEffect(() => {
     if (activeTab === 'leaderboards') {
-      if (additionalData.refetchLeaderboard) {
-        additionalData.refetchLeaderboard();
-      }
-      if (additionalData.refetchInvitationLeaderboard) {
-        additionalData.refetchInvitationLeaderboard();
-      }
+      stableRefetchLeaderboard();
+      stableRefetchInvitationLeaderboard();
     }
-  }, [activeTab, additionalData.refetchLeaderboard, additionalData.refetchInvitationLeaderboard]);
-
-
+  }, [activeTab, stableRefetchLeaderboard, stableRefetchInvitationLeaderboard]);
   const gmOperationsResult = GMOperations({
     chainId,
     currentAccount,
@@ -1077,7 +1014,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     if (showShareReferralModal && memoizedCurrentAccount && shareModalAdditionalData?.refetchInvitationStats) {
       shareModalAdditionalData.refetchInvitationStats();
     }
-  }, [showShareReferralModal]);
+  }, [showShareReferralModal, memoizedCurrentAccount, shareModalAdditionalData?.refetchInvitationStats]);
 
   const handleHistoryToggle = useCallback(async () => {
     if (showHistoryDropdown) {
@@ -1127,6 +1064,12 @@ function App({ chainId, appId, ownerId, inviter, port }) {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showHistoryDropdown]);
+  const {
+    gmRecordData,
+    refetchCooldownStatus,
+    refetchCooldownCheck,
+    refetchGmRecord
+  } = additionalData;
 
   const handleToggleCooldown = useCallback(async (enabled) => {
     if (!gmOps.isValidAccountOwner(currentAccount)) {
@@ -1137,25 +1080,47 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     setOperationStatus("processing");
     
     try {
-      await gmOps.handleSetCooldownEnabled(enabled);
-      const statusResult = await (additionalData?.refetchCooldownStatus && additionalData.refetchCooldownStatus());
-      const remoteEnabled = statusResult?.data?.getCooldownStatus?.enabled;
-      if (typeof remoteEnabled === 'boolean') {
-        setLocalCooldownEnabled(remoteEnabled);
+      setLocalCooldownEnabled(enabled);
+      
+      if (enabled && gmRecordData?.getGmRecord?.timestamp) {
+        const COOLDOWN_MS = 86_400_000;
+        const timestamp = Number(gmRecordData.getGmRecord.timestamp);
+        let lastGm;
+        if (timestamp > 1e12) {
+          lastGm = timestamp / 1000;
+        } else if (timestamp > 1e9) {
+          lastGm = timestamp * 1000;
+        } else {
+          lastGm = timestamp;
+        }
+        
+        const currentTs = Date.now();
+        if (currentTs < lastGm + COOLDOWN_MS) {
+          setCooldownRemaining(lastGm + COOLDOWN_MS - currentTs);
+        } else {
+          setCooldownRemaining(0);
+        }
       } else {
-        setLocalCooldownEnabled(enabled);
+        setCooldownRemaining(0);
       }
-      await (additionalData?.refetchCooldownCheck && additionalData.refetchCooldownCheck());
+      await gmOps.handleSetCooldownEnabled(enabled);
+      await (refetchCooldownStatus && refetchCooldownStatus());
+      await (refetchCooldownCheck && refetchCooldownCheck());
+      await (refetchGmRecord && refetchGmRecord());
+      
       setOperationStatus("success");
       setTimeout(() => setOperationStatus(null), 3000);
     } catch (error) {
+      setLocalCooldownEnabled(!enabled);
+      setCooldownRemaining(0);
+      
       addNotification(
         `Failed to ${enabled ? 'enable' : 'disable'} 24-hour limit: ${error.message}`,
         "error"
       );
       setOperationStatus("error");
     }
-  }, [currentAccount, setMessage, addNotification]);
+  }, [currentAccount, setMessage, addNotification, gmOps, gmRecordData, refetchCooldownStatus, refetchCooldownCheck, refetchGmRecord]);
 
 
 
@@ -1331,30 +1296,53 @@ function App({ chainId, appId, ownerId, inviter, port }) {
   useEffect(() => {
     const COOLDOWN_MS = 86_400_000;
     
-    const isCooldownEnabled = additionalData.cooldownStatusData?.getCooldownStatus?.enabled;
-    const hasValidTimestamp = additionalData.gmRecordData?.getGmRecord?.timestamp;
-    
-    if (isCooldownEnabled && hasValidTimestamp) {
-      const timestamp = Number(additionalData.gmRecordData.getGmRecord.timestamp);
-      let lastGm;
-      if (timestamp > 1e12) {
-        lastGm = timestamp / 1000;
-      } else if (timestamp > 1e9) {
-        lastGm = timestamp * 1000;
-      } else {
-        lastGm = timestamp;
-      }
+    const calculateCooldownRemaining = () => {
+      const hasValidTimestamp = additionalData.gmRecordData?.getGmRecord?.timestamp;
       
-      const currentTs = Date.now();
-      if (currentTs < lastGm + COOLDOWN_MS) {
-        setCooldownRemaining(lastGm + COOLDOWN_MS - currentTs);
+      if (localCooldownEnabled && hasValidTimestamp) {
+        const timestamp = Number(additionalData.gmRecordData.getGmRecord.timestamp);
+        let lastGm;
+        if (timestamp > 1e12) {
+          lastGm = timestamp / 1000;
+        } else if (timestamp > 1e9) {
+          lastGm = timestamp * 1000;
+        } else {
+          lastGm = timestamp;
+        }
+        
+        const currentTs = Date.now();
+        if (currentTs < lastGm + COOLDOWN_MS) {
+          return lastGm + COOLDOWN_MS - currentTs;
+        } else {
+          return 0;
+        }
       } else {
-        setCooldownRemaining(0);
+        return 0;
       }
+    };
+    
+    setCooldownRemaining(calculateCooldownRemaining());
+    
+    let intervalId;
+    if (localCooldownEnabled) {
+      intervalId = setInterval(() => {
+        const remaining = calculateCooldownRemaining();
+        setCooldownRemaining(remaining);
+        
+        if (remaining <= 0) {
+          clearInterval(intervalId);
+        }
+      }, 1000);
     } else {
       setCooldownRemaining(0);
     }
-  }, [additionalData.gmRecordData, additionalData.cooldownStatusData]);
+    
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [additionalData.gmRecordData, localCooldownEnabled]);
 
   const isManualTargetChainChange = useRef(false);
   
@@ -1371,8 +1359,8 @@ function App({ chainId, appId, ownerId, inviter, port }) {
 
   const handleSendGMWithInvitation = useCallback(() => {
     const content = customMessageEnabled ? customMessage : "Gmicrochains";
-    const inviter = urlInviter; // 获取解析到的邀请者地址
-    gmOps.handleSendGMWithInvitation(content, inviter); // 传递inviter参数
+    const inviter = urlInviter;
+    gmOps.handleSendGMWithInvitation(content, inviter);
   }, [gmOps, customMessageEnabled, customMessage, urlInviter]);
 
   const handleClaimInvitationRewards = useCallback(() => {
@@ -1483,7 +1471,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                 {invitedUsers.map((user, index) => (
                     <div key={index} className="invitation-item">
                       <div className="invitation-sender">
-                          {formatAddress(user.invitee)}
+                          {formatAddressForDisplay(user.invitee)}
                       </div>
                     </div>
                   ))}
@@ -1527,7 +1515,9 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                         readOnly
                         className="referral-link-input"
                       />
-                      <button onClick={copyReferralLink} className="copy-btn">Copy</button>
+                      <button onClick={copyReferralLink} className={`copy-btn ${copySuccess ? 'copied' : ''}`}>
+                        {copySuccess ? 'Copied!' : 'Copy'}
+                      </button>
                     </div>
                   </div>
                   <div className="share-options">
@@ -1713,11 +1703,30 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                         {localCooldownEnabled ? 'Enabled' : 'Disabled'}
                       </div>
                     </div>
-                    <div className="cooldown-timer-bar">
-                      <div className="cooldown-timer-track"></div>
-                      <div 
-                        className={`cooldown-timer-fill ${localCooldownEnabled ? 'active' : 'inactive'} ${cooldownRemaining > 0 ? 'cooldown-remaining' : 'cooldown-complete'}`}
-                      ></div>
+                    <div className="cooldown-timer-bar-container">
+                      <div className="cooldown-timer-bar">
+                        <div className="cooldown-timer-track"></div>
+                        <div 
+                          className={`cooldown-timer-fill ${localCooldownEnabled ? 'active' : 'inactive'} ${cooldownRemaining > 0 ? 'cooldown-remaining' : 'cooldown-complete'}`}
+                          style={{ 
+                            width: localCooldownEnabled ? 
+                              (cooldownRemaining > 0 ? 
+                                `${Math.max(0, Math.min(100, (cooldownRemaining / 86400000) * 100))}%` : 
+                                '0%') : 
+                              '100%'
+                          }}
+                        ></div>
+                        {localCooldownEnabled && cooldownRemaining > 0 && (
+                          <div 
+                            className={`cooldown-timer-countdown ${((cooldownRemaining / 86400000) * 100) > 90 ? 'below' : 'right'}`}
+                            style={{ 
+                              left: `${Math.max(0, Math.min(100, (cooldownRemaining / 86400000) * 100))}%`
+                            }}
+                          >
+                            {gmOps.formatCooldown(cooldownRemaining)}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1725,44 +1734,130 @@ function App({ chainId, appId, ownerId, inviter, port }) {
             )}
         
             {(additionalData.whitelistData?.isUserWhitelisted === true) && activeTab === 'settings' && (
-              <div className="card cooldown-control-card">
-                <div className="section-header">
-                  <h3>24-Hour Limit Control</h3>
-                  <span className="whitelist-badge">Whitelist Only</span>
-                </div>
-                <div className="cooldown-control-content">
-                  <div className="cooldown-status-info">
-                    <p className="cooldown-status-text">
-                      Current Status: <span className={`status ${additionalData.cooldownStatusData?.getCooldownStatus?.enabled ? 'enabled' : 'disabled'}`}>
-                        {additionalData.cooldownStatusData?.getCooldownStatus?.enabled ? 'ENABLED' : 'DISABLED'}
-                      </span>
-                    </p>
-                    <p className="cooldown-description">
-                      {additionalData.cooldownStatusData?.getCooldownStatus?.enabled 
-                        ? '24-hour cooldown is currently active for all users' 
-                        : '24-hour cooldown is currently disabled'
-                      }
-                    </p>
+              <>
+                <div className="card cooldown-control-card">
+                  <div className="section-header">
+                    <h3>24-Hour Limit Control</h3>
+                    <span className="whitelist-badge">Whitelist Only</span>
                   </div>
-                  <div className="cooldown-control-actions">
-                    <button
-                      className={`action-btn ${additionalData.cooldownStatusData?.getCooldownStatus?.enabled ? 'danger' : 'primary'}`}
-                      onClick={() => handleToggleCooldown(!additionalData.cooldownStatusData?.getCooldownStatus?.enabled)}
-                      disabled={operationStatus === "processing"}
-                    >
-                      {operationStatus === "processing" ? (
-                        <span className="button-loading">
-                          <span className="spinner">⏳</span> Updating...
+                  <div className="cooldown-control-content">
+                    <div className="cooldown-status-info">
+                      <p className="cooldown-status-text">
+                        Current Status: <span className={`status ${additionalData.cooldownStatusData?.getCooldownStatus?.enabled ? 'enabled' : 'disabled'}`}>
+                          {additionalData.cooldownStatusData?.getCooldownStatus?.enabled ? 'ENABLED' : 'DISABLED'}
                         </span>
-                      ) : additionalData.cooldownStatusData?.getCooldownStatus?.enabled ? (
-                        "🔓 Disable 24-Hour Limit"
-                      ) : (
-                        "🔒 Enable 24-Hour Limit"
-                      )}
-                    </button>
+                      </p>
+                      <p className="cooldown-description">
+                        {additionalData.cooldownStatusData?.getCooldownStatus?.enabled 
+                          ? '24-hour cooldown is currently active for all users' 
+                          : '24-hour cooldown is currently disabled'
+                        }
+                      </p>
+                    </div>
+                    <div className="cooldown-control-actions">
+                      <button
+                        className={`action-btn ${additionalData.cooldownStatusData?.getCooldownStatus?.enabled ? 'danger' : 'primary'}`}
+                        onClick={() => handleToggleCooldown(!additionalData.cooldownStatusData?.getCooldownStatus?.enabled)}
+                        disabled={operationStatus === "processing"}
+                      >
+                        {operationStatus === "processing" ? (
+                          <span className="button-loading">
+                            <span className="spinner">⏳</span> Updating...
+                          </span>
+                        ) : additionalData.cooldownStatusData?.getCooldownStatus?.enabled ? (
+                          "🔓 Disable 24-Hour Limit"
+                        ) : (
+                          "🔒 Enable 24-Hour Limit"
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
+
+                <div className="card ad-system-card">
+                  <div className="section-header">
+                    <h3>Ad System Settings</h3>
+                    <span className="whitelist-badge">Whitelist Only</span>
+                  </div>
+                  <div className="ad-system-content">
+                    <div className="ad-list">
+                      {adSettings.map((ad, index) => (
+                        (showAllAds || index === 0) && (
+                          <div key={index} className="ad-item">
+                            <div className="ad-input-group">
+                              <label>Ad URL:</label>
+                              <input
+                                type="url"
+                                value={ad.url}
+                                onChange={(e) => handleAdChange(index, 'url', e.target.value)}
+                                placeholder="https://example.com"
+                              />
+                            </div>
+                            <div className="ad-input-group">
+                              <label>Image URL:</label>
+                              <input
+                                type="url"
+                                value={ad.imageUrl}
+                                onChange={(e) => handleAdChange(index, 'imageUrl', e.target.value)}
+                                placeholder="https://example.com/image.jpg"
+                              />
+                            </div>
+                            <button
+                              className="remove-ad-btn"
+                              onClick={() => handleRemoveAd(index)}
+                              disabled={adSettings.length <= 1}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        )
+                      ))}
+                      {adSettings.length > 1 && (
+                        <button
+                          className="action-btn toggle-ads-btn"
+                          onClick={() => setShowAllAds(!showAllAds)}
+                          style={{ marginTop: '10px' }}
+                        >
+                          {showAllAds ? '▲ Hide Additional Ads' : '▼ Show All Ads'}
+                        </button>
+                      )}
+                    </div>
+                    {adSettings.length < 10 && (
+                      <button
+                        className="action-btn primary add-ad-btn"
+                        onClick={handleAddAd}
+                      >
+                        + Add New Ad
+                      </button>
+                    )}
+                    <div className="ad-actions-row">
+                      <button
+                        className="action-btn primary save-ad-btn"
+                        onClick={handleSaveAds}
+                      >
+                        💾 Save Locally
+                      </button>
+                      <div className="import-export-buttons">
+                        <button
+                          className="action-btn primary export-ad-btn"
+                          onClick={handleExportAds}
+                        >
+                          📤 Export JSON
+                        </button>
+                        <label className="action-btn primary import-ad-btn">
+                          📥 Import JSON
+                          <input
+                            type="file"
+                            accept=".json"
+                            onChange={handleImportAds}
+                            style={{ display: 'none' }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
             )}
 
             {activeTab === 'settings' && (
@@ -2086,25 +2181,48 @@ function App({ chainId, appId, ownerId, inviter, port }) {
               </>
             )}
 
-        {activeTab === 'leaderboards' && (
-          <div className="leaderboards-container">
-            <LeaderboardSection
-                    showLeaderboard={showLeaderboard}
-                    setShowLeaderboard={setShowLeaderboard}
-                    leaderboardData={additionalData.leaderboardData}
-                    invitationLeaderboardData={additionalData.invitationLeaderboardData}
-                    currentAccount={currentAccount}
-                    isMobile={isMobile}
-                    copyToClipboard={copyToClipboard}
-                    refetchLeaderboard={additionalData.refetchLeaderboard}
-                    refetchInvitationLeaderboard={additionalData.refetchInvitationLeaderboard}
-                  />
-          </div>
-        )}
+            {activeTab === 'leaderboards' && (
+              <div className="leaderboards-container">
+                <Leaderboard
+                  currentAccount={currentAccount}
+                  isMobile={isMobile}
+                  copyToClipboard={copyToClipboard}
+                />
+              </div>
+            )}
 
       </header>
     </div>
   </div>
+  {activeTab === 'messages' && (
+    <div className="ad-marquee-container">
+      <div 
+        ref={marqueeRef} 
+        className={`ad-marquee ${adSettings.length > 5 ? 'ad-marquee-js' : 'ad-marquee-center'}`}
+      >
+        {adSettings.map((ad, index) => (
+          ad.url && ad.imageUrl && (
+            <a 
+              key={index} 
+              href={ad.url} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="ad-marquee-item"
+            >
+              <img 
+                src={ad.imageUrl} 
+                alt={`Ad-${index + 1}`} 
+                className="ad-marquee-image"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
+            </a>
+          )
+        ))}
+      </div>
+    </div>
+  )}
   
   <NotificationCenter 
     notifications={notifications}

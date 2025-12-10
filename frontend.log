@@ -8,3 +8,13 @@
   ➜  Local:   http://localhost:3000/
   ➜  Network: http://194.60.87.30:3000/
   ➜  Network: http://172.24.0.1:3000/
+The request url "/root/linera-protocol/examples/gmic-buildathon/web-frontend/.env" is outside of Vite serving allow list.
+
+- /root/linera-protocol/examples
+
+Refer to docs https://vite.dev/config/server-options.html#server-fs-allow for configurations and more details.
+
+12:53:36 AM [vite] hmr update /src/App.css
+12:55:09 AM [vite] hmr update /src/App.css
+12:55:42 AM [vite] hmr update /src/App.css
+12:57:01 AM [vite] hmr update /src/App.css

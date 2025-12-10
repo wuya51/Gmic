@@ -80,6 +80,18 @@ impl GmState {
                     stats.last_reward_time = Some(timestamp);
                     
                     self.invitation_stats.insert(&inviter, stats)?;
+                } else {
+                    let mut stats = self.invitation_stats.get(&record.inviter).await?.unwrap_or(InvitationStats {
+                        total_invited: 0,
+                        total_rewards: 0,
+                        last_reward_time: None,
+                    });
+                    
+                    let reward = 10;
+                    stats.total_rewards += reward;
+                    stats.last_reward_time = Some(timestamp);
+                    
+                    self.invitation_stats.insert(&record.inviter, stats)?;
                 }
             } else {
                 let invitation = InvitationRecord {

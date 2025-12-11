@@ -2002,13 +2002,13 @@ body {
   left: 0;
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg, #ff2a00, #ff6b6b);
+  background: linear-gradient(90deg, #4ade80, #ffa500, #ff2a00);
   border-radius: 8px;
   transition: width 0.3s ease;
 }
 
 .cooldown-timer-fill.active {
-  background: linear-gradient(90deg, #ff2a00, #ff6b6b);
+  background: linear-gradient(90deg, #4ade80, #ffa500, #ff2a00);
 }
 
 .cooldown-timer-fill.inactive {
@@ -2022,7 +2022,7 @@ body {
   color: black;
   padding: 2px 6px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
   z-index: 10;

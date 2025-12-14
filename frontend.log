@@ -23,3 +23,9 @@ Refer to docs https://vite.dev/config/server-options.html#server-fs-allow for co
 4:48:07 AM [vite] hmr update /src/App.css
 4:53:05 AM [vite] hmr update /src/App.css
 4:55:13 AM [vite] hmr update /src/App.css
+7:25:55 AM [vite] ws proxy socket error:
+Error: read ETIMEDOUT
+    at TCP.onStreamRead (node:internal/stream_base_commons:218:20)
+The request url "/root/linera-protocol/examples/gmic-buildathon/web-frontend/.env" is outside of Vite serving allow list.
+The request url "/root/linera-protocol/examples/gmic-buildathon/web-frontend/.env" is outside of Vite serving allow list.
+2:38:14 AM [vite] page reload src/adSettings.json

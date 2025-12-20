@@ -6,6 +6,9 @@ import GMOperations, { useGMAdditionalData, useLeaderboardData, useCooldownData,
 import NotificationCenter from './NotificationCenter';
 import defaultAdSettings from './adSettings.json';
 import Leaderboard from './Leaderboard';
+import GifPicker from './components/GifPicker';
+import EmojiPicker from './components/EmojiPicker';
+import VoiceRecorder from './components/VoiceRecorder';
 
 window.onerror = function(message, source, lineno, colno, error) {
   console.error('Global error captured:', {
@@ -216,6 +219,17 @@ function App({ chainId, appId, ownerId, inviter, port }) {
   const [customMessage, setCustomMessage] = useState('');
   const [selectedMessage, setSelectedMessage] = useState('gm');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [selectedGif, setSelectedGif] = useState('');
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
+  const [longPressTimer, setLongPressTimer] = useState(null);
+  const [isLongPressing, setIsLongPressing] = useState(false);
+  
+  const addEmojiToMessage = (emoji) => {
+    setCustomMessage(prev => prev + emoji);
+    setShowEmojiPicker(false);
+  };
   const [showShareReferralModal, setShowShareReferralModal] = useState(false);
   const [showInvitedUsersDropdown, setShowInvitedUsersDropdown] = useState(false);
   const [invitedUsersList, setInvitedUsersList] = useState([]);
@@ -430,25 +444,80 @@ function App({ chainId, appId, ownerId, inviter, port }) {
       }
     }
   }, [customMessageEnabled, isMessageContentValid]);
-  
-  const addEmojiToMessage = useCallback((emoji) => {
-    const newMessage = customMessage + emoji;
-    if (newMessage.length <= 280) {
-      setCustomMessage(newMessage);
-      if (customMessageEnabled) {
-        setSelectedMessage(newMessage || 'gm');
-      }
-    } else {
-      addNotification("Cannot add emoji. Message would exceed the 280 character limit.", "error");
+
+  const handleGifSelect = useCallback((gifUrl) => {
+    setSelectedGif(gifUrl);
+    setShowGifPicker(false);
+  }, []);
+
+  // 长按开始录音
+  const handleLongPressStart = () => {
+    if (isButtonDisabled(operationStatus, currentAccount, gmOps, cooldownRemaining, localCooldownEnabled)) {
+      return;
     }
-  }, [customMessage, customMessageEnabled, addNotification]);
+    
+    setIsLongPressing(true);
+    const timer = setTimeout(() => {
+      setIsVoiceMode(true);
+      setShowVoiceRecorder(true);
+      setIsLongPressing(false);
+    }, 1000); // 长按1秒触发语音录制
+    
+    setLongPressTimer(timer);
+  };
+
+  // 长按结束或取消
+  const handleLongPressEnd = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+    setIsLongPressing(false);
+  };
+
+  // 处理语音录制完成
+  const handleVoiceRecordingComplete = (audioBlob, filename) => {
+    console.log('语音录制完成:', filename, audioBlob.size);
+    
+    // 保存语音文件到本地
+    const formData = new FormData();
+    formData.append('voice', audioBlob, filename);
+    
+    // 这里可以添加上传到服务器的逻辑
+    // 暂时只保存到本地
+    const audioUrl = URL.createObjectURL(audioBlob);
+    
+    // 发送语音消息
+    handleSendGM('🎤 语音消息', recipientAddress || null, urlInviter || null);
+    
+    // 显示成功消息
+    addNotification('语音消息已发送', 'success');
+    
+    // 重置语音模式
+    setIsVoiceMode(false);
+    setShowVoiceRecorder(false);
+  };
+
+  // 取消语音录制
+  const handleVoiceRecordingCancel = () => {
+    setIsVoiceMode(false);
+    setShowVoiceRecorder(false);
+  };
   
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // 处理emoji选择器
       if (showEmojiPicker && 
-          !event.target.closest('.emoji-picker') && 
+          !event.target.closest('.emoji-picker-container') && 
           !event.target.closest('.emoji-picker-button')) {
         setShowEmojiPicker(false);
+      }
+      
+      // 处理GIF选择器
+      if (showGifPicker && 
+          !event.target.closest('.gif-picker-container') && 
+          !event.target.closest('.gif-picker-button')) {
+        setShowGifPicker(false);
       }
     };
     
@@ -456,7 +525,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showEmojiPicker]);
+  }, [showEmojiPicker, showGifPicker]);
 
   const cachedAccountRef = useRef(null);
   useEffect(() => {
@@ -1989,61 +2058,43 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                         onChange={handleCustomMessageChange}
                         maxLength={MAX_MESSAGE_LENGTH}
                       ></textarea>
-                      <button 
-                        className="emoji-picker-button"
-                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                        title="Add emoji"
-                      >
-                        😊
-                      </button>
+                      <div className="message-buttons">
+                        <button 
+                          className="emoji-picker-button"
+                          onClick={() => {
+                            setShowEmojiPicker(!showEmojiPicker);
+                            setShowGifPicker(false);
+                          }}
+                          title="Add emoji"
+                        >
+                          😊
+                        </button>
+                        <button 
+                          className="gif-picker-button"
+                          onClick={() => {
+                            setShowGifPicker(!showGifPicker);
+                            setShowEmojiPicker(false);
+                          }}
+                          title="Add GIF"
+                        >
+                          GIF
+                        </button>
+                      </div>
                     </div>
                     
-                    {showEmojiPicker && (
-                      <div className="emoji-picker">
-                        <div className="emoji-category">
-                          <span className="emoji-category-title">Frequently Used</span>
-                          <div className="emoji-grid">
-                            {['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐'].map(emoji => (
-                              <span 
-                                key={emoji} 
-                                className="emoji-item"
-                                onClick={() => addEmojiToMessage(emoji)}
-                              >
-                                {emoji}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        
-                        <div className="emoji-category">
-                          <span className="emoji-category-title">Gestures</span>
-                          <div className="emoji-grid">
-                            {['👍', '👎', '👌', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '👇', '☝️', '✋', '🤚', '🖐️', '🖖', '👋', '🤙', '💪', '🙏', '👏', '👐', '🤲', '🙌'].map(emoji => (
-                              <span 
-                                key={emoji} 
-                                className="emoji-item"
-                                onClick={() => addEmojiToMessage(emoji)}
-                              >
-                                {emoji}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        
-                        <div className="emoji-category">
-                          <span className="emoji-category-title">Crypto & Tech</span>
-                          <div className="emoji-grid">
-                            {['🚀', '💰', '💎', '🔥', '🌙', '⭐', '✨', '💫', '🌟', '💯', '🔮', '💻', '📱', '⚡', '🔧', '⚙️', '🛠️', '🔗', '📊', '📈', '📉', '💹', '🏦', '💳', '💵', '💴', '💶', '💷', '🪙'].map(emoji => (
-                              <span 
-                                key={emoji} 
-                                className="emoji-item"
-                                onClick={() => addEmojiToMessage(emoji)}
-                              >
-                                {emoji}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
+
+                    
+                    {selectedGif && (
+                      <div className="selected-gif-preview">
+                        <span>Selected GIF:</span>
+                        <img src={selectedGif} alt="Selected GIF" />
+                        <button 
+                          className="remove-gif-button"
+                          onClick={() => setSelectedGif('')}
+                          title="Remove GIF"
+                        >
+                          ×
+                        </button>
                       </div>
                     )}
                     
@@ -2089,9 +2140,14 @@ function App({ chainId, appId, ownerId, inviter, port }) {
 
                   <div className="send-actions">
                     <button 
-                      className="send-button" 
+                      className={`send-button ${isVoiceMode ? 'voice-mode' : ''} ${isLongPressing ? 'long-pressing' : ''}`} 
                       id="sendButton"
-                      onClick={handleSendGM}
+                      onClick={isVoiceMode ? () => setShowVoiceRecorder(true) : handleSendGM}
+                      onMouseDown={handleLongPressStart}
+                      onMouseUp={handleLongPressEnd}
+                      onMouseLeave={handleLongPressEnd}
+                      onTouchStart={handleLongPressStart}
+                      onTouchEnd={handleLongPressEnd}
                       disabled={
                         isButtonDisabled(operationStatus, currentAccount, gmOps, cooldownRemaining, localCooldownEnabled)
                       }
@@ -2106,6 +2162,8 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                         "🔒 Invalid account"
                       ) : localCooldownEnabled && cooldownRemaining > 0 ? (
                         `🔓 ${gmOps.formatCooldown(cooldownRemaining)}`
+                      ) : isVoiceMode ? (
+                        "🎤 发送语音"
                       ) : (
                         "Send GMicrochains ✨"
                       )}
@@ -2193,6 +2251,28 @@ function App({ chainId, appId, ownerId, inviter, port }) {
 
       </header>
     </div>
+    
+    {/* 将emoji和GIF选择器移到更高的DOM层级 */}
+    {showEmojiPicker && (
+      <EmojiPicker 
+        onEmojiSelect={addEmojiToMessage}
+        onClose={() => setShowEmojiPicker(false)}
+      />
+    )}
+    
+    {showGifPicker && (
+      <GifPicker 
+        onGifSelect={handleGifSelect}
+        onClose={() => setShowGifPicker(false)}
+      />
+    )}
+    
+    {showVoiceRecorder && (
+      <VoiceRecorder 
+        onComplete={handleVoiceRecordingComplete}
+        onCancel={handleVoiceRecordingCancel}
+      />
+    )}
   </div>
   {activeTab === 'messages' && (
     <div className="ad-marquee-container">

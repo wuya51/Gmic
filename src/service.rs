@@ -2,11 +2,12 @@
 
 mod state;
 use self::state::GmState;
-use gm::{GmAbi, GmOperation, InvitationRecord, InvitationStats};
+use gm::{GmAbi, GmOperation, InvitationRecord, InvitationStats, MessageContent};
 use async_graphql::{Object, Request, Response, Schema, SimpleObject, Subscription};
 use linera_sdk::{Service, ServiceRuntime};
 use linera_sdk::linera_base_types::{AccountOwner, ChainId};
-use linera_sdk::views::{View, MapView, RegisterView};
+
+
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use serde::{Deserialize, Serialize};
@@ -30,26 +31,7 @@ impl Service for GmService {
             Ok(state) => state,
             Err(e) => {
                 log::error!("Failed to load GmState: {:?}", e);
-                GmState {
-                    owner: RegisterView::new(context.clone()).expect("Failed to init owner"),
-                    last_gm: MapView::new(context.clone()).expect("Failed to init last_gm"),
-                    total_messages: RegisterView::new(context.clone()).expect("Failed to init total_messages"),
-                    chain_messages: MapView::new(context.clone()).expect("Failed to init chain_messages"),
-                    wallet_messages: MapView::new(context.clone()).expect("Failed to init wallet_messages"),
-                    events: MapView::new(context.clone()).expect("Failed to init events"),
-                    user_events: MapView::new(context.clone()).expect("Failed to init user_events"),
-                    hourly_stats: MapView::new(context.clone()).expect("Failed to init hourly_stats"),
-                    daily_stats: MapView::new(context.clone()).expect("Failed to init daily_stats"),
-                    monthly_stats: MapView::new(context.clone()).expect("Failed to init monthly_stats"),
-                    top_users_cache: RegisterView::new(context.clone()).expect("Failed to init top_users_cache"),
-                    top_chains_cache: RegisterView::new(context.clone()).expect("Failed to init top_chains_cache"),
-                    cache_timestamp: RegisterView::new(context.clone()).expect("Failed to init cache_timestamp"),
-                    invitations: MapView::new(context.clone()).expect("Failed to init invitations"),
-                    invitation_stats: MapView::new(context.clone()).expect("Failed to init invitation_stats"),
-                    cooldown_enabled: RegisterView::new(context.clone()).expect("Failed to init cooldown_enabled"),
-                    cooldown_whitelist: MapView::new(context.clone()).expect("Failed to init cooldown_whitelist"),
-                    stream_events: MapView::new(context.clone()).expect("Failed to init stream_events"),
-                }
+                GmState::create_empty(context)
             }
         };
         Self {
@@ -78,6 +60,9 @@ impl Service for GmService {
     }
 }
 
+impl GmService {
+}
+
 #[derive(SimpleObject)]
 pub struct GmRecord {
     owner: String,
@@ -101,12 +86,13 @@ pub struct SignatureVerificationResult {
     pub verified_sender: Option<String>,
 }
 
-#[derive(SimpleObject, Serialize)]
+#[derive(SimpleObject)]
 pub struct GmEvent {
-    sender: String,
-    recipient: Option<String>,
-    timestamp: u64,
-    content: Option<String>,
+    pub sender: String,
+    pub recipient: Option<String>,
+    pub timestamp: u64,
+    pub nonce: u64,
+    pub content: MessageContent,
 }
 
 #[derive(SimpleObject)]
@@ -134,45 +120,6 @@ struct WhitelistOperationResult {
     message: String,
 }
 
-#[derive(Serialize, Deserialize)]
-struct GmEventData {
-    sender: String,
-    recipient: Option<String>,
-    content: Option<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct ChainStatusData {
-    message_count: u64,
-}
-
-#[derive(Serialize, Deserialize)]
-struct PersonalMessageData {
-    sender: String,
-    recipient: String,
-    content: Option<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct CooldownStatusData {
-    user: String,
-    enabled: bool,
-}
-
-#[derive(Serialize, Deserialize)]
-struct InvitationEventData {
-    inviter: String,
-    invitee: String,
-    reward_claimed: bool,
-}
-
-#[derive(Serialize, Deserialize)]
-struct LeaderboardUpdateData {
-    leaderboard_type: String,
-    top_users: Vec<LeaderboardUser>,
-    top_chains: Vec<LeaderboardChain>,
-}
-
 #[derive(SimpleObject)]
 struct TimeStat {
     time: u64,
@@ -190,6 +137,10 @@ struct LeaderboardChain {
     chain: String,
     count: u64,
 }
+
+
+
+
 
 #[derive(SimpleObject, Serialize, Deserialize)]
 pub struct LeaderboardInvitationUser {
@@ -301,11 +252,23 @@ impl QueryRoot {
         let events = state.get_events(chain_id, &sender).await?;
         Ok(events
             .into_iter()
-            .map(|(recipient, timestamp, content)| GmEvent {
-                sender: sender.to_string(),
-                recipient: recipient.map(|r| r.to_string()),
-                timestamp,
-                content,
+            .map(|(recipient, timestamp, content)| {
+                let final_content = if content.is_text() && content.content.trim().is_empty() {
+                    MessageContent {
+                        message_type: "text".to_string(),
+                        content: "GMicrochains".to_string(),
+                    }
+                } else {
+                    content
+                };
+                
+                GmEvent {
+                    sender: sender.to_string(),
+                    recipient: recipient.map(|r| r.to_string()),
+                    timestamp,
+                    nonce: 0,
+                    content: final_content,
+                }
             })
             .collect())
     }
@@ -325,12 +288,43 @@ impl QueryRoot {
                 sender: sender.to_string(),
                 recipient: recipient.map(|r| r.to_string()),
                 timestamp,
+                nonce: 0,
                 content,
             });
         }       
         all_events.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
         
         Ok(all_events)
+    }
+
+    async fn get_received_gm_events(
+        &self,
+        _ctx: &async_graphql::Context<'_>,
+        recipient: AccountOwner,
+    ) -> Result<Vec<GmEvent>, async_graphql::Error> {
+        let state = self.state.lock().await;
+        let chain_id = self.runtime.chain_id();
+        let mut received_events = Vec::new();
+        
+        let all_index_values = state.events.index_values().await?;
+        
+        for ((event_chain_id, sender, recipient_option), (timestamp, content)) in all_index_values {
+            if let Some(rec) = recipient_option {
+                if rec == recipient && event_chain_id == chain_id {
+                    received_events.push(GmEvent {
+                        sender: sender.to_string(),
+                        recipient: Some(recipient.to_string()),
+                        timestamp,
+                        nonce: 0,
+                        content,
+                    });
+                }
+            }
+        }
+        
+        received_events.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        
+        Ok(received_events)
     }
 
     async fn get_total_messages(&self, _ctx: &async_graphql::Context<'_>) -> Result<u64, async_graphql::Error> {
@@ -341,7 +335,7 @@ impl QueryRoot {
 
     async fn get_chain_messages(&self, _ctx: &async_graphql::Context<'_>, chain_id: ChainId) -> Result<u64, async_graphql::Error> {
         let state = self.state.lock().await;
-        let count = state.chain_messages.get(&chain_id).await.unwrap().unwrap_or(0);
+        let count = state.chain_messages.get(&chain_id).await?.unwrap_or(0);
         Ok(count)
     }
 
@@ -349,19 +343,21 @@ impl QueryRoot {
         let state = self.state.lock().await;      
         let has_user = state.wallet_messages.contains_key(&owner).await?;
         
-        let count = state.wallet_messages.get(&owner).await.unwrap().unwrap_or(0);
+        let count = state.wallet_messages.get(&owner).await?.unwrap_or(0);
         
         if !has_user {
             let mut users = Vec::new();
             state.wallet_messages.for_each_index(|user| {
-                users.push(user.clone());
+                users.push(user);
                 Ok(())
             }).await?;
+            
+            if users.is_empty() {
+                log::info!("No users found in wallet messages");
+            }
         }
         
-        let final_count = if count == 0 && !has_user { 0 } else { count };
-        
-        Ok(final_count)
+        Ok(count)
     }
     
     async fn get_hourly_stats(&self, _ctx: &async_graphql::Context<'_>, chain_id: ChainId, start_hour: u64, end_hour: u64) -> Result<Vec<TimeStat>, async_graphql::Error> {
@@ -468,11 +464,17 @@ impl QueryRoot {
         sender: AccountOwner,
         recipient: Option<AccountOwner>,
         chain_id: ChainId,
-        content: Option<String>,
+        content: MessageContent,
     ) -> Result<String, async_graphql::Error> {
         let nonce = self.get_next_nonce(_ctx, sender).await?;
         let recipient_str = recipient.map_or("none".to_string(), |r| r.to_string());
-        let content_str = content.map_or("none".to_string(), |c| c.to_string());
+        let content_str = if content.is_gif() {
+            format!("GIF: {}", content.content)
+        } else if content.is_voice() {
+            format!("Voice: {}", content.content)
+        } else {
+            content.content.clone()
+        };
         
         let message = format!(
             "GM signature verification: sender={}, receiver={}, chainID={}, nonce={}, content={}",
@@ -638,7 +640,7 @@ impl MutationRoot {
         chain_id: ChainId,
         sender: AccountOwner,
         recipient: Option<AccountOwner>,
-        content: Option<String>,
+        content: MessageContent,
         inviter: Option<AccountOwner>,
     ) -> Result<SendGmResponse, async_graphql::Error> {
         self.send_gm_with_signature(_ctx, chain_id, sender, recipient, "".to_string(), 0, content, inviter).await
@@ -652,7 +654,7 @@ impl MutationRoot {
         recipient: Option<AccountOwner>,
         signature: String,
         nonce: u64,
-        content: Option<String>,
+        content: MessageContent,
         inviter: Option<AccountOwner>,
     ) -> Result<SendGmResponse, async_graphql::Error> {
         let current_chain_id = self.runtime.chain_id();
@@ -664,7 +666,7 @@ impl MutationRoot {
                 chain_id: chain_id.to_string(),
                 timestamp: self.runtime.system_time().micros(),
                 nonce,
-                content: content.clone(),
+                content: Some(serde_json::to_string(&content).unwrap_or_default()),
             };
             
             let service = GmService {
@@ -696,15 +698,21 @@ impl MutationRoot {
             }
         };
 
-        let default_content = Some("Gmicrochains".to_string());
-        let final_content = content.or(default_content);        
-        let recipient = recipient.unwrap_or(owner.clone());
+        let final_content = if content.is_text() && content.content.trim().is_empty() {
+            MessageContent {
+                message_type: "text".to_string(),
+                content: "GMicrochains".to_string(),
+            }
+        } else {
+            content
+        };        
+        let recipient = recipient.unwrap_or_else(|| owner.clone());
         let processed_inviter = if let Some(inviter_account) = &inviter {
             let existing_invitation = state.invitations.get(&sender).await?;
             if existing_invitation.is_none() && inviter_account == &sender {
                 None
             } else {
-                inviter.clone()
+                inviter
             }
         } else {
             inviter
@@ -713,7 +721,7 @@ impl MutationRoot {
         let operation = GmOperation::Gm {
             sender,
             recipient,
-            content: final_content.clone(),
+            content: final_content,
             inviter: processed_inviter
         };
     

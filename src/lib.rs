@@ -2,6 +2,37 @@
 
 use serde::{Deserialize, Serialize};
 use linera_sdk::linera_base_types::{AccountOwner, Timestamp};
+use async_graphql::{InputObject, SimpleObject};
+pub type MessageType = String;
+
+#[derive(Clone, Serialize, Deserialize, Debug, SimpleObject, InputObject)]
+#[graphql(input_name = "MessageContentInput")]
+pub struct MessageContent {
+    pub message_type: MessageType,
+    pub content: String,
+}
+
+impl MessageContent {
+    pub fn is_text(&self) -> bool {
+        self.message_type == "text"
+    }
+    
+    pub fn is_gif(&self) -> bool {
+        self.message_type == "gif"
+    }
+    
+    pub fn is_voice(&self) -> bool {
+        self.message_type == "voice"
+    }
+    
+    pub fn is_valid_message_type(&self) -> bool {
+        matches!(&self.message_type as &str, "text" | "gif" | "voice")
+    }
+}
+
+pub fn is_valid_message_type(message_type: &str) -> bool {
+    matches!(message_type, "text" | "gif" | "voice")
+}
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum GmMessage {
@@ -9,7 +40,7 @@ pub enum GmMessage {
         sender: AccountOwner,
         recipient: Option<AccountOwner>,
         timestamp: Timestamp,
-        content: Option<String>,
+        content: MessageContent,
     },
 }
 
@@ -27,7 +58,7 @@ impl linera_sdk::abi::ServiceAbi for GmAbi {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum GmOperation {
-    Gm { sender: AccountOwner, recipient: AccountOwner, content: Option<String>, inviter: Option<AccountOwner> },
+    Gm { sender: AccountOwner, recipient: AccountOwner, content: MessageContent, inviter: Option<AccountOwner> },
     ClaimInvitationRewards { sender: AccountOwner },
     SetCooldownEnabled { enabled: bool },
 }

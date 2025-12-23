@@ -1,8 +1,8 @@
 use linera_sdk::views::{linera_views, MapView, RegisterView, RootView, View, ViewError};
 use linera_sdk::ViewStorageContext;
 use linera_sdk::linera_base_types::{AccountOwner, ChainId, Timestamp};
-use linera_views::context::Context;
-use gm::{InvitationRecord, InvitationStats};
+use linera_sdk::views::linera_views::context::Context;
+use gm::{InvitationRecord, InvitationStats, MessageContent};
 
 #[derive(RootView)]
 #[view(context = ViewStorageContext)]
@@ -12,8 +12,8 @@ pub struct GmState {
     pub total_messages: RegisterView<u64>,
     pub chain_messages: MapView<ChainId, u64>,
     pub wallet_messages: MapView<AccountOwner, u64>,
-    pub events: MapView<(ChainId, AccountOwner, Option<AccountOwner>), (u64, Option<String>)>,
-    pub user_events: MapView<(ChainId, AccountOwner), Vec<(Option<AccountOwner>, u64, Option<String>)>>,
+    pub events: MapView<(ChainId, AccountOwner, Option<AccountOwner>), (u64, MessageContent)>,
+    pub user_events: MapView<(ChainId, AccountOwner), Vec<(Option<AccountOwner>, u64, MessageContent)>>,
 
     pub hourly_stats: MapView<(ChainId, u64), u64>,
     pub daily_stats: MapView<(ChainId, u64), u64>,
@@ -34,13 +34,38 @@ pub struct GmState {
 
 #[allow(dead_code)]
 impl GmState {
+    pub fn create_empty(context: linera_sdk::ViewStorageContext) -> Self {
+        use linera_sdk::views::{MapView, RegisterView};
+        
+        Self {
+            owner: RegisterView::new(context.clone()).expect("Failed to create owner register"),
+            last_gm: MapView::new(context.clone()).expect("Failed to create last_gm map"),
+            total_messages: RegisterView::new(context.clone()).expect("Failed to create total_messages register"),
+            chain_messages: MapView::new(context.clone()).expect("Failed to create chain_messages map"),
+            wallet_messages: MapView::new(context.clone()).expect("Failed to create wallet_messages map"),
+            events: MapView::new(context.clone()).expect("Failed to create events map"),
+            user_events: MapView::new(context.clone()).expect("Failed to create user_events map"),
+            hourly_stats: MapView::new(context.clone()).expect("Failed to create hourly_stats map"),
+            daily_stats: MapView::new(context.clone()).expect("Failed to create daily_stats map"),
+            monthly_stats: MapView::new(context.clone()).expect("Failed to create monthly_stats map"),
+            top_users_cache: RegisterView::new(context.clone()).expect("Failed to create top_users_cache register"),
+            top_chains_cache: RegisterView::new(context.clone()).expect("Failed to create top_chains_cache register"),
+            cache_timestamp: RegisterView::new(context.clone()).expect("Failed to create cache_timestamp register"),
+            invitations: MapView::new(context.clone()).expect("Failed to create invitations map"),
+            invitation_stats: MapView::new(context.clone()).expect("Failed to create invitation_stats map"),
+            cooldown_enabled: RegisterView::new(context.clone()).expect("Failed to create cooldown_enabled register"),
+            cooldown_whitelist: MapView::new(context.clone()).expect("Failed to create cooldown_whitelist map"),
+            stream_events: MapView::new(context.clone()).expect("Failed to create stream_events map"),
+        }
+    }
+
     pub async fn record_gm(
         &mut self,
         chain_id: ChainId,
         sender: AccountOwner,
         recipient: Option<AccountOwner>,
         timestamp: Timestamp,
-        content: Option<String>,
+        content: MessageContent,
         inviter: Option<AccountOwner>,
     ) -> Result<(), ViewError> {
         let current_ts = timestamp.micros();
@@ -80,18 +105,6 @@ impl GmState {
                     stats.last_reward_time = Some(timestamp);
                     
                     self.invitation_stats.insert(&inviter, stats)?;
-                } else {
-                    let mut stats = self.invitation_stats.get(&record.inviter).await?.unwrap_or(InvitationStats {
-                        total_invited: 0,
-                        total_rewards: 0,
-                        last_reward_time: None,
-                    });
-                    
-                    let reward = 10;
-                    stats.total_rewards += reward;
-                    stats.last_reward_time = Some(timestamp);
-                    
-                    self.invitation_stats.insert(&record.inviter, stats)?;
                 }
             } else {
                 let invitation = InvitationRecord {
@@ -287,19 +300,7 @@ impl GmState {
         }
     }
 
-    pub async fn get_chain_count(&self, chain_id: ChainId) -> Result<u64, ViewError> {
-        self.chain_messages
-            .get(&chain_id)
-            .await
-            .map(|opt| opt.unwrap_or(0))
-    }
 
-    pub async fn get_wallet_count(&self, owner: &AccountOwner) -> Result<u64, ViewError> {
-        self.wallet_messages
-            .get(owner)
-            .await
-            .map(|opt| opt.unwrap_or(0))
-    }
 
     pub async fn get_total_messages(&self) -> u64 {
         *self.total_messages.get()
@@ -317,7 +318,7 @@ impl GmState {
         &self,
         chain_id: ChainId,
         sender: &AccountOwner,
-    ) -> Result<Vec<(Option<AccountOwner>, u64, Option<String>)>, ViewError> {
+    ) -> Result<Vec<(Option<AccountOwner>, u64, MessageContent)>, ViewError> {
         let events = self.user_events.get(&(chain_id, *sender)).await?.unwrap_or_default();
         Ok(events)
     }
@@ -546,33 +547,7 @@ impl GmState {
         Ok(activity)
     }
 
-    pub async fn add_event(
-        &mut self,
-        chain_id: ChainId,
-        sender: &AccountOwner,
-        recipient: Option<AccountOwner>,
-        timestamp: u64,
-        content: Option<String>,
-    ) -> Result<(), ViewError> {
-        let event_data = serde_json::json!({
-            "sender": sender.to_string(),
-            "recipient": recipient.map(|r| r.to_string()),
-            "timestamp": timestamp,
-            "content": content,
-            "chain_id": chain_id.to_string()
-        });
 
-        let event_json = event_data.to_string();
-
-        self.stream_events.insert(&(chain_id, timestamp), event_json)?;
-
-        let mut user_events = self.user_events.get(&(chain_id, sender.clone())).await?.unwrap_or_default();
-        user_events.push((recipient.clone(), timestamp, content.clone()));
-        user_events.sort_by(|a, b| b.1.cmp(&a.1));
-        self.user_events.insert(&(chain_id, sender.clone()), user_events)?;
-
-        Ok(())
-    }
 
     pub async fn get_stream_events(
         &self,
@@ -619,43 +594,5 @@ impl GmState {
         self.get_stream_events(chain_id, last_known_timestamp, Some(50)).await
     }
 
-    pub async fn get_total_events_count(&self) -> Result<u64, ViewError> {
-        let mut count = 0;
 
-        self.stream_events
-            .for_each_index_value(|_, _| {
-                count += 1;
-                Ok(())
-            })
-            .await?;
-
-        Ok(count)
-    }
-
-    pub async fn cleanup_old_events(&mut self, older_than_timestamp: u64) -> Result<u64, ViewError> {
-        let mut removed_count = 0;
-        let mut keys_to_remove = Vec::new();
-
-        self.stream_events
-            .for_each_index_value(|key, _| {
-                let (_, event_timestamp) = key;
-                if event_timestamp < older_than_timestamp {
-                    keys_to_remove.push(key.clone());
-                }
-                Ok(())
-            })
-            .await?;
-
-        for key in keys_to_remove {
-            self.stream_events.remove(&key)?;
-            removed_count += 1;
-        }
-
-        if removed_count > 0 {
-            self.save().await?;
-            log::info!("Cleaned up {} expired events", removed_count);
-        }
-
-        Ok(removed_count)
-    }
 }

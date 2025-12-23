@@ -60,12 +60,12 @@ class ErrorBoundary extends React.Component {
           </header>
           <main className="main-content">
             <div className="game-setup">
-              <h2>应用出现错误</h2>
-              <p>抱歉，应用遇到了一个错误：</p>
+              <h2>Application Error</h2>
+              <p>Sorry, the application encountered an error:</p>
               <pre style={{ color: 'red', overflow: 'auto' }}>
                 {this.state.error && this.state.error.toString()}
               </pre>
-              <p>请刷新页面重试，或检查URL参数是否正确。</p>
+              <p>Please refresh the page to try again, or check if the URL parameters are correct.</p>
             </div>
           </main>
         </div>
@@ -90,7 +90,7 @@ root.render(
 );
 
 function DefaultGraphQLApp() {
-  // 从环境变量读取配置参数
+  // Read configuration parameters from environment variables
   const CHAIN_ID = import.meta.env.VITE_CHAIN_ID || "9bfde0d7516716607d52f2c18a0aadcbf58ef6c4543a4dce68625d669e7a7e9d";
   const APP_ID = import.meta.env.VITE_APP_ID || "e8cba958bd6cc630678d12986534dc84f3a529171353621c4644a49d284e69b4";
   const OWNER_ID = import.meta.env.VITE_OWNER_ID || "0x215115530daaada3b012212ac2472e3c3cbcfaa0149a8bfa59e051005cbeb851";

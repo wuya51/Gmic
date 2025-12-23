@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { useQuery, useMutation, useSubscription } from '@apollo/client';
+import { useWallet } from './WalletProvider';
 import {
   GET_GM_STATS, 
   GET_WALLET_MESSAGES, 
@@ -15,7 +16,8 @@ import {
   GET_INVITATION_RECORD,
   SEND_GM, 
   SET_COOLDOWN_ENABLED,
-  SUBSCRIBE_GM_EVENTS
+  SUBSCRIBE_GM_EVENTS,
+  GET_RECEIVED_GM_EVENTS
 } from './queries';
 
 const isValidAccountOwner = (owner) => {
@@ -92,7 +94,8 @@ const GMOperations = ({
   customMessage,
   customMessageEnabled,
   cooldownStatus,
-  inviter
+  inviter,
+  currentIsConnected
 }) => {
   const queryChainId = getQueryChainId(currentChainId, chainId);
   const [subscriptionData, setSubscriptionData] = useState({
@@ -185,7 +188,7 @@ const GMOperations = ({
           const eventId = `block-${blockHeight}-${blockHash.substring(0, 16)}`;
           
           if (processedEventIds.has(eventId)) {
-            console.log('Skipping duplicate subscription event:', eventId);
+
             return;
           }
           
@@ -239,7 +242,7 @@ const GMOperations = ({
           }, 100);
           
         } catch (error) {
-          console.error('Subscription event processing failed:', error);
+
         }
       }
     }
@@ -267,10 +270,7 @@ const GMOperations = ({
 
    useEffect(() => {
     if (queryError) {
-      console.error("GET_GM_STATS query error:", queryError);
-      
       if (queryError.message && queryError.message.includes('Failed to parse')) {
-        console.warn('ChainId parsing error, skipping retry:', queryError.message);
         return;
       }
       
@@ -287,7 +287,7 @@ const GMOperations = ({
 
   const { data: gmRecordData, refetch: refetchGmRecord } = useQuery(GET_GM_RECORD, {
     variables: { owner: formatAccountOwner(currentAccount) },
-    skip: !currentAccount,
+    skip: !currentIsConnected || !currentAccount || !isValidAccountOwner(currentAccount),
     fetchPolicy: "cache-first",
     notifyOnNetworkStatusChange: false,
     pollInterval: 0,
@@ -296,8 +296,8 @@ const GMOperations = ({
 
   const { data: walletMessagesData, refetch: refetchWalletMessages } = useQuery(GET_WALLET_MESSAGES, {
     variables: { owner: formatAccountOwner(currentAccount) },
-    skip: !currentAccount,
-    fetchPolicy: "cache-first",
+    skip: !currentIsConnected || !currentAccount || !isValidAccountOwner(currentAccount),
+    fetchPolicy: currentIsConnected ? "cache-first" : "network-only",
     notifyOnNetworkStatusChange: false,
     pollInterval: 0,
     nextFetchPolicy: "cache-first",
@@ -326,7 +326,7 @@ const GMOperations = ({
       user: formatAccountOwner(currentAccount) 
     },
     fetchPolicy: "cache-first",
-    skip: !currentAccount,
+    skip: !currentIsConnected || !currentAccount,
     notifyOnNetworkStatusChange: false,
     pollInterval: 0,
     nextFetchPolicy: "cache-first",
@@ -337,7 +337,7 @@ const GMOperations = ({
       user: formatAccountOwner(currentAccount) 
     },
     fetchPolicy: "cache-and-network",
-    skip: !currentAccount,
+    skip: !currentIsConnected || !currentAccount,
   });
 
   const { data: invitedUsersData, refetch: refetchInvitationRecord } = useQuery(GET_INVITATION_RECORD, {
@@ -345,7 +345,7 @@ const GMOperations = ({
       user: formatAccountOwner(currentAccount) 
     },
     fetchPolicy: "cache-and-network",
-    skip: !currentAccount,
+    skip: !currentIsConnected || !currentAccount,
   });
 
   const invitationStatsData = {
@@ -364,7 +364,7 @@ const GMOperations = ({
       const records = Array.isArray(invitationRecords) ? invitationRecords : [invitationRecords];
       return records.filter(record => record && record.invitee);
     } catch (error) {
-      console.error('Failed to get invited users list:', error);
+
       return [];
     }
   }, [currentAccount, refetchInvitationRecord, formatAccountOwner]);
@@ -379,7 +379,13 @@ const GMOperations = ({
 
   const { data: gmEventsData, refetch: refetchGmEvents } = useQuery(GET_GM_EVENTS, {
     variables: { sender: formatAccountOwner(currentAccount) },
-    skip: !currentAccount,
+    skip: !currentIsConnected || !currentAccount || !isValidAccountOwner(currentAccount),
+    fetchPolicy: "no-cache",
+  });
+
+  const { data: receivedGmEventsData, refetch: refetchReceivedGmEvents } = useQuery(GET_RECEIVED_GM_EVENTS, {
+    variables: { recipient: formatAccountOwner(currentAccount) },
+    skip: !currentAccount || !isValidAccountOwner(currentAccount),
     fetchPolicy: "no-cache",
   });
 
@@ -455,14 +461,14 @@ const GMOperations = ({
     }
   }, [setCooldownEnabledError, onMutationError]);
 
-  const handleSendGM = useCallback(async (content = "Gmicrochains", recipient = null, inviter = null) => {
+  const handleSendGM = useCallback(async (content = "Gmicrochains", recipient = null, inviter = null, messageType = "text") => {
     if (!isValidAccountOwner(currentAccount)) {
       setMessage("Invalid wallet account", "error");
       setOperationStatus("error");
       return;
     }
     
-    if (cooldownStatus?.enabled === true && cooldownCheckData?.checkCooldown?.inCooldown) {
+    if (cooldownStatusData?.getCooldownStatus?.enabled === true && cooldownCheckData?.checkCooldown?.inCooldown) {
       const remainingTime = cooldownCheckData.checkCooldown.remainingTime;
       const formattedTime = formatCooldown(remainingTime);
       setMessage(`Within 24-hour cooldown period, please wait ${formattedTime} before sending`, "warning");
@@ -491,6 +497,7 @@ const GMOperations = ({
           chainId: targetChainId || currentChainId,
           sender: formatAccountOwner(currentAccount),
           recipient: recipient,
+          messageType: messageType,
           content: content,
           inviter: inviter ? formatAccountOwner(inviter) : null,
         },
@@ -589,13 +596,13 @@ const GMOperations = ({
 
   return {
     data: data || {},
-    walletMessagesData: walletMessagesData || {},
+    walletMessagesData: currentIsConnected ? (walletMessagesData || {}) : { walletMessages: null },
     gmEventsData: filteredGmEvents || [],
     streamEventsData: filteredStreamEvents || [],
     loading,
     queryError,
-    invitationStatsData: invitationStatsData || { totalInvited: 0, totalRewards: 0, lastRewardTime: null },
-    safeInvitationStats: safeInvitationStats || { totalInvited: 0, totalRewards: 0, lastRewardTime: null },
+    invitationStatsData: currentIsConnected ? (invitationStatsData || { totalInvited: 0, totalRewards: 0, lastRewardTime: null }) : { totalInvited: 0, totalRewards: 0, lastRewardTime: null },
+    safeInvitationStats: currentIsConnected ? (safeInvitationStats || { totalInvited: 0, totalRewards: 0, lastRewardTime: null }) : { totalInvited: 0, totalRewards: 0, lastRewardTime: null },
     refetch,
     refetchGmEvents,
     refetchStreamEvents,
@@ -609,9 +616,9 @@ const GMOperations = ({
   };
 };
 
-// 专门的排行榜数据钩子，只包含与排行榜直接相关的数据和函数
-// 这样24小时开关状态变化时不会影响排行榜组件渲染
 export const useLeaderboardData = () => {
+  const { currentIsConnected } = useWallet();
+  
   const { data: leaderboardData, loading: leaderboardLoading, error: leaderboardError, refetch: refetchLeaderboard } = useQuery(GET_LEADERBOARD, {
     variables: { 
       limit: 15 
@@ -646,7 +653,6 @@ export const useLeaderboardData = () => {
     }
   }, [leaderboardError, invitationLeaderboardError]);
 
-  // 使用空依赖数组的useCallback确保refetch函数引用绝对稳定
   const stableRefetchLeaderboard = useCallback(() => {
     refetchLeaderboard && refetchLeaderboard();
   }, []);
@@ -655,7 +661,6 @@ export const useLeaderboardData = () => {
     refetchInvitationLeaderboard && refetchInvitationLeaderboard();
   }, []);
   
-  // 使用JSON.stringify深度比较数据，确保只有数据内容变化时才更新引用
   return useMemo(() => ({  
     leaderboardData,
     invitationLeaderboardData,
@@ -673,7 +678,7 @@ export const useLeaderboardData = () => {
   ]);
 };
 
-export const useCooldownData = ({ currentAccount, queryRetryCount, setQueryRetryCount }) => {
+export const useCooldownData = ({ currentAccount, queryRetryCount, setQueryRetryCount, currentIsConnected }) => {
   const { data: cooldownStatusData, loading: cooldownStatusLoading, error: cooldownStatusError, refetch: refetchCooldownStatus } = useQuery(GET_COOLDOWN_STATUS, {
     fetchPolicy: 'cache-first',
     notifyOnNetworkStatusChange: false,
@@ -741,12 +746,12 @@ export const useCooldownData = ({ currentAccount, queryRetryCount, setQueryRetry
   ]);
 };
 
-export const useUserData = ({ chainId, currentAccount, queryRetryCount, setQueryRetryCount }) => {
+export const useUserData = ({ chainId, currentAccount, queryRetryCount, setQueryRetryCount, currentIsConnected }) => {
   const { data: invitationStatsDataRaw, loading: invitationStatsLoading, error: invitationStatsError, refetch: refetchInvitationStats } = useQuery(GET_INVITATION_STATS, {
     variables: { 
       user: currentAccount ? formatAccountOwner(currentAccount) : null
     },
-    skip: !currentAccount,
+    skip: !currentAccount || !isValidAccountOwner(currentAccount),
     fetchPolicy: 'cache-first',
     pollInterval: 0,
     nextFetchPolicy: 'cache-first',
@@ -757,7 +762,7 @@ export const useUserData = ({ chainId, currentAccount, queryRetryCount, setQuery
     variables: { 
       inviter: currentAccount ? formatAccountOwner(currentAccount) : null
     },
-    skip: !currentAccount,
+    skip: !currentAccount || !isValidAccountOwner(currentAccount),
     fetchPolicy: 'cache-first',
     pollInterval: 0,
     nextFetchPolicy: 'cache-first',
@@ -769,7 +774,7 @@ export const useUserData = ({ chainId, currentAccount, queryRetryCount, setQuery
       owner: currentAccount ? formatAccountOwner(currentAccount) : null,
       chainId: chainId 
     },
-    skip: !currentAccount || !chainId,
+    skip: !currentIsConnected || !currentAccount || !chainId || !isValidAccountOwner(currentAccount),
     fetchPolicy: 'cache-first',
     notifyOnNetworkStatusChange: false,
     pollInterval: 0,
@@ -835,7 +840,6 @@ export const useUserData = ({ chainId, currentAccount, queryRetryCount, setQuery
     };
   }, [refetchInvitationRecord, currentAccount]);
 
-  // 使用useMemo稳定返回的对象引用
   return useMemo(() => ({
     gmRecordData,
     invitationStatsData,
@@ -854,13 +858,11 @@ export const useUserData = ({ chainId, currentAccount, queryRetryCount, setQuery
   ]);
 };
 
-// 保留原始的useGMAdditionalData钩子以保持向后兼容性
-export const useGMAdditionalData = ({ chainId, currentAccount, currentChainId, walletMode, queryRetryCount, setQueryRetryCount }) => {
+export const useGMAdditionalData = ({ chainId, currentAccount, currentChainId, walletType, queryRetryCount, setQueryRetryCount, currentIsConnected }) => {
   const leaderboardData = useLeaderboardData();
-  const cooldownData = useCooldownData({ currentAccount, queryRetryCount, setQueryRetryCount });
-  const userData = useUserData({ chainId, currentAccount, queryRetryCount, setQueryRetryCount });
+  const cooldownData = useCooldownData({ currentAccount, queryRetryCount, setQueryRetryCount, currentIsConnected });
+  const userData = useUserData({ chainId, currentAccount, queryRetryCount, setQueryRetryCount, currentIsConnected });
 
-  // 合并所有数据，使用useMemo确保只有当子钩子返回的数据变化时，才会更新合并后的对象引用
   return useMemo(() => ({
     ...leaderboardData,
     ...cooldownData,

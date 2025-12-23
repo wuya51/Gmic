@@ -5,107 +5,64 @@ import { useDynamicContext, DynamicConnectButton } from '@dynamic-labs/sdk-react
 import { EthereumWalletConnectors } from '@dynamic-labs/ethereum';
 
 const WalletContext = createContext();
+
 const getFormattedAccount = (account) => {
   if (!account) return null;
   return account.startsWith('0x') ? account : `0x${account}`;
 };
 
+const formatShortAddress = (address) => {
+  if (!address) return '';
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+};
+
 const getLineraChainId = async (provider) => {
-  try {
-    try {
-      const chainId = await provider.request({ 
-        method: 'linera_getChainId' 
-      });
-      if (chainId) {
-        return chainId.toString();
-      }
-    } catch (error) {
-    }
-    
-    try {
-      const state = await provider.request({ 
-        method: 'metamask_getProviderState' 
-      });
-      
-      if (state && state.chainId) {
-        let chainId = state.chainId;
-        if (chainId.startsWith('0x')) {
+  const fallbackChainId = '1';
+  if (!provider) return fallbackChainId;
+
+  const methods = [
+    { method: 'linera_getChainId', processor: (result) => result?.toString() },
+    { 
+      method: 'metamask_getProviderState', 
+      processor: (result) => {
+        if (!result?.chainId) return null;
+        let chainId = result.chainId;
+        if (typeof chainId === 'string' && chainId.startsWith('0x')) {
           chainId = chainId.slice(2);
         }
-        if (typeof chainId === 'number') {
-          chainId = chainId.toString();
-        }
-        return chainId;
+        return chainId.toString();
       }
-    } catch (error) {
-    }
-    
+    },
+    { method: 'eth_chainId', processor: (result) => result?.startsWith?.('0x') ? result.slice(2) : result },
+    { method: 'net_version', processor: (result) => result?.toString?.() }
+  ];
+
+  for (const { method, processor } of methods) {
     try {
-      const web3 = new Web3(provider);
-      const accounts = await web3.eth.getAccounts();
-      if (accounts && accounts.length > 0) {
-        const account = accounts[0];
-        
-        if (account && account.length === 66 && account.startsWith('0x')) {
-          const potentialChainId = account.slice(2);
-          return potentialChainId;
-        }
-      }
+      const result = await provider.request({ method });
+      const processed = processor(result);
+      if (processed) return processed;
     } catch (error) {
+      continue;
     }
-    
-    try {
-      const chainId = await provider.request({ method: 'eth_chainId' });
-      if (chainId) {
-        let processedChainId = chainId;
-        if (processedChainId.startsWith('0x')) {
-          processedChainId = processedChainId.slice(2);
-        }
-        return processedChainId;
-      }
-    } catch (error) {
-    }
-    
-    try {
-      const chainId = await provider.request({ method: 'net_version' });
-      if (chainId) {
-        return chainId;
-      }
-    } catch (error) {
-    }
-    
-    if (provider.chainId) {
-      let chainId = provider.chainId;
-      if (chainId.startsWith('0x')) {
-        chainId = chainId.slice(2);
-      }
-      return chainId;
-    }
-    
-    if (provider.networkVersion) {
-      return provider.networkVersion;
-    }
-    
-    return '1';
-  } catch (error) {
-    return '1';
   }
+
+  if (provider.chainId) {
+    const chainId = provider.chainId.toString().startsWith('0x') 
+      ? provider.chainId.toString().slice(2)
+      : provider.chainId.toString();
+    return chainId;
+  }
+
+  if (provider.networkVersion) {
+    return provider.networkVersion;
+  }
+
+  return fallbackChainId;
 };
 
 const getEthereumChainId = async (provider) => {
-  try {
-    return await provider.request({ 
-      method: 'eth_chainId' 
-    });
-  } catch (error) {
-    throw error;
-  }
-};
-
-const handleConnectionError = (error, setError, defaultMessage = 'Failed to connect wallet') => {
-  const message = error.message || defaultMessage;
-  setError(message);
-  return message;
+  return await provider.request({ method: 'eth_chainId' });
 };
 
 const shouldUseAppChainId = (walletType, appChainId) => {
@@ -122,406 +79,265 @@ export const useWallet = () => {
 
 export const WalletProvider = ({ children, appChainId }) => {
   const WALLET_CACHE_KEY = 'gm_wallet_cache';
-  
-  const getCachedWalletState = () => {
+  const CACHE_DURATION = 5 * 60 * 1000;
+  const CHECK_INTERVAL = 5000;
+  const RECONNECT_DELAY = 500;
+
+  const getCachedWalletState = useCallback(() => {
     try {
       const cached = localStorage.getItem(WALLET_CACHE_KEY);
       if (cached) {
         const state = JSON.parse(cached);
-        if (Date.now() - state.timestamp < 5 * 60 * 1000) {
+        if (Date.now() - state.timestamp < CACHE_DURATION) {
           return state;
         }
       }
     } catch (error) {
+      console.error('Cache read error:', error);
     }
     return null;
-  };
-  
-  const cacheWalletState = (state) => {
+  }, []);
+
+  const cacheWalletState = useCallback((state) => {
     try {
-      const cacheData = {
+      localStorage.setItem(WALLET_CACHE_KEY, JSON.stringify({
         ...state,
         timestamp: Date.now()
-      };
-      localStorage.setItem(WALLET_CACHE_KEY, JSON.stringify(cacheData));
+      }));
     } catch (error) {
+      console.error('Cache write error:', error);
     }
-  };
-  
-  const clearWalletCache = () => {
+  }, []);
+
+  const clearWalletCache = useCallback(() => {
     try {
       localStorage.removeItem(WALLET_CACHE_KEY);
     } catch (error) {
+      console.error('Cache clear error:', error);
     }
-  };
-  
-  const cachedState = getCachedWalletState();
-  const [account, setAccount] = useState(cachedState?.account || null);
-  const [isConnected, setIsConnected] = useState(cachedState?.isConnected || false);
-  const [chainId, setChainId] = useState(cachedState?.chainId || appChainId || null);
-  const [walletChainId, setWalletChainId] = useState(cachedState?.walletChainId || null);
+  }, []);
+
+  const [account, setAccount] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [chainId, setChainId] = useState(appChainId || null);
+  const [walletChainId, setWalletChainId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [walletType, setWalletType] = useState(cachedState?.walletType || null);
-  
-  useEffect(() => {
-    const checkInitialConnection = async () => {
-      if (cachedState && cachedState.isConnected) {
-        return;
-      }
-      await checkConnection();
-    };
-    
-    checkInitialConnection();
-  }, []);
-  
+  const [walletType, setWalletType] = useState(null);
+
   const { primaryWallet, handleLogOut } = useDynamicContext();
-  
-  const isDynamicConnected = (primaryWallet && primaryWallet.address) || (walletType === 'dynamic' && isConnected);
-  const isActiveDynamicWallet = isConnected && walletType === 'dynamic' && account;
   const reconnectTimeoutRef = useRef(null);
-  const lastConnectionCheckRef = useRef(0);
+  const lastCheckRef = useRef(0);
+
+  const updateWalletState = useCallback((newAccount, newWalletType, newChainId, newWalletChainId) => {
+    setAccount(newAccount);
+    setWalletType(newWalletType);
+    setChainId(newChainId);
+    setWalletChainId(newWalletChainId);
+    setIsConnected(!!newAccount);
+    
+    cacheWalletState({
+      account: newAccount,
+      isConnected: !!newAccount,
+      chainId: newChainId,
+      walletChainId: newWalletChainId,
+      walletType: newWalletType
+    });
+  }, [cacheWalletState]);
+
+  const disconnectWalletState = useCallback(() => {
+    setAccount(null);
+    setIsConnected(false);
+    setChainId(appChainId || null);
+    setWalletChainId(null);
+    setWalletType(null);
+    setError(null);
+    clearWalletCache();
+  }, [appChainId, clearWalletCache]);
 
   const connectToWallet = useCallback(async (walletTypeToConnect, provider, requestMethod = 'eth_requestAccounts') => {
     try {
-      if (isConnected && walletTypeToConnect !== walletType) {
-        if (walletType === 'dynamic' && handleLogOut) {
-          await handleLogOut();
-        }
-        setAccount(null);
-        setIsConnected(false);
-        setWalletType(null);
-        clearWalletCache();
+      if (isConnected && walletTypeToConnect !== walletType && walletType === 'dynamic' && handleLogOut) {
+        await handleLogOut();
       }
       
       let accounts;
-      
       if (walletTypeToConnect === 'linera') {
         const lineraProvider = window.linera || provider;
         if (!lineraProvider) {
-          throw new Error('Linera wallet not found. Please install the Linera wallet extension.');
+          throw new Error('Linera wallet not found');
         }
-        
         const web3 = new Web3(lineraProvider);
-        if (requestMethod === 'eth_requestAccounts') {
-          accounts = await web3.eth.requestAccounts();
-        } else {
-          accounts = await web3.eth.getAccounts();
-        }
+        accounts = requestMethod === 'eth_requestAccounts'
+          ? await web3.eth.requestAccounts()
+          : await web3.eth.getAccounts();
       } else if (walletTypeToConnect === 'dynamic') {
-        if (!primaryWallet) {
-          throw new Error('Dynamic wallet not connected. Please connect through Dynamic widget first.');
+        if (!primaryWallet?.address) {
+          throw new Error('Dynamic wallet not connected');
         }
         accounts = [primaryWallet.address];
       } else {
         accounts = await provider.request({ method: requestMethod });
       }
-      
-      if (accounts.length === 0) {
-        throw new Error('User rejected the request or no accounts available');
+
+      if (!accounts?.length) {
+        throw new Error('No accounts available');
       }
 
-      const selectedAccount = accounts[0];
-      const formattedAccount = getFormattedAccount(selectedAccount);
-      
+      const formattedAccount = getFormattedAccount(accounts[0]);
       if (!formattedAccount) {
         throw new Error('Invalid account format');
       }
 
-      setAccount(formattedAccount);
-      setIsConnected(true);
-      setWalletType(walletTypeToConnect);
+      let walletChainIdValue = '1';
+      try {
+        if (walletTypeToConnect === 'linera') {
+          walletChainIdValue = await getLineraChainId(window.linera || provider);
+        } else if (walletTypeToConnect === 'dynamic') {
+          walletChainIdValue = appChainId || '1';
+        } else {
+          walletChainIdValue = await getEthereumChainId(provider);
+        }
+      } catch (chainError) {
+        console.error('Chain ID error:', chainError);
+      }
+
+      const finalChainId = shouldUseAppChainId(walletTypeToConnect, appChainId)
+        ? appChainId
+        : walletChainIdValue;
+
+      updateWalletState(formattedAccount, walletTypeToConnect, finalChainId, walletChainIdValue);
       setError(null);
-
-  let walletChainIdValue;
-  try {
-    if (walletTypeToConnect === 'linera') {
-      const lineraProvider = window.linera || provider;
-      walletChainIdValue = await getLineraChainId(lineraProvider);
-    } else if (walletTypeToConnect === 'dynamic') {
-      walletChainIdValue = appChainId || '1';
-    } else {
-      walletChainIdValue = await getEthereumChainId(provider);
-    }
-    setWalletChainId(walletChainIdValue);
-  } catch (chainError) {
-    walletChainIdValue = '1';
-    setWalletChainId(walletChainIdValue);
-  }
-
-      if (shouldUseAppChainId(walletTypeToConnect, appChainId)) {
-    setChainId(appChainId);
-  } else {
-    setChainId(walletChainIdValue);
-  }
-
-      // 缓存钱包状态
-      cacheWalletState({
-        account: formattedAccount,
-        isConnected: true,
-        chainId: shouldUseAppChainId(walletTypeToConnect, appChainId) ? appChainId : walletChainIdValue,
-        walletChainId: walletChainIdValue,
-        walletType: walletTypeToConnect
-      });
-
-      // 输出钱包连接日志
-      console.log(`Wallet connected: ${walletTypeToConnect} wallet, Address: ${formattedAccount}, Chain ID: ${walletChainIdValue}`);
 
       return { account: formattedAccount, chainId: walletChainIdValue };
     } catch (error) {
-      setAccount(null);
-      setIsConnected(false);
-      setWalletType(null);
-      clearWalletCache();
+      disconnectWalletState();
       throw error;
     }
-  }, [appChainId, primaryWallet, isConnected, walletType, handleLogOut]);
+  }, [appChainId, primaryWallet, isConnected, walletType, handleLogOut, updateWalletState, disconnectWalletState]);
 
   useEffect(() => {
-    const now = Date.now();
-    if (now - lastConnectionCheckRef.current < 5000) {
-      return;
-    }
-    lastConnectionCheckRef.current = now;
-    
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
-    }
-    
-    const handleDynamicWalletChange = async () => {
-      if (primaryWallet && primaryWallet.address) {
-        const formattedAccount = getFormattedAccount(primaryWallet.address);
-        
-        if (!isConnected || walletType !== 'dynamic') {
-          
-          reconnectTimeoutRef.current = setTimeout(async () => {
-            try {
-              await connectToWallet('dynamic', null);
-            } catch (error) {
-              console.warn('Failed to connect dynamic wallet:', error);
-            }
-          }, 500);
-        } else if (account !== formattedAccount && account !== '已连接') {
-          setAccount(formattedAccount);
-          setWalletType('dynamic'); // 确保设置正确的walletType
-          cacheWalletState({
-            account: formattedAccount,
-            isConnected: true,
-            chainId: appChainId || '1',
-            walletChainId: appChainId || '1',
-            walletType: 'dynamic'
-          });
-        }
-        
-      } else if (isConnected && walletType === 'dynamic') {
-        
-        reconnectTimeoutRef.current = setTimeout(() => {
-          setAccount(null);
-          setIsConnected(false);
-          setWalletType(null);
-          clearWalletCache();
-        }, 1000);
-      }
-    };
-    
-    handleDynamicWalletChange();
-  }, [primaryWallet, isConnected, walletType, connectToWallet, account, appChainId]);
+    checkConnection();
+  }, []);
 
   const checkConnection = useCallback(async () => {
-    // 检查缓存状态
     const now = Date.now();
-    if (now - lastConnectionCheckRef.current < 5000) {
+    if (now - lastCheckRef.current < CHECK_INTERVAL) {
       return;
     }
-    lastConnectionCheckRef.current = now;
-    
-    // 重新获取缓存状态，确保获取最新状态
-    const currentCachedState = getCachedWalletState();
-    if (currentCachedState && currentCachedState.isConnected) {
-      setAccount(currentCachedState.account);
-      setIsConnected(true);
-      setChainId(currentCachedState.chainId);
-      setWalletChainId(currentCachedState.walletChainId);
-      setWalletType(currentCachedState.walletType);
-      console.log('Wallet state restored from cache:', currentCachedState);
-      return;
-    }
-    
-    // 优先检查Dynamic钱包
-    if (primaryWallet && primaryWallet.address) {
+    lastCheckRef.current = now;
+
+    if (primaryWallet?.address) {
       try {
         await connectToWallet('dynamic', null, 'eth_requestAccounts');
-        // connectToWallet内部已经正确缓存了walletType，这里不需要重复缓存
         return;
       } catch (err) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Error checking Dynamic wallet connection:', err);
-        }
+
       }
     }
-    
-    // 检查Linera钱包
+
     if (window.linera) {
       try {
         const web3 = new Web3(window.linera);
-        const accounts = await web3.eth.requestAccounts();
-        if (accounts.length > 0) {
-          // 获取Linera钱包的实际chainId
-          const lineraChainId = await getLineraChainId(window.linera);
-          await connectToWallet('linera', window.linera, 'eth_requestAccounts');
-          // connectToWallet内部已经正确缓存了walletType，这里不需要重复缓存
+        const accounts = await web3.eth.getAccounts();
+        if (accounts?.length > 0) {
+          await connectToWallet('linera', window.linera);
+          return;
         }
       } catch (err) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Error checking Linera wallet connection:', err);
-        }
+
       }
     }
-    
-    // 检查以太坊钱包
+
     if (window.ethereum) {
       try {
         await connectToWallet('ethereum', window.ethereum, 'eth_accounts');
       } catch (err) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Error checking Ethereum wallet connection:', err);
-        }
-      }
-    }
-    
-    // 处理特殊状态
-    if (isConnected && (account === '已连接' || account === '未连接')) {
-      if (primaryWallet && primaryWallet.address) {
-        const formattedAccount = getFormattedAccount(primaryWallet.address);
-        setAccount(formattedAccount);
-        setWalletType('dynamic'); // 确保设置正确的walletType
-        cacheWalletState({
-          account: formattedAccount,
-          isConnected: true,
-          chainId: appChainId || '1',
-          walletChainId: appChainId || '1',
-          walletType: 'dynamic'
-        });
-      } else if (window.linera) {
-        try {
-          const web3 = new Web3(window.linera);
-          const accounts = await web3.eth.requestAccounts();
-          if (accounts.length > 0) {
-            const formattedAccount = getFormattedAccount(accounts[0]);
-            setAccount(formattedAccount);
-            setWalletType('linera'); // 确保设置正确的walletType
-            cacheWalletState({
-              account: formattedAccount,
-              isConnected: true,
-              chainId: appChainId || '1',
-              walletChainId: appChainId || '1',
-              walletType: 'linera'
-            });
-          }
-        } catch (err) {
-        }
-      }
-    }
-  }, [appChainId, primaryWallet, connectToWallet, isConnected, account, cachedState]);
 
-  // 连接钱包
-  const connectWallet = async (walletType = null) => {
+      }
+    }
+  }, [getCachedWalletState, updateWalletState, connectToWallet, primaryWallet]);
+
+  useEffect(() => {
+    const now = Date.now();
+    if (now - lastCheckRef.current < CHECK_INTERVAL) {
+      return;
+    }
+    lastCheckRef.current = now;
+
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+    }
+
+    if (primaryWallet?.address) {
+      const formattedAccount = getFormattedAccount(primaryWallet.address);
+      if (!isConnected || walletType !== 'dynamic') {
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connectToWallet('dynamic', null).catch(err => {
+
+          });
+        }, RECONNECT_DELAY);
+      } else if (account !== formattedAccount && account !== 'Connected') {
+        updateWalletState(formattedAccount, 'dynamic', appChainId || '1', appChainId || '1');
+      }
+    } else if (isConnected && walletType === 'dynamic') {
+      reconnectTimeoutRef.current = setTimeout(() => {
+        disconnectWalletState();
+      }, 1000);
+    }
+  }, [primaryWallet, isConnected, walletType, connectToWallet, account, appChainId, updateWalletState, disconnectWalletState]);
+
+  const connectWallet = useCallback(async (walletTypeParam = null) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      // 自动检测钱包类型
-      const detectedWalletType = walletType || 
-        (primaryWallet && primaryWallet.address ? 'dynamic' : 
-         window.linera ? 'linera' : 
-         window.ethereum ? 'ethereum' : null);
-      
-      if (!detectedWalletType) {
-        throw new Error('No wallet detected. Please connect through Dynamic widget or install MetaMask/Linera wallet.');
+      const detectedType = walletTypeParam ||
+        (primaryWallet?.address ? 'dynamic' : window.linera ? 'linera' : window.ethereum ? 'ethereum' : null);
+
+      if (!detectedType) {
+        throw new Error('No wallet detected');
       }
 
       let provider = null;
-      if (detectedWalletType === 'dynamic') {
-        // Dynamic钱包不需要provider
-        provider = null;
-      } else if (detectedWalletType === 'linera') {
-        provider = window.linera;
-      } else {
-        provider = window.ethereum;
-      }
-      
-      if (detectedWalletType !== 'dynamic' && !provider) {
-        // 提供更具体的错误信息
-        if (detectedWalletType === 'linera') {
-          throw new Error('Linera wallet not detected. Please install Linera wallet from https://github.com/respeer-ai/linera-wallet');
-        } else {
-          throw new Error('MetaMask wallet not detected. Please install MetaMask from https://metamask.io/');
+      if (detectedType !== 'dynamic') {
+        provider = detectedType === 'linera' ? window.linera : window.ethereum;
+        if (!provider) {
+          throw new Error(`${detectedType} wallet not found`);
         }
       }
 
-      await connectToWallet(detectedWalletType, provider, 'eth_requestAccounts');
-      
+      await connectToWallet(detectedType, provider, 'eth_requestAccounts');
     } catch (err) {
-      const errorMessage = handleConnectionError(err, setError);
-      
-      // 特定错误处理
-      if (err.message.includes('User rejected')) {
-        setError('User rejected the connection request');
-      } else if (err.message.includes('not detected')) {
-        setError(err.message);
-      }
+      const message = err?.message || 'Connection failed';
+      setError(message);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [primaryWallet, connectToWallet]);
 
-  const disconnectWallet = useCallback(() => {
-    setAccount(null);
-    setIsConnected(false);
-    setChainId(appChainId || null);
-    setWalletChainId(null);
-    setError(null);
-  }, [appChainId]);
-
-  // 切换账户处理
   useEffect(() => {
     const handleAccountsChanged = (accounts) => {
-      if (accounts.length === 0) {
-        // User disconnected
-        disconnectWallet();
+      if (!accounts?.length) {
+        disconnectWalletState();
       } else {
-        // User switched account
-        setAccount(accounts[0]);
+        setAccount(getFormattedAccount(accounts[0]));
       }
     };
 
-    const handleChainChanged = (walletChainId) => {
-      setWalletChainId(walletChainId);
-      
-      const currentWalletType = typeof walletType !== 'undefined' ? walletType : 'unknown';
-      
-      if (appChainId) {
-        setChainId(appChainId);
-        window.dispatchEvent(new CustomEvent('walletChainChanged', {
-          detail: { 
-            walletChainId, 
-            appChainId,
-            walletType: currentWalletType,
-            usingAppChain: true 
-          }
-        }));
-      } else {
-        setChainId(walletChainId);
-        window.dispatchEvent(new CustomEvent('walletChainChanged', {
-          detail: { 
-            walletChainId, 
-            appChainId: null,
-            walletType: currentWalletType,
-            usingAppChain: false 
-          }
-        }));
-      }
+    const handleChainChanged = (newChainId) => {
+      setWalletChainId(newChainId);
+      const finalChainId = appChainId || newChainId;
+      setChainId(finalChainId);
+
+      window.dispatchEvent(new CustomEvent('walletChainChanged', {
+        detail: {
+          walletChainId: newChainId,
+          appChainId: appChainId || null,
+          walletType: walletType || 'unknown',
+          usingAppChain: !!appChainId
+        }
+      }));
     };
 
     if (window.linera) {
@@ -541,33 +357,39 @@ export const WalletProvider = ({ children, appChainId }) => {
         window.linera.removeListener('accountsChanged', handleAccountsChanged);
         window.linera.removeListener('chainChanged', handleChainChanged);
       }
-      
       if (window.ethereum) {
         window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
         window.ethereum.removeListener('chainChanged', handleChainChanged);
       }
     };
-  }, [checkConnection, appChainId, disconnectWallet, walletType]);
+  }, [checkConnection, appChainId, disconnectWalletState, walletType]);
 
-  const value = {
-    account,
-    isConnected,
-    chainId,
-    walletChainId,
-    walletType,
-    isLoading,
-    error,
-    setError,
-    connectWallet,
-    disconnectWallet,
-    checkConnection,
-    // Dynamic钱包状态
-    isDynamicConnected: primaryWallet && primaryWallet.address,
-    isActiveDynamicWallet: isConnected && walletType === 'dynamic' && account
-  };
+  useEffect(() => {
+    return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
-    <WalletContext.Provider value={value}>
+    <WalletContext.Provider
+      value={{
+        account,
+        isConnected,
+        chainId,
+        walletChainId,
+        walletType,
+        isLoading,
+        error,
+        setError,
+        connectWallet,
+        disconnectWallet: disconnectWalletState,
+        checkConnection,
+        isDynamicConnected: primaryWallet?.address,
+        isActiveDynamicWallet: isConnected && walletType === 'dynamic' && account
+      }}
+    >
       {children}
     </WalletContext.Provider>
   );
@@ -582,125 +404,111 @@ WalletProvider.defaultProps = {
   appChainId: null
 };
 
-export {
-  getFormattedAccount,
-  getLineraChainId,
-  getEthereumChainId,
-  handleConnectionError,
-  shouldUseAppChainId
-};
-
 const WalletConnector = ({ setMessage }) => {
-  const { 
-    account, 
-    isConnected, 
-    isLoading, 
-    error, 
-    setError,
-    walletType, 
-    connectWallet, 
-    disconnectWallet 
+  const {
+    account,
+    isConnected,
+    isLoading,
+    error,
+    walletType,
+    connectWallet,
+    disconnectWallet
   } = useWallet();
-  
+
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   const buttonRef = useRef(null);
-  
+
   const { primaryWallet, handleLogOut } = useDynamicContext();
-  const isDynamicConnected = primaryWallet && primaryWallet.address;
-  const dynamicAccount = isDynamicConnected ? primaryWallet.address : null;
-  
+  const isDynamicConnected = primaryWallet?.address;
   const isLineraConnected = isConnected && walletType === 'linera' && account;
-  const lineraAccount = isLineraConnected ? account : null;
-  
-  const isActiveDynamicWallet = isConnected && walletType === 'dynamic' && account;
 
   useEffect(() => {
-    if (!isDropdownOpen) {
-      return;
-    }
-    
+    if (!isDropdownOpen) return;
+
     const handleClickOutside = (event) => {
-      const isClickOutsideDropdown = dropdownRef.current && !dropdownRef.current.contains(event.target);
-      const isClickOutsideButton = buttonRef.current && !buttonRef.current.contains(event.target);
-      
-      if (isClickOutsideDropdown && isClickOutsideButton) {
-        setIsDropdownOpen(false);
+      if (dropdownRef.current?.contains(event.target) || buttonRef.current?.contains(event.target)) {
+        return;
       }
+      setIsDropdownOpen(false);
     };
 
     document.addEventListener('click', handleClickOutside, true);
-    
-    return () => {
-      document.removeEventListener('click', handleClickOutside, true);
-    };
+    return () => document.removeEventListener('click', handleClickOutside, true);
   }, [isDropdownOpen]);
 
-  const toggleDropdown = () => {
-    setIsDropdownOpen(!isDropdownOpen);
-  };
-
-  const closeDropdown = () => {
+  const closeDropdown = useCallback(() => {
     setIsDropdownOpen(false);
-  };
+  }, []);
 
-  const disconnectDynamicWallet = async () => {
+  const disconnectDynamicWallet = useCallback(async () => {
     try {
       if (handleLogOut) {
         await handleLogOut();
         disconnectWallet();
+        closeDropdown();
       }
     } catch (error) {
+      console.error('Dynamic disconnect error:', error);
     }
-  };
+  }, [handleLogOut, disconnectWallet, closeDropdown]);
 
-  const [isDynamicLoading, setIsDynamicLoading] = useState(false);
-  
-  useEffect(() => {
-    if (primaryWallet && primaryWallet.address) {
-      setIsDynamicLoading(false);
+  const handleLineraConnect = useCallback(async () => {
+    if (!window.linera) {
+      setMessage('Linera wallet not installed. Please visit https://github.com/linera-io/linera-protocol/releases', 'warning');
+      return;
     }
-  }, [primaryWallet]);
+    try {
+      await connectWallet('linera');
+      closeDropdown();
+    } catch (error) {
+      console.error('Linera connect error:', error);
+    }
+  }, [connectWallet, closeDropdown, setMessage]);
 
   return (
     <div className="wallet-section top-right">
       <div className="linera-wallet-section">
         {isLineraConnected ? (
-          <button 
-            className={`linera-wallet-button active`}
-            onClick={() => {
-              disconnectWallet();
-            }}
-            title="Disconnect Linera"
+          <button
+            className="linera-wallet-button active"
+            onClick={handleLineraConnect}
             disabled={isLoading && walletType === 'linera'}
           >
-            <span className="linera-wallet-text">
-              {`${lineraAccount?.slice(0, 6)}...${lineraAccount?.slice(-4)}`}
-            </span>
+            {formatShortAddress(account)}
           </button>
         ) : (
-          <button 
+          <button
             className="linera-wallet-button"
-            onClick={async () => {
-              if (!window.linera) {
-                setMessage("Linera wallet not installed. Please visit https://github.com/linera-io/linera-protocol/releases to download and install", "warning");
-                return;
-              }
-              connectWallet('linera');
-            }}
+            onClick={handleLineraConnect}
             disabled={isLoading && walletType === 'linera'}
           >
-            <span className="linera-wallet-text">
-              {isLoading && walletType === 'linera' ? "Connecting..." : 'Linera Wallet'}
-            </span>
+            {isLoading && walletType === 'linera' ? 'Connecting...' : 'Linera Wallet'}
           </button>
         )}
-        
         {error && <div className="wallet-error">{error}</div>}
+      </div>
+
+      <div className="dynamic-wallet-section">
+        {isDynamicConnected ? (
+          <button
+            className="dynamic-wallet-button active"
+            onClick={disconnectDynamicWallet}
+            title="Disconnect Dynamic"
+          >
+            {formatShortAddress(primaryWallet.address)}
+          </button>
+        ) : (
+          <DynamicConnectButton />
+        )}
       </div>
     </div>
   );
 };
 
+WalletConnector.propTypes = {
+  setMessage: PropTypes.func.isRequired
+};
+
 export default WalletProvider;
-export { WalletConnector };
+export { WalletConnector, getFormattedAccount, getLineraChainId, getEthereumChainId };

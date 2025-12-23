@@ -98,7 +98,10 @@ export const GET_GM_EVENTS = gql`
       sender
       recipient
       timestamp
-      content
+      content {
+        content
+        messageType
+      }
     }
   }
 `;
@@ -109,7 +112,24 @@ export const GET_STREAM_EVENTS = gql`
       sender
       recipient
       timestamp
-      content
+      content {
+        content
+        messageType
+      }
+    }
+  }
+`;
+
+export const GET_RECEIVED_GM_EVENTS = gql`
+  query GetReceivedGmEvents($recipient: AccountOwner!) {
+    getReceivedGmEvents(recipient: $recipient) {
+      sender
+      recipient
+      timestamp
+      content {
+        content
+        messageType
+      }
     }
   }
 `;
@@ -121,8 +141,8 @@ export const SUBSCRIBE_GM_EVENTS = gql`
 `;
 
 export const SEND_GM = gql`
-  mutation SendGm($chainId: ChainId!, $sender: AccountOwner!, $recipient: AccountOwner, $content: String, $inviter: AccountOwner) {
-    sendGm(chainId: $chainId, sender: $sender, recipient: $recipient, content: $content, inviter: $inviter) {
+  mutation SendGm($chainId: ChainId!, $sender: AccountOwner!, $recipient: AccountOwner, $messageType: String!, $content: String, $inviter: AccountOwner) {
+    sendGm(chainId: $chainId, sender: $sender, recipient: $recipient, content: { messageType: $messageType, content: $content }, inviter: $inviter) {
       success
       message
       timestamp

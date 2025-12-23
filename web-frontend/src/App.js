@@ -1,14 +1,32 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+
+const KeyboardIcon = ({ className = "" }) => (
+  <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="16" rx="2" ry="2"></rect>
+    <line x1="7" y1="8" x2="13" y2="8"></line>
+    <line x1="7" y1="12" x2="17" y2="12"></line>
+    <line x1="7" y1="16" x2="15" y2="16"></line>
+  </svg>
+);
+
+const VoiceIcon = ({ className = "" }) => (
+  <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+    <line x1="12" y1="19" x2="12" y2="23"></line>
+    <line x1="8" y1="23" x2="16" y2="23"></line>
+  </svg>
+);
 import { useWallet, WalletConnector } from './WalletProvider';
 import { DynamicConnectButton, useDynamicContext } from '@dynamic-labs/sdk-react-core';
 import "./App.css";
 import GMOperations, { useGMAdditionalData, useLeaderboardData, useCooldownData, useUserData } from './GMOperations';
 import NotificationCenter from './NotificationCenter';
-import defaultAdSettings from './adSettings.json';
 import Leaderboard from './Leaderboard';
 import GifPicker from './components/GifPicker';
 import EmojiPicker from './components/EmojiPicker';
-import VoiceRecorder from './components/VoiceRecorder';
+
+import ChatHistory from './components/ChatHistory';
 
 window.onerror = function(message, source, lineno, colno, error) {
   console.error('Global error captured:', {
@@ -48,8 +66,9 @@ const formatAddressForDisplay = (address, isMobile = false, startChars = 6, endC
     : address;
 };
 
-const isButtonDisabled = (operationStatus, currentAccount, gmOps, cooldownRemaining = 0, localCooldownEnabled = false) => {
+const isButtonDisabled = (operationStatus, currentAccount, gmOps, cooldownRemaining = 0, localCooldownEnabled = false, isConnected = false) => {
     return operationStatus === "processing" || 
+      !isConnected ||
       (currentAccount && !gmOps.isValidAccountOwner(currentAccount)) || 
       (currentAccount && localCooldownEnabled && cooldownRemaining > 0);
   };
@@ -112,23 +131,17 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     if (inviterParam) {
       const formattedInviter = formatAccountOwner(inviterParam);
       setUrlInviter(formattedInviter);
-      console.log('Detected inviter from URL:', formattedInviter);
+
       localStorage.setItem('urlInviter', formattedInviter); 
       addNotification(`You were invited by: ${formattedInviter.slice(0, 8)}...${formattedInviter.slice(-6)}`, 'info');
     }
     
-    const savedPageLoadTime = localStorage.getItem('pageLoadTime');
-    if (!savedPageLoadTime) {
-      pageLoadTime.current = Date.now();
-      localStorage.setItem('pageLoadTime', pageLoadTime.current.toString());
-    } else {
-      pageLoadTime.current = parseInt(savedPageLoadTime);
-    }
-    
+    pageLoadTime.current = Date.now();
     pageLoadTimestampRef.current = pageLoadTime.current;
   }, []);
   
   const [connectionError, setConnectionError] = useState("");
+
   
   let walletState = {};
   try {
@@ -221,117 +234,301 @@ function App({ chainId, appId, ownerId, inviter, port }) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [selectedGif, setSelectedGif] = useState('');
-  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [isVoiceMode, setIsVoiceMode] = useState(false);
   const [longPressTimer, setLongPressTimer] = useState(null);
   const [isLongPressing, setIsLongPressing] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [showVoicePopup, setShowVoicePopup] = useState(false);
+  const [voicePopupText, setVoicePopupText] = useState('');
+  const [voicePopupType, setVoicePopupType] = useState('normal');
+  const [messageInputFocused, setMessageInputFocused] = useState(false);
+  const [isMessageInputActive, setIsMessageInputActive] = useState(false);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [showContactList, setShowContactList] = useState(false);
+  const [showSetRecipientInput, setShowSetRecipientInput] = useState(false);
+  const [newRecipientAddress, setNewRecipientAddress] = useState('');
+  const [newRecipientValidationError, setNewRecipientValidationError] = useState('');
+  const [recentContacts, setRecentContacts] = useState([
+    {
+      address: '0xfe609ad118ba733dafb3ce2b6094c86a441b10de4ffd1651251fffe973efd959',
+      name: 'wuya51',
+      avatar: '👤'
+    }
+  ]);
+  const [currentChatPartner, setCurrentChatPartner] = useState(null);
+
+  const handleChatPartnerChange = (partnerAddress) => {
+    if (partnerAddress) {
+      setRecipientAddress(partnerAddress);
+      setCurrentChatPartner(partnerAddress);
+    } else {
+      setRecipientAddress('');
+      setCurrentChatPartner(null);
+    }
+  };
+
+  useEffect(() => {
+    if (currentChatPartner && currentChatPartner !== recipientAddress) {
+      setRecipientAddress(currentChatPartner);
+    }
+  }, [currentChatPartner, recipientAddress]);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
   
   const addEmojiToMessage = (emoji) => {
     setCustomMessage(prev => prev + emoji);
     setShowEmojiPicker(false);
+    setMessageInputFocused(true);
+  };
+
+  const isVoiceRecordingSupported = () => {
+    return navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder;
+  };
+
+  const handleVoiceRecording = () => {
+  };
+
+  const handleVoicePressStart = async () => {
+    if (!isVoiceRecordingSupported()) {
+      setVoicePopupText('Voice recording not supported');
+      setVoicePopupType('error');
+      setShowVoicePopup(true);
+      setTimeout(() => setShowVoicePopup(false), 2000);
+      return;
+    }
+
+    setShowVoicePopup(true);
+    setVoicePopupText('Recording...');
+    setVoicePopupType('recording');
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+
+          }
+        };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+
+        
+        stream.getTracks().forEach(track => track.stop());
+
+      };
+
+      mediaRecorder.start(100);
+      setIsRecording(true);
+      setRecordingTime(0);
+
+      let startTime = Date.now();
+      recordingTimerRef.current = setInterval(() => {
+        const elapsed = (Date.now() - startTime) / 1000;
+        const displayTime = Math.min(elapsed, 10);
+        
+        setRecordingTime(displayTime);
+        setVoicePopupText(`Recording... ${displayTime.toFixed(1)}s`);
+        
+        if (elapsed >= 10 && mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+            clearInterval(recordingTimerRef.current);
+            recordingTimerRef.current = null;
+            const timestamp = performance.now();
+            const microTimestamp = Math.floor(timestamp * 1000);
+            const filename = `gmic-voice-${microTimestamp}.webm`;
+            
+            setVoicePopupText('Auto-sent (max 10s)');
+            setVoicePopupType('success');
+            setShowVoicePopup(true);
+            setTimeout(() => setShowVoicePopup(false), 1500);
+            
+            const audioData = [...audioChunksRef.current];
+            audioChunksRef.current = [];
+            
+            saveVoiceToLocal(audioData, filename);
+          }
+      }, 100);
+    } catch (error) {
+
+      setVoicePopupText('Cannot access microphone');
+      setVoicePopupType('error');
+      setIsRecording(false);
+    }
+  };
+
+  const handleVoicePressEnd = () => {
+    setShowVoicePopup(false);
+    
+    if (isRecording && mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+
+      if (recordingTime < 1) {
+        setVoicePopupText('Recording too short (min 1s)');
+        setVoicePopupType('error');
+        setShowVoicePopup(true);
+        setTimeout(() => setShowVoicePopup(false), 1500);
+        audioChunksRef.current = [];
+      } else {
+        const timestamp = performance.now();
+        const microTimestamp = Math.floor(timestamp * 1000);
+        const filename = `gmic-voice-${microTimestamp}.webm`;
+        
+        setVoicePopupText('Uploading voice message...');
+        setVoicePopupType('info');
+        setShowVoicePopup(true);
+        
+        const audioData = [...audioChunksRef.current];
+        audioChunksRef.current = [];
+        saveVoiceToLocal(audioData, filename);
+      }
+    }
+  };
+
+  const saveVoiceToLocal = async (audioChunks, filename) => {
+    try {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+
+      
+      const result = await uploadToPinata(audioBlob, filename);
+      
+      if (result && result.data && result.data.IpfsHash) {
+
+        
+        const voiceUrl = result.url || `https://gateway.pinata.cloud/ipfs/${result.data.IpfsHash}`;
+        handleSendGM('voice', voiceUrl);
+        setVoicePopupText('Voice message sent!');
+        setVoicePopupType('success');
+        setShowVoicePopup(true);
+        setTimeout(() => setShowVoicePopup(false), 1500);
+      } else {
+        throw new Error('Upload failed - no IPFS hash returned');
+      }
+      
+    } catch (error) {
+      console.error('❌ Error uploading voice file:', error);
+      
+      setVoicePopupText('Failed to send voice message');
+      setVoicePopupType('error');
+      setShowVoicePopup(true);
+      setTimeout(() => setShowVoicePopup(false), 2000);
+      setVoicePopupText('Upload failed');
+      setVoicePopupType('error');
+      setShowVoicePopup(true);
+      setTimeout(() => setShowVoicePopup(false), 3000);
+    }
+  };
+
+  const uploadToPinata = async (audioBlob, filename) => {
+    try {
+
+      const PINATA_API_KEY = import.meta.env.VITE_PINATA_API_KEY;
+      const PINATA_SECRET_API_KEY = import.meta.env.VITE_PINATA_SECRET_API_KEY;
+
+      
+      if (!PINATA_API_KEY || !PINATA_SECRET_API_KEY) {
+        throw new Error('Pinata API keys missing in environment variables');
+      }
+
+      const formData = new FormData();
+      formData.append('file', audioBlob, filename);
+
+      const metadata = JSON.stringify({
+        name: filename,
+        keyvalues: {
+          app: 'gmic-buildathon',
+          type: 'voice-message',
+          timestamp: Date.now()
+        }
+      });
+      formData.append('pinataMetadata', metadata);
+
+
+      
+      const response = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+        method: 'POST',
+        headers: {
+          'pinata_api_key': PINATA_API_KEY,
+          'pinata_secret_api_key': PINATA_SECRET_API_KEY
+        },
+        body: formData
+      });
+
+
+
+      if (!response.ok) {
+        const errorText = await response.text();
+
+        throw new Error(`Pinata upload failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.IpfsHash) {
+
+      } else {
+        throw new Error('Upload failed - no IPFS hash in response');
+      }
+      
+      const gatewayUrl = `https://salmon-main-vole-335.mypinata.cloud/ipfs/${result.IpfsHash}`;
+
+  
+      return { 
+        success: true, 
+        data: result,
+        cid: result.IpfsHash, 
+        url: gatewayUrl 
+      };
+
+    } catch (error) {
+      setVoicePopupText('Upload failed');
+      setVoicePopupType('error');
+      setShowVoicePopup(true);
+      setTimeout(() => setShowVoicePopup(false), 3000);
+      
+      throw error;
+    }
+  };
+
+  const saveVoiceToServer = async (audioChunks, filename) => {
+    try {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      
+      const formData = new FormData();
+      formData.append('voice', audioBlob, filename);
+      formData.append('timestamp', Date.now().toString());
+      
+      const response = await fetch('/api/save-voice', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (response.ok) {
+      } else {
+      }
+    } catch (error) {
+    }
   };
   const [showShareReferralModal, setShowShareReferralModal] = useState(false);
   const [showInvitedUsersDropdown, setShowInvitedUsersDropdown] = useState(false);
   const [invitedUsersList, setInvitedUsersList] = useState([]);
   const [invitedUsers, setInvitedUsers] = useState([]);
   const [invitedUsersLoading, setInvitedUsersLoading] = useState(false);
-  const [adSettings, setAdSettings] = useState(defaultAdSettings);
-  const [showAllAds, setShowAllAds] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
-  const marqueeRef = useRef(null);
-
-  const loadAdSettings = () => {
-    setAdSettings(defaultAdSettings);
-  };
-  
-  useEffect(() => {
-    loadAdSettings();
-  }, []);
-
-  useEffect(() => {
-    if (activeTab !== 'messages' || adSettings.length <= 5 || !marqueeRef.current) return;
-
-    const marqueeElement = marqueeRef.current;
-    let scrollPosition = 0;
-    let animationFrameId;
-    const originalAds = Array.from(marqueeElement.children);
-    originalAds.forEach(ad => {
-      const clone = ad.cloneNode(true);
-      marqueeElement.appendChild(clone);
-    });
-
-    const scroll = () => {
-      scrollPosition += 1;
-      marqueeElement.style.transform = `translateX(-${scrollPosition}px)`;
-      if (scrollPosition >= marqueeElement.scrollWidth / 2) {
-        scrollPosition = 0;
-        marqueeElement.style.transform = `translateX(0)`;
-      }
-
-      animationFrameId = requestAnimationFrame(scroll);
-    };
-    animationFrameId = requestAnimationFrame(scroll);
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      const clonedAds = Array.from(marqueeElement.children).slice(originalAds.length);
-      clonedAds.forEach(ad => marqueeElement.removeChild(ad));
-    };
-  }, [adSettings, activeTab]);
-  
-  const handleAdChange = (index, field, value) => {
-    setAdSettings(prev => {
-      const updated = [...prev];
-      updated[index][field] = value;
-      return updated;
-    });
-  };
-  
-  const handleAddAd = () => {
-    if (adSettings.length < 10) {
-      setAdSettings(prev => [...prev, { url: '', imageUrl: '' }]);
-    }
-  };
-  
-  const handleRemoveAd = (index) => {
-    if (adSettings.length > 1) {
-      setAdSettings(prev => prev.filter((_, i) => i !== index));
-    }
-  };
-  
-  const handleSaveAds = () => {
-    try {
-      const dataStr = JSON.stringify(adSettings, null, 2);
-      const dataBlob = new Blob([dataStr], { type: 'application/json' });
-      const url = URL.createObjectURL(dataBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'adSettings.json';
-      link.click();
-      URL.revokeObjectURL(url);
-      
-      addNotification('Ad settings exported as adSettings.json. Please manually save to src/adSettings.json.', 'success');
-    } catch (error) {
-      console.error('Failed to export ad settings:', error);
-      addNotification('Failed to save ad settings. Please try again.', 'error');
-    }
-  };
-  
-  const handleExportAds = () => {
-    try {
-      const dataStr = JSON.stringify(adSettings, null, 2);
-      const dataBlob = new Blob([dataStr], { type: 'application/json' });
-      const url = URL.createObjectURL(dataBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'adSettings.json';
-      link.click();
-      URL.revokeObjectURL(url);
-      addNotification('Ad settings exported successfully!', 'success');
-    } catch (error) {
-      console.error('Failed to export ad settings:', error);
-      addNotification('Failed to export ad settings. Please try again.', 'error');
-    }
-  };
   
   const handleImportAds = (event) => {
     try {
@@ -354,7 +551,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
         reader.readAsText(file);
       }
     } catch (error) {
-      console.error('Failed to import ad settings:', error);
+
       addNotification('Failed to import ad settings. Please try again.', 'error');
     }
     event.target.value = '';
@@ -387,7 +584,18 @@ function App({ chainId, appId, ownerId, inviter, port }) {
       timestamp: Date.now()
     };
     
-    setNotifications(prev => [...prev, newNotification]);
+    const isOverlayNotification = 
+      (type === 'success' && (message.includes('send') || message.includes('sent') || 
+                              message.includes('connect') || message.includes('connected') ||
+                              message.includes('voice message') || message.includes('voice'))) ||
+      (type === 'success' && message.includes('Wallet connected')) ||
+      (type === 'success' && message.includes('Connected to wallet'));
+    
+    if (isOverlayNotification) {
+      setNotifications([newNotification]);
+    } else {
+      setNotifications(prev => [...prev, newNotification]);
+    }
     
     setTimeout(() => {
       removeNotification(id);
@@ -436,37 +644,31 @@ function App({ chainId, appId, ownerId, inviter, port }) {
 
   const handleCustomMessageChange = useCallback((e) => {
     const value = e.target.value;
+
     setCustomMessage(value);
     if (customMessageEnabled) {
       setSelectedMessage(value || 'gm');
       
       if (value && !isMessageContentValid(value)) {
+
       }
     }
   }, [customMessageEnabled, isMessageContentValid]);
 
-  const handleGifSelect = useCallback((gifUrl) => {
-    setSelectedGif(gifUrl);
-    setShowGifPicker(false);
-  }, []);
-
-  // 长按开始录音
   const handleLongPressStart = () => {
-    if (isButtonDisabled(operationStatus, currentAccount, gmOps, cooldownRemaining, localCooldownEnabled)) {
+    if (isButtonDisabled(operationStatus, currentAccount, gmOps, cooldownRemaining, localCooldownEnabled, currentIsConnected)) {
       return;
     }
     
     setIsLongPressing(true);
     const timer = setTimeout(() => {
       setIsVoiceMode(true);
-      setShowVoiceRecorder(true);
       setIsLongPressing(false);
-    }, 1000); // 长按1秒触发语音录制
+    }, 1000);
     
     setLongPressTimer(timer);
   };
 
-  // 长按结束或取消
   const handleLongPressEnd = () => {
     if (longPressTimer) {
       clearTimeout(longPressTimer);
@@ -474,46 +676,15 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     }
     setIsLongPressing(false);
   };
-
-  // 处理语音录制完成
-  const handleVoiceRecordingComplete = (audioBlob, filename) => {
-    console.log('语音录制完成:', filename, audioBlob.size);
-    
-    // 保存语音文件到本地
-    const formData = new FormData();
-    formData.append('voice', audioBlob, filename);
-    
-    // 这里可以添加上传到服务器的逻辑
-    // 暂时只保存到本地
-    const audioUrl = URL.createObjectURL(audioBlob);
-    
-    // 发送语音消息
-    handleSendGM('🎤 语音消息', recipientAddress || null, urlInviter || null);
-    
-    // 显示成功消息
-    addNotification('语音消息已发送', 'success');
-    
-    // 重置语音模式
-    setIsVoiceMode(false);
-    setShowVoiceRecorder(false);
-  };
-
-  // 取消语音录制
-  const handleVoiceRecordingCancel = () => {
-    setIsVoiceMode(false);
-    setShowVoiceRecorder(false);
-  };
-  
+ 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // 处理emoji选择器
       if (showEmojiPicker && 
           !event.target.closest('.emoji-picker-container') && 
           !event.target.closest('.emoji-picker-button')) {
         setShowEmojiPicker(false);
       }
       
-      // 处理GIF选择器
       if (showGifPicker && 
           !event.target.closest('.gif-picker-container') && 
           !event.target.closest('.gif-picker-button')) {
@@ -527,19 +698,28 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     };
   }, [showEmojiPicker, showGifPicker]);
 
-  const cachedAccountRef = useRef(null);
+  const [currentAccount, setCurrentAccount] = useState(null);
   useEffect(() => {
     if (connectedAccount) {
       const formattedAccount = formatAccountOwner(connectedAccount);
-      cachedAccountRef.current = formattedAccount;
+      setCurrentAccount(formattedAccount);
     } else {
-      cachedAccountRef.current = null;
+      setCurrentAccount(null);
     }
   }, [connectedAccount]);
-  
-  const currentAccount = cachedAccountRef.current;
   const currentChainId = connectedChainId;
   const currentIsConnected = isConnected;
+
+  // Log wallet connection status changes
+  useEffect(() => {
+    console.log('Wallet connection status changed:', {
+      isConnected: currentIsConnected,
+      account: currentAccount,
+      chainId: currentChainId,
+      walletType: walletType,
+      timestamp: new Date().toISOString()
+    });
+  }, [currentIsConnected, currentAccount, currentChainId, walletType]);
 
   const memoizedCurrentAccount = useMemo(() => currentAccount, [currentAccount]);
   const memoizedIsMobile = useMemo(() => isMobile, [isMobile]);
@@ -572,12 +752,12 @@ function App({ chainId, appId, ownerId, inviter, port }) {
             btn.style.backgroundColor = '';
           }, 2000);
         }
-        console.log('Referral link copied to clipboard using fallback method!');
+
       } else {
         throw new Error('Copy command failed');
       }
     } catch (err) {
-      console.error('Failed to copy using fallback method:', err);
+
       alert('Failed to copy referral link');
     } finally {
       document.body.removeChild(textArea);
@@ -621,6 +801,8 @@ function App({ chainId, appId, ownerId, inviter, port }) {
       }
     }
   }, [walletType, connectedWalletChainId, chainId]);
+
+
   
   useEffect(() => {
     localStorage.setItem('activeTab', activeTab);
@@ -644,7 +826,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
           setActiveTab(saved);
         }
       } catch (error) {
-        console.error('[activeTab] Restoration error:', error);
+
       }
     };
 
@@ -675,7 +857,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
           activeTabRef.current = saved;
         }
       } catch (error) {
-        console.warn('[activeTab] Stability check error:', error);
+
       }
     }, 10000);
 
@@ -728,13 +910,13 @@ function App({ chainId, appId, ownerId, inviter, port }) {
             await new Promise(resolve => setTimeout(resolve, 500));
           } else if (walletType === 'linera') {
             await props.disconnectWallet();
-            addNotification('Linera wallet disconnected successfully', 'success');
+            addNotification('Linera Wallet: Disconnected', 'success');
             return;
           }
         }
         
         await connectWallet('linera');
-        addNotification('Linera wallet connected successfully!', 'success');
+        addNotification('Linera wallet: connected', 'success');
       } catch (error) {
         addNotification(`Failed to connect Linera wallet: ${error.message}`, 'error');
       }
@@ -743,7 +925,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     const handleDisconnectLineraWallet = async () => {
       try {
         await props.disconnectWallet();
-        addNotification('Linera wallet disconnected successfully', 'success');
+        addNotification('Linera wallet: disconnected', 'success');
       } catch (error) {
         addNotification(`Failed to disconnect Linera wallet: ${error.message}`, 'error');
       }
@@ -753,7 +935,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
       try {
         if (isDynamicConnected || isActiveDynamicWallet) {
           await props.disconnectDynamicWallet();
-          addNotification('Dynamic wallet disconnected successfully', 'success');
+          addNotification('Dynamic wallet disconnected', 'success');
           return;
         }
         if (isLineraConnected) {
@@ -772,7 +954,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     const handleDisconnectDynamicWalletClick = async () => {
       try {
         await props.disconnectDynamicWallet();
-        addNotification('Dynamic wallet disconnected successfully', 'success');
+        addNotification('Dynamic wallet: disconnected', 'success');
       } catch (error) {
         addNotification(`Failed to disconnect Dynamic wallet: ${error.message}`, 'error');
       }
@@ -805,16 +987,16 @@ function App({ chainId, appId, ownerId, inviter, port }) {
         </div>
         
         <div className="wallet-button-container">
-          {(currentIsConnected && walletType === 'dynamic') || (primaryWallet && primaryWallet.address) || isDynamicConnected || isActiveDynamicWallet ? (
+          {(primaryWallet && primaryWallet.address) || (currentIsConnected && currentAccount && walletType !== 'linera') ? (
             <div 
               className="wallet-info-card dynamic clickable"
               onClick={handleDisconnectDynamicWalletClick}
-              title="Click to disconnect Dynamic wallet"
+              title="Click to disconnect wallet"
             >
               <div className="wallet-address">
                 <span className="status-dot"></span>
                 {primaryWallet?.address ? `${formatAccountOwner(primaryWallet.address).slice(0, 6)}...${formatAccountOwner(primaryWallet.address).slice(-4)}` : 
-                 (currentAccount && (walletType === 'dynamic' || isDynamicConnected || isActiveDynamicWallet)) ? `${currentAccount.slice(0, 6)}...${currentAccount.slice(-4)}` : 
+                 currentAccount ? `${currentAccount.slice(0, 6)}...${currentAccount.slice(-4)}` : 
                  'Connected'}
               </div>
             </div>
@@ -932,7 +1114,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
 
   const copyReferralLink = useCallback(() => {
     if (!memoizedCurrentAccount) {
-      console.error('No account found');
+
       alert('Please connect your wallet first');
       return;
     }
@@ -1001,7 +1183,8 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     currentChainId: connectedWalletChainId,
     walletType,
     queryRetryCount,
-    setQueryRetryCount
+    setQueryRetryCount,
+    currentIsConnected
   });
   const stableLeaderboardData = useMemo(() => ({
     getTopUsers: [...(leaderboardData.leaderboardData?.getTopUsers || [])]
@@ -1030,6 +1213,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     chainId,
     currentAccount,
     currentChainId: connectedWalletChainId,
+    walletMode: walletType,
     targetChainId,
     appId,
     ownerId,
@@ -1039,17 +1223,20 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     setClaimStatus,
     onMutationComplete: handleMutationComplete,
     onMutationError: (error) => {
-      console.error('Mutation error:', error);
+
       setOperationStatus("error");
       setTimeout(() => setOperationStatus(null), 5000);
       addNotification(`Operation failed: ${error.message}`, "error");
     },
     inviter,
     queryRetryCount,
-    setQueryRetryCount
+    setQueryRetryCount,
+    currentIsConnected,
+    customMessage,
+    customMessageEnabled
   }) || {};
   const gmOps = {
-    walletMessagesData: { walletMessages: 0 },
+    walletMessagesData: { walletMessages: null },
     subscriptionStatus: {},
     streamEventsData: [],
     gmEventsData: {},
@@ -1091,17 +1278,32 @@ function App({ chainId, appId, ownerId, inviter, port }) {
       return;
     }
     
-    if (!currentAccount) {
-      setShowHistoryDropdown(true);
+    if (!currentIsConnected || !currentAccount) {
+      addNotification('Please connect your wallet first to view chat history', 'info');
+      const walletSection = document.querySelector('.wallet-connection-section');
+      if (walletSection) {
+        walletSection.scrollIntoView({ behavior: 'smooth' });
+      }
       return;
     }
     
     try {
       setHistoryLoading(true);
-      const { data } = await gmOps.refetchGmEvents();
       
-      if (data && data.getGmEvents) {
-        const sortedRecords = [...data.getGmEvents].sort((a, b) => 
+      const [sentData, receivedData] = await Promise.all([
+        gmOps.refetchGmEvents(),
+        gmOps.refetchReceivedGmEvents()
+      ]);
+      
+      const sentEvents = sentData.data?.getGmEvents || [];
+      const receivedEvents = receivedData.data?.getReceivedGmEvents || [];
+      
+
+      
+      const allEvents = [...sentEvents, ...receivedEvents];
+      
+      if (allEvents.length > 0) {
+        const sortedRecords = allEvents.sort((a, b) => 
           parseInt(b.timestamp) - parseInt(a.timestamp)
         );
         
@@ -1110,7 +1312,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
         setHistoryRecords([]);
       }
     } catch (error) {
-      console.error('Error fetching history:', error);
+
       setHistoryRecords([]);
     } finally {
       setHistoryLoading(false);
@@ -1216,7 +1418,6 @@ function App({ chainId, appId, ownerId, inviter, port }) {
               console.log('Syncing 24-hour limit status:', currentCooldownStatus ? 'ENABLED' : 'DISABLED');
             }
           }).catch(error => {
-            console.warn('Failed to sync 24-hour limit status (non-critical):', error.message);
             const cachedCooldownStatus = additionalData.cooldownStatusData?.getCooldownStatus?.enabled;
             if (typeof cachedCooldownStatus === 'boolean') {
               setLocalCooldownEnabled(cachedCooldownStatus);
@@ -1280,7 +1481,15 @@ function App({ chainId, appId, ownerId, inviter, port }) {
           processedEventsRef.current.add(eventId);
         });
         
-        setGmRecords([]);
+        setTimeout(() => {
+          const initialRecords = allEvents.map(event => ({
+            sender: event.sender,
+            recipient: event.recipient,
+            timestamp: event.timestamp,
+            content: event.content || 'Gmicrochains'
+          }));
+          setGmRecords(initialRecords);
+        }, 100);
       } else {
         const newEvents = allEvents.filter((event, index) => {
           const eventId = eventIds[index];
@@ -1436,7 +1645,12 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     gmOps.handleClaimInvitationRewards();
   }, [gmOps]);
 
-  const handleSendGM = useCallback(async () => {
+  const handleSendGM = useCallback(async (messageType = "text", contentUrl = null) => {
+
+    if (isSendingMessage) {
+      return;
+    }
+    
     if (!currentIsConnected) {
       if (window.linera) {
         connectWallet('linera');
@@ -1451,18 +1665,64 @@ function App({ chainId, appId, ownerId, inviter, port }) {
       return;
     }
     
-    let formattedRecipient = null;
-    if (recipientAddress && recipientAddress.trim() !== '') {
-      formattedRecipient = gmOps.formatAccountOwner(recipientAddress);
-      const validation = gmOps.validateRecipientAddress(formattedRecipient);
-      if (!validation.isValid) {
-        setAddressValidationError(validation.error);
-        return;
-      }
+    if (currentAccount && !gmOps.isValidAccountOwner(currentAccount)) {
+      addNotification('Your wallet：connection', 'error');
+      return;
     }
     
-    const messageContent = customMessageEnabled ? customMessage : null;
-    await gmOps.handleSendGM(messageContent, formattedRecipient, urlInviter);
+    let formattedRecipient = null;
+
+    if (recipientAddress && recipientAddress.trim() !== '') {
+      formattedRecipient = gmOps.formatAccountOwner(recipientAddress);
+
+      const validation = gmOps.validateRecipientAddress(formattedRecipient);
+
+      if (!validation.isValid) {
+        addNotification(validation.error, 'error');
+
+        return;
+      }
+    } else {
+
+    }
+    
+    let messageContent = customMessageEnabled ? customMessage : null;
+    
+    if (messageType === "gif") {
+      if (contentUrl) {
+        messageContent = contentUrl;
+
+      } else if (selectedGif) {
+        messageContent = selectedGif;
+
+      }
+    } else if (messageType === "voice") {
+      if (contentUrl) {
+        messageContent = contentUrl;
+
+      } else {
+        messageContent = '🎤 Voice Message';
+
+      }
+    }   
+
+    setIsSendingMessage(true);
+    
+    try {
+      await gmOps.handleSendGM(messageContent, formattedRecipient, urlInviter, messageType);
+
+    } finally {
+
+      setIsSendingMessage(false);
+    }
+    
+    if (messageType === "gif") {
+      setSelectedGif('');
+    }
+
+    if (messageType === 'text' && customMessageEnabled && customMessage.trim() !== '') {
+      setCustomMessage('');
+    }
     
     setTimeout(() => {
       if (additionalData.refetchCooldownStatus) {
@@ -1478,12 +1738,36 @@ function App({ chainId, appId, ownerId, inviter, port }) {
         gmOps.refetchWalletMessages();
       }
     }, 1000);
-  }, [currentIsConnected, connectWallet, gmOps, addNotification, customMessageEnabled, customMessage, additionalData, recipientAddress, setAddressValidationError, urlInviter]);
+  }, [currentIsConnected, connectWallet, gmOps, addNotification, customMessageEnabled, customMessage, selectedGif, additionalData, recipientAddress, setAddressValidationError, urlInviter, isSendingMessage]);
+
+  const handleGifSelect = useCallback((gifUrl, gmOperations) => {
+
+    setSelectedGif(gifUrl);
+    setShowGifPicker(false);
+    
+    if (!currentIsConnected) {
+      addNotification('Please connect your wallet first', 'error');
+      setSelectedGif('');
+      return;
+    }
+
+
+    if (currentAccount && gmOperations?.isValidAccountOwner(currentAccount)) {
+
+      handleSendGM("gif", gifUrl);
+    } else if (currentIsConnected) {
+
+      handleSendGM("gif", gifUrl);
+    } else {
+
+      addNotification('Invalid wallet account format', 'error');
+      setSelectedGif('');
+    }
+  }, [currentAccount, currentIsConnected, addNotification, recipientAddress, currentChatPartner]);
 
   return (
     <ErrorBoundary>
       <div>
-
         <button 
           className="referral-floating-btn"
           onClick={handleToggleShareReferral}
@@ -1494,201 +1778,201 @@ function App({ chainId, appId, ownerId, inviter, port }) {
         {showShareReferralModal && (
           <div className="modal-overlay" onClick={handleToggleShareReferral}>
             <div className="referral-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Share Your Referral Link ✨</h3>
-              <button className="modal-close" onClick={handleToggleShareReferral}>×</button>
-            </div>
-            <div className="modal-content">
-              {memoizedCurrentAccount && (
-                <>
-                  <div className="referral-stats">
-                    <button 
-                      className="refresh-btn" 
-                      onClick={() => shareModalAdditionalData?.refetchInvitationStats && shareModalAdditionalData.refetchInvitationStats()}
-                      title="Refresh invitation stats"
-                    >
-                      🔄 Refresh
-                    </button>
-                <div className="referral-stat-item">
-                  <div className="dropdown-container">
-                    <div 
-                      className="referral-stat-label dropdown-toggle"
-                      onClick={() => {
-                        if (!shareModalAdditionalData?.invitationStatsData?.totalInvited || !currentAccount) return;
-                        const event = new CustomEvent('toggleInvitedUsersDropdown', {
-                          detail: { userId: currentAccount }
-                        });
-                        window.dispatchEvent(event);
-                        setShowInvitedUsersDropdown(!showInvitedUsersDropdown);
-                      }}
-                      style={{ cursor: shareModalAdditionalData?.invitationStatsData?.totalInvited > 0 ? 'pointer' : 'default' }}
-                    >
-                      Invited Users: {showInvitedUsersDropdown ? '▲' : '▼'}
-                    </div>
-                    <span className="referral-stat-value">{(() => {
-                      try {
-                        return Number(shareModalAdditionalData?.invitationStatsData?.totalInvited) || 0;
-                      } catch (error) {
-                        return 0;
-                      }
-                    })()}</span>
-                    <div className={`invited-users-dropdown ${showInvitedUsersDropdown ? 'show' : ''}`}>
-            {invitedUsersLoading ? (
-              <div className="invitation-loading">Loading...</div>
-            ) : invitedUsers.length > 0 ? (
-              <div className="invitation-list">
-                {invitedUsers.map((user, index) => (
-                    <div key={index} className="invitation-item">
-                      <div className="invitation-sender">
-                          {formatAddressForDisplay(user.invitee)}
-                      </div>
-                    </div>
-                  ))}
+              <div className="modal-header">
+                <h3>Share Your Referral Link ✨</h3>
+                <button className="modal-close" onClick={handleToggleShareReferral}>×</button>
               </div>
-            ) : (
-              <div className="invitation-empty">No invited users found</div>
-            )}
-          </div>
-                  </div>
-                </div>
-                <div className="referral-stat-item">
-                  <span className="referral-stat-label">Your Reward Points:</span>
-                  <span className="referral-stat-value">{(() => {
-                    try {
-                      return Number(shareModalAdditionalData?.invitationStatsData?.totalRewards) || 0;
-                    } catch (error) {
-                      return 0;
-                    }
-                  })()}</span>
-                </div>
-                {(() => {
-                  try {
-                    const lastRewardTime = shareModalAdditionalData?.invitationStatsData?.lastRewardTime;
-                    return lastRewardTime ? (
-                      <div className="referral-stat-item">
-                        <span className="referral-stat-label">Last Reward:</span>
-                        <span className="referral-stat-value">{new Date(Number(lastRewardTime) / 1000).toLocaleString()}</span>
-                      </div>
-                    ) : null;
-                  } catch (error) {
-                    return null;
-                  }
-                })()}
-                </div>
-                <div className="referral-link-section">
-                    <label>Your Referral Link:</label>
-                    <div className="link-container">
-                      <input 
-                        type="text" 
-                        value={`${window.location.origin}?inviter=${memoizedCurrentAccount}`}
-                        readOnly
-                        className="referral-link-input"
-                      />
-                      <button onClick={copyReferralLink} className={`copy-btn ${copySuccess ? 'copied' : ''}`}>
-                        {copySuccess ? 'Copied!' : 'Copy'}
+              <div className="modal-content">
+                {memoizedCurrentAccount && (
+                  <>
+                    <div className="referral-stats">
+                      <button 
+                        className="refresh-btn" 
+                        onClick={() => shareModalAdditionalData?.refetchInvitationStats && shareModalAdditionalData.refetchInvitationStats()}
+                        title="Refresh invitation stats"
+                      >
+                        🔄 Refresh
                       </button>
+                      <div className="referral-stat-item">
+                        <div className="dropdown-container">
+                          <div 
+                            className="referral-stat-label dropdown-toggle"
+                            onClick={() => {
+                              if (!shareModalAdditionalData?.invitationStatsData?.totalInvited || !currentAccount) return;
+                              const event = new CustomEvent('toggleInvitedUsersDropdown', {
+                                detail: { userId: currentAccount }
+                              });
+                              window.dispatchEvent(event);
+                              setShowInvitedUsersDropdown(!showInvitedUsersDropdown);
+                            }}
+                            style={{ cursor: shareModalAdditionalData?.invitationStatsData?.totalInvited > 0 ? 'pointer' : 'default' }}
+                          >
+                            Invited Users: {showInvitedUsersDropdown ? '▲' : '▼'}
+                          </div>
+                          <span className="referral-stat-value">{(() => {
+                            try {
+                              return Number(shareModalAdditionalData?.invitationStatsData?.totalInvited) || 0;
+                            } catch (error) {
+                              return 0;
+                            }
+                          })()}</span>
+                          <div className={`invited-users-dropdown ${showInvitedUsersDropdown ? 'show' : ''}`}>
+                            {invitedUsersLoading ? (
+                              <div className="invitation-loading">Loading...</div>
+                            ) : invitedUsers.length > 0 ? (
+                              <div className="invitation-list">
+                                {invitedUsers.map((user, index) => (
+                                  <div key={index} className="invitation-item">
+                                    <div className="invitation-sender">
+                                      {formatAddressForDisplay(user.invitee)}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="invitation-empty">No invited users found</div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="referral-stat-item">
+                        <span className="referral-stat-label">Your Reward Points:</span>
+                        <span className="referral-stat-value">{(() => {
+                          try {
+                            return Number(shareModalAdditionalData?.invitationStatsData?.totalRewards) || 0;
+                          } catch (error) {
+                            return 0;
+                          }
+                        })()}</span>
+                      </div>
+                      {(() => {
+                        try {
+                          const lastRewardTime = shareModalAdditionalData?.invitationStatsData?.lastRewardTime;
+                          return lastRewardTime ? (
+                            <div className="referral-stat-item">
+                              <span className="referral-stat-label">Last Reward:</span>
+                              <span className="referral-stat-value">{new Date(Number(lastRewardTime) / 1000).toLocaleString()}</span>
+                            </div>
+                          ) : null;
+                        } catch (error) {
+                          return null;
+                        }
+                      })()}
                     </div>
-                  </div>
-                  <div className="share-options">
-                    <p className="share-label">Share directly:</p>
-                    <div className="social-buttons">
-                      <a 
-                        href={`https://twitter.com/intent/tweet?text=Join%20GMicrochains%20and%20use%20my%20referral%20link!&url=${encodeURIComponent(window.location.origin + '?inviter=' + memoizedCurrentAccount)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="social-btn twitter"
-                      >
-                        Twitter
-                      </a>
-                      <a 
-                        href={`https://t.me/share/url?url=${encodeURIComponent(window.location.origin + '?inviter=' + memoizedCurrentAccount)}&text=Join%20GMicrochains%20and%20use%20my%20referral%20link!`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="social-btn telegram"
-                      >
-                        Telegram
-                      </a>
+                    <div className="referral-link-section">
+                      <label>Your Referral Link:</label>
+                      <div className="link-container">
+                        <input 
+                          type="text" 
+                          value={`${window.location.origin}?inviter=${memoizedCurrentAccount}`}
+                          readOnly
+                          className="referral-link-input"
+                        />
+                        <button onClick={copyReferralLink} className={`copy-btn ${copySuccess ? 'copied' : ''}`}>
+                          {copySuccess ? 'Copied!' : 'Copy'}
+                        </button>
+                      </div>
                     </div>
+                    <div className="share-options">
+                      <p className="share-label">Share directly:</p>
+                      <div className="social-buttons">
+                        <a 
+                          href={`https://twitter.com/intent/tweet?text=Join%20GMicrochains%20and%20use%20my%20referral%20link!&url=${encodeURIComponent(window.location.origin + '?inviter=' + memoizedCurrentAccount)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="social-btn twitter"
+                        >
+                          Twitter
+                        </a>
+                        <a 
+                          href={`https://t.me/share/url?url=${encodeURIComponent(window.location.origin + '?inviter=' + memoizedCurrentAccount)}&text=Join%20GMicrochains%20and%20use%20my%20referral%20link!`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="social-btn telegram"
+                        >
+                          Telegram
+                        </a>
+                      </div>
+                    </div>
+                    <div className="referral-rewards-info">
+                      <p>Invite a user to send their first GMIC → 30 points</p>
+                      <p>Each GMIC they send after → +10 points</p>
+                    </div>
+                  </>
+                )}
+                {!memoizedCurrentAccount && (
+                  <div className="no-wallet-message">
+                    <p>Please connect your wallet to access your referral link</p>
                   </div>
-                  <div className="referral-rewards-info">
-                    <p>Invite a user to send their first GMIC → 30 points</p>
-                    <p>Each GMIC they send after → +10 points</p>
-                  </div>
-                </>
-              )}
-              {!memoizedCurrentAccount && (
-                <div className="no-wallet-message">
-                  <p>Please connect your wallet to access your referral link</p>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-      <header className="top-navbar">
-        <div className="navbar-container">
-          <div className="logo">
-            <img src="/GMic.png" alt="GMIC Logo" className="logo-img" />
+        )}
+        <header className="top-navbar">
+          <div className="navbar-container">
+            <div className="logo">
+              <img src="/GMic.png" alt="GMIC Logo" className="logo-img" />
+            </div>
+            <nav className="nav-links">
+              <button 
+                className={`nav-tab ${activeTab === 'messages' ? 'active' : ''}`}
+                onClick={() => setActiveTab('messages')}
+              >
+                Messages
+              </button>
+              <button 
+                className={`nav-tab ${activeTab === 'leaderboards' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveTab('leaderboards');
+                  setShowLeaderboard(true);
+                  setTimeout(() => {
+                    const shouldRefetch = (
+                      !additionalData.leaderboardData?.getTopUsers || 
+                      additionalData.leaderboardData.getTopUsers.length === 0 ||
+                      (additionalData.leaderboardData && !additionalData.leaderboardData.getTopUsers) ||
+                      additionalData.leaderboardError
+                    );
+                    
+                    if (shouldRefetch && additionalData.refetchLeaderboard) {
+                      additionalData.refetchLeaderboard();
+                    }
+                    if (additionalData.refetchInvitationLeaderboard) {
+                      additionalData.refetchInvitationLeaderboard();
+                    }
+                  }, 0);
+                }}
+              >
+                Leaderboards
+              </button>
+              <button 
+                className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
+                onClick={() => setActiveTab('settings')}
+              >
+                Settings
+              </button>
+            </nav>
+            <WalletConnectionSection 
+              isDynamicConnected={isDynamicConnected}
+              isActiveDynamicWallet={isActiveDynamicWallet}
+              currentAccount={currentAccount}
+              isDynamicLoading={isDynamicLoading}
+              currentIsConnected={currentIsConnected}
+              disconnectDynamicWallet={() => disconnectDynamicWallet(disconnectWallet)}
+              addNotification={addNotification}
+              dynamicAccount={dynamicAccount}
+              connectWallet={connectWallet}
+              disconnectWallet={disconnectWallet}
+              walletType={walletType}
+              isLoading={walletLoading}
+              primaryWallet={primaryWallet}
+            />
           </div>
-          <nav className="nav-links">
-            <button 
-              className={`nav-tab ${activeTab === 'messages' ? 'active' : ''}`}
-              onClick={() => setActiveTab('messages')}
-            >
-              Messages
-            </button>
-            <button 
-              className={`nav-tab ${activeTab === 'leaderboards' ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTab('leaderboards');
-                setShowLeaderboard(true);
-                setTimeout(() => {
-                  const shouldRefetch = (
-                    !additionalData.leaderboardData?.getTopUsers || 
-                    additionalData.leaderboardData.getTopUsers.length === 0 ||
-                    (additionalData.leaderboardData && !additionalData.leaderboardData.getTopUsers) ||
-                    additionalData.leaderboardError
-                  );
-                  
-                  if (shouldRefetch && additionalData.refetchLeaderboard) {
-                    additionalData.refetchLeaderboard();
-                  }
-                  if (additionalData.refetchInvitationLeaderboard) {
-                    additionalData.refetchInvitationLeaderboard();
-                  }
-                }, 0);
-              }}
-            >
-              Leaderboards
-            </button>
-            <button 
-              className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
-              onClick={() => setActiveTab('settings')}
-            >
-              Settings
-            </button>
-          </nav>
-          <WalletConnectionSection 
-            isDynamicConnected={isDynamicConnected}
-            isActiveDynamicWallet={isActiveDynamicWallet}
-            currentAccount={currentAccount}
-            isDynamicLoading={isDynamicLoading}
-            currentIsConnected={currentIsConnected}
-            disconnectDynamicWallet={() => disconnectDynamicWallet(disconnectWallet)}
-            addNotification={addNotification}
-            dynamicAccount={dynamicAccount}
-            connectWallet={connectWallet}
-            disconnectWallet={disconnectWallet}
-            walletType={walletType}
-            isLoading={walletLoading}
-            primaryWallet={primaryWallet}
-          />
-        </div>
-      </header>
-
+        </header>
+      </div>
       <div className="App-content">
         <div className="App">
-          <header className="App-header">
+          <div className="App-header">
             {walletError && (
               <div className="alert error">{walletError}</div>
             )}
@@ -1746,55 +2030,56 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                 <div className="card stats-card">                  
                   <div className="stats-panel">
                     <div className="stats-left">
-                      <div className="stats-grid">
-                        <div className="stat-item">
-                          <div className="stat-value">{gmOps.data?.totalMessages || (gmOps.loading ? '***' : 'No data')}</div>
-                          <div className="stat-label">Total GMIC</div>
+                      <div className="stats-vertical">
+                        <div className="stat-row">
+                          <span className="stat-label">Total GMIC：</span>
+                          <span className="stat-value">
+                            {gmOps.data?.totalMessages ?? (gmOps.loading ? '***' : '0')}
+                          </span>
                         </div>
-                        <div className="stat-item">
-                          <div className="stat-value">
-                            {currentIsConnected && gmOps.isValidAccountOwner(currentAccount) ? (
-                              gmOps.walletMessagesData?.walletMessages !== undefined && gmOps.walletMessagesData?.walletMessages !== null ? gmOps.walletMessagesData.walletMessages : '0'
+                        <div className="stat-row">
+                          <span className="stat-label">Your GMIC：</span>
+                          <span className="stat-value">
+                            {currentIsConnected && gmOps.isValidAccountOwner(currentAccount) && gmOps.walletMessagesData?.walletMessages !== null ? (
+                              gmOps.walletMessagesData.walletMessages
                             ) : (
                               <span className="connect-wallet-prompt">？</span>
                             )}
-                          </div>
-                          <div className="stat-label">Your GMIC</div>
+                          </span>
                         </div>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="cooldown-timer-container">
-                    <div className="cooldown-timer-header">
-                      <div className="cooldown-timer-label">Cooldown Timer</div>
-                      <div className="cooldown-timer-status" data-status={localCooldownEnabled ? 'enabled' : 'disabled'}>
-                        {localCooldownEnabled ? 'Enabled' : 'Disabled'}
+                    <div className="cooldown-timer-container">
+                      <div className="cooldown-timer-header">
+                        <div className="cooldown-timer-label">Cooldown Timer</div>
+                        <div className="cooldown-timer-status" data-status={localCooldownEnabled ? 'enabled' : 'disabled'}>
+                          {localCooldownEnabled ? 'Enabled' : 'Disabled'}
+                        </div>
                       </div>
-                    </div>
-                    <div className="cooldown-timer-bar-container">
-                      <div className="cooldown-timer-bar">
-                        <div className="cooldown-timer-track"></div>
-                        <div 
-                          className={`cooldown-timer-fill ${localCooldownEnabled ? 'active' : 'inactive'} ${cooldownRemaining > 0 ? 'cooldown-remaining' : 'cooldown-complete'}`}
-                          style={{ 
-                            width: localCooldownEnabled ? 
-                              (cooldownRemaining > 0 ? 
-                                `${Math.max(0, Math.min(100, (cooldownRemaining / 86400000) * 100))}%` : 
-                                '0%') : 
-                              '100%'
-                          }}
-                        ></div>
-                        {localCooldownEnabled && cooldownRemaining > 0 && (
+                      <div className="cooldown-timer-bar-container">
+                        <div className="cooldown-timer-bar">
+                          <div className="cooldown-timer-track"></div>
                           <div 
-                            className={`cooldown-timer-countdown ${((cooldownRemaining / 86400000) * 100) > 90 ? 'below' : 'right'}`}
+                            className={`cooldown-timer-fill ${localCooldownEnabled ? 'active' : 'inactive'} ${cooldownRemaining > 0 ? 'cooldown-remaining' : 'cooldown-complete'}`}
                             style={{ 
-                              left: `${Math.max(0, Math.min(100, (cooldownRemaining / 86400000) * 100))}%`
+                              width: localCooldownEnabled ? 
+                                (cooldownRemaining > 0 ? 
+                                  `${Math.max(0, Math.min(100, (cooldownRemaining / 86400000) * 100))}%` : 
+                                  '0%') : 
+                                '100%'
                             }}
-                          >
-                            {gmOps.formatCooldown(cooldownRemaining)}
-                          </div>
-                        )}
+                          ></div>
+                          {localCooldownEnabled && cooldownRemaining > 0 && (
+                            <div 
+                              className={`cooldown-timer-countdown ${((cooldownRemaining / 86400000) * 100) > 90 ? 'below' : 'right'}`}
+                              style={{ 
+                                left: `${Math.max(0, Math.min(100, (cooldownRemaining / 86400000) * 100))}%`
+                              }}
+                            >
+                              {gmOps.formatCooldown(cooldownRemaining)}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1839,90 +2124,6 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                           "🔒 Enable 24-Hour Limit"
                         )}
                       </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="card ad-system-card">
-                  <div className="section-header">
-                    <h3>Ad System Settings</h3>
-                    <span className="whitelist-badge">Whitelist Only</span>
-                  </div>
-                  <div className="ad-system-content">
-                    <div className="ad-list">
-                      {adSettings.map((ad, index) => (
-                        (showAllAds || index === 0) && (
-                          <div key={index} className="ad-item">
-                            <div className="ad-input-group">
-                              <label>Ad URL:</label>
-                              <input
-                                type="url"
-                                value={ad.url}
-                                onChange={(e) => handleAdChange(index, 'url', e.target.value)}
-                                placeholder="https://example.com"
-                              />
-                            </div>
-                            <div className="ad-input-group">
-                              <label>Image URL:</label>
-                              <input
-                                type="url"
-                                value={ad.imageUrl}
-                                onChange={(e) => handleAdChange(index, 'imageUrl', e.target.value)}
-                                placeholder="https://example.com/image.jpg"
-                              />
-                            </div>
-                            <button
-                              className="remove-ad-btn"
-                              onClick={() => handleRemoveAd(index)}
-                              disabled={adSettings.length <= 1}
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        )
-                      ))}
-                      {adSettings.length > 1 && (
-                        <button
-                          className="action-btn toggle-ads-btn"
-                          onClick={() => setShowAllAds(!showAllAds)}
-                          style={{ marginTop: '10px' }}
-                        >
-                          {showAllAds ? '▲ Hide Additional Ads' : '▼ Show All Ads'}
-                        </button>
-                      )}
-                    </div>
-                    {adSettings.length < 10 && (
-                      <button
-                        className="action-btn primary add-ad-btn"
-                        onClick={handleAddAd}
-                      >
-                        + Add New Ad
-                      </button>
-                    )}
-                    <div className="ad-actions-row">
-                      <button
-                        className="action-btn primary save-ad-btn"
-                        onClick={handleSaveAds}
-                      >
-                        💾 Save Locally
-                      </button>
-                      <div className="import-export-buttons">
-                        <button
-                          className="action-btn primary export-ad-btn"
-                          onClick={handleExportAds}
-                        >
-                          📤 Export JSON
-                        </button>
-                        <label className="action-btn primary import-ad-btn">
-                          📥 Import JSON
-                          <input
-                            type="file"
-                            accept=".json"
-                            onChange={handleImportAds}
-                            style={{ display: 'none' }}
-                          />
-                        </label>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -2042,199 +2243,297 @@ function App({ chainId, appId, ownerId, inviter, port }) {
 
             {activeTab === 'messages' && (
               <>
-                <div className="card custom-message-card">
-                  <div className="custom-message-header">
-                    <label>Custom Message</label>
-                    <div className={`toggle-switch ${customMessageEnabled ? 'active' : ''}`} id="customToggle" onClick={handleCustomMessageToggle}>
-                      <div className="toggle-switch-thumb"></div>
+                <div className="card chat-history-card">
+                  <ChatHistory 
+                    currentAccount={currentAccount} 
+                    isMobile={isMobile} 
+                    gmOps={gmOps} 
+                    currentChatPartner={currentChatPartner}
+                    onChatPartnerChange={handleChatPartnerChange}
+                    currentIsConnected={currentIsConnected}
+                  />
+                </div>
+
+                <div className="card send-action-card">
+                  {currentChatPartner && (
+                    <div className="selected-recipient">
+                      <span className="recipient-label">To:</span>
+                      <span className="recipient-address">{formatAddressForDisplay(currentChatPartner, isMobile, 6, 4)}</span>
+                      <button 
+                        className="clear-recipient-btn"
+                        onClick={() => handleChatPartnerChange(null)}
+                        title="Clear recipient"
+                      >
+                        ✕
+                      </button>
                     </div>
-                  </div>
-                  <div className={`message-editor ${customMessageEnabled ? 'visible' : 'hidden'}`} id="messageEditor">
-                    <div className="message-input-container">
-                      <textarea 
-                        id="customMessage" 
-                        placeholder="● Default: GMicrochains"
-                        value={customMessage}
-                        onChange={handleCustomMessageChange}
-                        maxLength={MAX_MESSAGE_LENGTH}
-                      ></textarea>
+                  )}
+
+                  <div className="send-actions">
+                    <div className="send-button-container">
+                      <button 
+                        className={`voice-toggle ${isVoiceMode ? 'active' : ''}`}
+                        onClick={() => setIsVoiceMode(!isVoiceMode)}
+                        title={isVoiceMode ? "Switch to text mode" : "Switch to voice mode"}
+                      >
+                        <div className="icon-container">
+                        <div className={`icon-wrapper ${isVoiceMode ? 'show-keyboard' : 'show-voice'}`}>
+                          <KeyboardIcon className="keyboard-icon" />
+                          <VoiceIcon className="voice-icon" />
+                        </div>
+                      </div>
+                      </button>
+                      
+                      {isVoiceMode ? (
+                        <button 
+                          className={`send-button voice-mode ${isLongPressing ? 'long-pressing' : ''}`} 
+                          id="sendButton"
+                          onMouseDown={handleVoicePressStart}
+                          onMouseUp={handleVoicePressEnd}
+                          onMouseLeave={handleVoicePressEnd}
+                          onTouchStart={handleVoicePressStart}
+                          onTouchEnd={handleVoicePressEnd}
+                          disabled={isButtonDisabled(operationStatus, currentAccount, gmOps, cooldownRemaining, localCooldownEnabled, currentIsConnected) || isSendingMessage}
+                        >
+                          {operationStatus === "processing" ? (
+                            <span className="button-loading">
+                              <span className="spinner">⏳</span> Sending...
+                            </span>
+                          ) : !currentIsConnected ? (
+                            "🔒 Connect wallet"
+                          ) : !gmOps.isValidAccountOwner(currentAccount) ? (
+                            "🔒 Invalid account"
+                          ) : localCooldownEnabled && cooldownRemaining > 0 ? (
+                            `🔓 ${gmOps.formatCooldown(cooldownRemaining)}`
+                          ) : (
+                            "🎤 Hold to speak"
+                          )}
+                        </button>
+                      ) : (
+                        <div className="message-input-wrapper">
+                          <textarea 
+                            className="message-input"
+                            placeholder={
+                              !currentIsConnected ? "Please connect wallet" :
+                              !gmOps.isValidAccountOwner(currentAccount) ? "Invalid account" :
+                              (localCooldownEnabled && cooldownRemaining > 0) ? "24-hour cooldown active" :
+                              "GMicrochains"
+                            }
+                            value={customMessageEnabled ? customMessage : ""}
+                            onChange={(e) => {
+                              if (customMessageEnabled) {
+                                handleCustomMessageChange(e);                              
+                                const textarea = e.target;
+                                textarea.style.height = 'auto';
+                                textarea.style.height = textarea.scrollHeight + 'px';
+                              }
+                            }}
+                            onFocus={() => {
+                              setMessageInputFocused(true);
+                            }}
+                            onBlur={(e) => {
+                              if (e.relatedTarget && e.relatedTarget.className && 
+                                  e.relatedTarget.className.includes('send-message-button')) {
+                                return;
+                              }
+                              setMessageInputFocused(false);
+                            }}
+                            onKeyDown={(e) => {
+
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                if (messageInputFocused && currentIsConnected && !isSendingMessage) {
+                                  handleSendGM("text");
+                                }
+                              }
+                            }}
+                            autoFocus={false}
+                            rows={1}
+                            disabled={!currentIsConnected || !gmOps.isValidAccountOwner(currentAccount) || (localCooldownEnabled && cooldownRemaining > 0)}
+                          />
+                          <div className={`contact-selector ${currentChatPartner ? 'hidden' : ''} ${showContactList ? 'active' : ''}`}>
+                            {!showHistoryDropdown && !currentChatPartner && (
+                              <div 
+                                className="contact-avatar"
+                                onClick={() => {
+                                  if (!currentIsConnected || !gmOps.isValidAccountOwner(currentAccount) || (localCooldownEnabled && cooldownRemaining > 0)) {
+                                    return;
+                                  }
+                                  setShowContactList(!showContactList);
+                                }}
+                                style={{
+                                  opacity: (!currentIsConnected || !gmOps.isValidAccountOwner(currentAccount) || (localCooldownEnabled && cooldownRemaining > 0)) ? '0.5' : '1',
+                                  cursor: (!currentIsConnected || !gmOps.isValidAccountOwner(currentAccount) || (localCooldownEnabled && cooldownRemaining > 0)) ? 'not-allowed' : 'pointer'
+                                }}
+                                title={
+                                  !currentIsConnected ? "Please connect wallet" :
+                                  !gmOps.isValidAccountOwner(currentAccount) ? "Invalid account" :
+                                  (localCooldownEnabled && cooldownRemaining > 0) ? "24-hour cooldown active" :
+                                  "Select contact"
+                                }
+                              >
+                                👤
+                              </div>
+                            )}
+                            {showContactList && (
+                              <div className="contact-dropdown">
+                                <div className="contact-list">
+                                  <div 
+                                    className="contact-item"
+                                    onClick={() => {
+                                      const wuya51Address = '0xfe609ad118ba733dafb3ce2b6094c86a441b10de4ffd1651251fffe973efd959';
+
+                                      if (currentAccount && currentAccount.toLowerCase() === wuya51Address.toLowerCase()) {
+                                        addNotification('Cannot send GMicrochains to yourself', 'error');
+                                        setShowContactList(false);
+                                        return;
+                                      }
+                                      setRecipientAddress(wuya51Address);
+                                      setCurrentChatPartner(wuya51Address);
+                                      setShowContactList(false);
+
+                                    }}
+                                  >
+                                    <span className="contact-avatar-small">👤</span>
+                                    <span className="contact-name">wuya51</span>
+                                    <span className="contact-address">0xfe60...f959</span>
+                                  </div>
+                                  {showSetRecipientInput ? (
+                                    <div className="contact-item set-recipient-input">
+                                      <input
+                                        type="text"
+                                        className={`contact-address-input ${newRecipientValidationError ? 'error' : ''}`}
+                                        placeholder="Enter recipient address (0x...)"
+                                        value={newRecipientAddress}
+                                        onChange={(e) => {
+                                          setNewRecipientAddress(e.target.value);
+                                          if (newRecipientValidationError) {
+                                            setNewRecipientValidationError('');
+                                          }
+                                        }}
+                                        onBlur={() => {
+                                          if (gmOps && gmOps.validateRecipientAddress) {
+                                            const validation = gmOps.validateRecipientAddress(newRecipientAddress);
+                                            if (!validation.isValid) {
+                                              setNewRecipientValidationError(validation.error);
+                                            } else {
+                                              setNewRecipientValidationError('');
+                                            }
+                                          }
+                                        }}
+                                        autoFocus
+                                      />
+                                      <button 
+                                        className={`confirm-contact-button ${newRecipientValidationError ? 'disabled' : ''}`}
+                                        onClick={() => {
+                                          if (gmOps && gmOps.validateRecipientAddress) {
+                                            const validation = gmOps.validateRecipientAddress(newRecipientAddress);
+                                            if (!validation.isValid) {
+                                              setNewRecipientValidationError(validation.error);
+                                              return;
+                                            }
+                                          }
+                                          
+                                          if (newRecipientAddress.trim()) {
+                                            setRecipientAddress(newRecipientAddress.trim());
+                                            setCurrentChatPartner(newRecipientAddress.trim());
+                                            setShowContactList(false);
+                                        setShowSetRecipientInput(false);
+                                        setNewRecipientAddress('');
+                                        setNewRecipientValidationError('');
+                                            
+                                            const newContact = {
+                                              address: newRecipientAddress.trim(),
+                                              name: '',
+                                              avatar: '👤'
+                                            };
+                                            setRecentContacts(prev => [newContact, ...prev.filter(c => c.address !== newRecipientAddress.trim())]);
+                                          }
+                                        }}
+                                        disabled={!!newRecipientValidationError}
+                                      >
+                                        Set Recipient
+                                      </button>
+                                      {newRecipientValidationError && (
+                                        <div className="address-validation-error">
+                                          {newRecipientValidationError}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div 
+                                      className="contact-item set-recipient"
+                                      onClick={() => {
+                                        setShowSetRecipientInput(true);
+                                        setNewRecipientAddress('');
+                                      }}
+                                    >
+                                      <span className="contact-avatar-small">+</span>
+                                      <span className="contact-name">Set Recipient</span>
+                                      <span className="contact-description">Enter wallet address</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
                       <div className="message-buttons">
                         <button 
                           className="emoji-picker-button"
                           onClick={() => {
+                            if (!currentIsConnected || !gmOps.isValidAccountOwner(currentAccount) || (localCooldownEnabled && cooldownRemaining > 0)) {
+                              return;
+                            }
                             setShowEmojiPicker(!showEmojiPicker);
                             setShowGifPicker(false);
                           }}
-                          title="Add emoji"
+                          disabled={!currentIsConnected || !gmOps.isValidAccountOwner(currentAccount) || (localCooldownEnabled && cooldownRemaining > 0)}
+                          title={
+                            !currentIsConnected ? "Please connect wallet" :
+                            !gmOps.isValidAccountOwner(currentAccount) ? "Invalid account" :
+                            (localCooldownEnabled && cooldownRemaining > 0) ? "24-hour cooldown active" :
+                            "Add emoji"
+                          }
+                          style={{
+                            opacity: (!currentIsConnected || !gmOps.isValidAccountOwner(currentAccount) || (localCooldownEnabled && cooldownRemaining > 0)) ? '0.5' : '1',
+                            cursor: (!currentIsConnected || !gmOps.isValidAccountOwner(currentAccount) || (localCooldownEnabled && cooldownRemaining > 0)) ? 'not-allowed' : 'pointer'
+                          }}
                         >
                           😊
                         </button>
                         <button 
-                          className="gif-picker-button"
+                          className={`send-message-button ${messageInputFocused ? 'send-mode' : 'gif-mode'}`}
                           onClick={() => {
-                            setShowGifPicker(!showGifPicker);
-                            setShowEmojiPicker(false);
+
+                            if (messageInputFocused && !isSendingMessage) {
+
+                              handleSendGM("text");
+                            } else {
+                              setShowGifPicker(!showGifPicker);
+                              setShowEmojiPicker(false);
+                            }
                           }}
-                          title="Add GIF"
+                          disabled={isButtonDisabled(operationStatus, currentAccount, gmOps, cooldownRemaining, localCooldownEnabled, currentIsConnected) || isSendingMessage}
+                          title={messageInputFocused ? "Send message" : "Add GIF"}
                         >
-                          GIF
-                        </button>
+                            {messageInputFocused ? (
+                              operationStatus === "processing" ? (
+                                <span className="button-loading">
+                                  <span className="spinner">⏳</span>
+                                </span>
+                              ) : !currentIsConnected ? (
+                                <span>🔒 Send</span>
+                              ) : (
+                                "Send"
+                              )
+                            ) : "GIF"}
+                          </button>
                       </div>
                     </div>
-                    
-
-                    
-                    {selectedGif && (
-                      <div className="selected-gif-preview">
-                        <span>Selected GIF:</span>
-                        <img src={selectedGif} alt="Selected GIF" />
-                        <button 
-                          className="remove-gif-button"
-                          onClick={() => setSelectedGif('')}
-                          title="Remove GIF"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    )}
-                    
-                    <div className="message-info">
-                      <div className="char-count">
-                        {customMessage.length}/{MAX_MESSAGE_LENGTH} characters
-                    </div>
-                    {customMessage.length > WARNING_THRESHOLD && (
-                        <div className="char-warning">
-                          Approaching character limit
-                        </div>
-                      )}
-                    </div>
-
-                  </div>
-                </div>
-
-                <div className="card send-action-card">
-                  <div className="input-group">
-                    <label>Recipient Wallet Address (Optional)</label>
-                    <div className="input-wrapper">
-                      <input 
-                        type="text" 
-                        id="recipientAddress" 
-                        placeholder="0x..., Default to Contract Owner"
-                        value={formatAccountOwner(recipientAddress)}
-                        onChange={(e) => {
-                          setRecipientAddress(e.target.value);
-                          if (addressValidationError) {
-                            setAddressValidationError("");
-                          }
-                        }}
-                        onBlur={() => validateRecipientAddress(recipientAddress)}
-                        className={addressValidationError ? 'error' : ''}
-                      />
-                    </div>
-                    {addressValidationError && (
-                      <div className="address-validation-error">
-                        {addressValidationError}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="send-actions">
-                    <button 
-                      className={`send-button ${isVoiceMode ? 'voice-mode' : ''} ${isLongPressing ? 'long-pressing' : ''}`} 
-                      id="sendButton"
-                      onClick={isVoiceMode ? () => setShowVoiceRecorder(true) : handleSendGM}
-                      onMouseDown={handleLongPressStart}
-                      onMouseUp={handleLongPressEnd}
-                      onMouseLeave={handleLongPressEnd}
-                      onTouchStart={handleLongPressStart}
-                      onTouchEnd={handleLongPressEnd}
-                      disabled={
-                        isButtonDisabled(operationStatus, currentAccount, gmOps, cooldownRemaining, localCooldownEnabled)
-                      }
-                    >
-                      {operationStatus === "processing" ? (
-                        <span className="button-loading">
-                          <span className="spinner">⏳</span> Sending...
-                        </span>
-                      ) : !currentIsConnected ? (
-                        "🔒 Connect wallet"
-                      ) : !gmOps.isValidAccountOwner(currentAccount) ? (
-                        "🔒 Invalid account"
-                      ) : localCooldownEnabled && cooldownRemaining > 0 ? (
-                        `🔓 ${gmOps.formatCooldown(cooldownRemaining)}`
-                      ) : isVoiceMode ? (
-                        "🎤 发送语音"
-                      ) : (
-                        "Send GMicrochains ✨"
-                      )}
-                    </button>
-                    
-                    <button 
-                      className="history-button" 
-                      id="historyButton"
-                      onClick={handleHistoryToggle}
-                    >
-                      History {showHistoryDropdown ? '▲' : '▼'}
-                    </button>
-                    
-                    <div className={`history-dropdown ${showHistoryDropdown ? 'show' : ''}`}>
-                      {currentAccount ? (
-                        <div className="history-list">
-                          {historyLoading ? (
-                            <div className="history-loading">
-                              <span className="spinner">⏳</span> Loading...
-                            </div>
-                          ) : historyRecords.length > 0 ? (
-                            historyRecords.map((record, index) => (
-                              <div key={index} className="history-item">
-                                <div className="history-sender">
-                                  From: {record.sender ? formatAddressForDisplay(record.sender, isMobile) : 'Unknown'}
-                                </div>
-                                {record.recipient && (
-                                  <div className="history-recipient">
-                                    To: {formatAddressForDisplay(record.recipient, isMobile)}
-                                  </div>
-                                )}
-                                <div className="history-content">
-                                  Content: {record.content || 'Gmicrochains'}
-                                </div>
-                                <div className="history-timestamp">
-                                  Time: {(() => {
-                                    const timestamp = Number(record.timestamp);
-                                    const timestampStr = timestamp.toString();
-                                    const timestampLength = timestampStr.length;                                   
-                                    let recordTime = timestamp;
-                                    if (timestampLength <= 12) {
-                                      recordTime = recordTime * 1000;
-                                    } else if (timestampLength >= 13 && timestampLength <= 16) {
-                                      recordTime = recordTime / 1000;  
-                                    }                                 
-                                    const date = new Date(recordTime);
-                                    return date.toLocaleString('zh-CN', {
-                                      year: 'numeric',
-                                      month: '2-digit',
-                                      day: '2-digit',
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                      second: '2-digit'
-                                    });
-                                  })()}
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="history-empty">
-                              No history records
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="history-empty">
-                          Please connect your wallet first
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  </div>                             
                 </div>
               </>
             )}
@@ -2248,72 +2547,50 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                 />
               </div>
             )}
+          </div>
+        </div>
+    
+        {showEmojiPicker && (
+          <EmojiPicker 
+            onEmojiSelect={addEmojiToMessage}
+            onClose={() => setShowEmojiPicker(false)}
+          />
+        )}
+        
+        {showGifPicker && (
+          <GifPicker 
+            onGifSelect={(gifUrl) => handleGifSelect(gifUrl, gmOps)}
+            onClose={() => setShowGifPicker(false)}
+          />
+        )}
 
-      </header>
-    </div>
-    
-    {/* 将emoji和GIF选择器移到更高的DOM层级 */}
-    {showEmojiPicker && (
-      <EmojiPicker 
-        onEmojiSelect={addEmojiToMessage}
-        onClose={() => setShowEmojiPicker(false)}
-      />
-    )}
-    
-    {showGifPicker && (
-      <GifPicker 
-        onGifSelect={handleGifSelect}
-        onClose={() => setShowGifPicker(false)}
-      />
-    )}
-    
-    {showVoiceRecorder && (
-      <VoiceRecorder 
-        onComplete={handleVoiceRecordingComplete}
-        onCancel={handleVoiceRecordingCancel}
-      />
-    )}
-  </div>
-  {activeTab === 'messages' && (
-    <div className="ad-marquee-container">
-      <div 
-        ref={marqueeRef} 
-        className={`ad-marquee ${adSettings.length > 5 ? 'ad-marquee-js' : 'ad-marquee-center'}`}
-      >
-        {adSettings.map((ad, index) => (
-          ad.url && ad.imageUrl && (
-            <a 
-              key={index} 
-              href={ad.url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="ad-marquee-item"
-            >
-              <img 
-                src={ad.imageUrl} 
-                alt={`Ad-${index + 1}`} 
-                className="ad-marquee-image"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                }}
-              />
-            </a>
-          )
-        ))}
+        
+        {showVoicePopup && (
+          <div className={`voice-recording-popup ${voicePopupType}`}>
+            <div className="voice-recording-icon">
+              {voicePopupType === 'recording' ? '🎤' : 
+               voicePopupType === 'error' ? '❌' : 
+               voicePopupType === 'success' ? '✅' : '🎤'}
+            </div>
+            <div className="voice-recording-text">{voicePopupText}</div>
+            {voicePopupType === 'recording' && (
+              <div className="voice-recording-time">
+                {recordingTime.toFixed(1)}s
+              </div>
+            )}
+          </div>
+        )}
       </div>
-    </div>
-  )}
-  
-  <NotificationCenter 
-    notifications={notifications}
-    onRemoveNotification={removeNotification}
-    gmRecords={gmRecords}
-    currentAccount={currentAccount}
-    gmOperations={gmOps}
-    chainId={chainId}
-  />
-</div>
-  </ErrorBoundary>
+    
+      <NotificationCenter 
+        notifications={notifications}
+        onRemoveNotification={removeNotification}
+        gmRecords={gmOps.streamEventsData || []} 
+        currentAccount={currentAccount}
+        gmOperations={gmOps}
+        chainId={chainId}
+      />
+    </ErrorBoundary>
   );
 }
 

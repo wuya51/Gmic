@@ -39,7 +39,7 @@ const GifPicker = ({ onGifSelect, onClose }) => {
       setGifs(data.data || []);
     } catch (err) {
       setError('Failed to load GIFs');
-      console.error('Error fetching GIFs:', err);
+
     } finally {
       setLoading(false);
     }

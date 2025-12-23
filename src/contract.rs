@@ -4,10 +4,10 @@ mod state;
 use crate::state::GmState;
 use linera_sdk::{Contract, ContractRuntime};
 use linera_sdk::linera_base_types::{AccountOwner, StreamName, StreamUpdate};
-use linera_sdk::views::{View, RootView, RegisterView, MapView};
+use linera_sdk::views::RootView;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use gm::{GmAbi, GmMessage, GmOperation};
+use gm::{GmAbi, GmMessage, GmOperation, MessageContent};
 
 linera_sdk::contract!(GmContract);
 
@@ -27,26 +27,7 @@ impl Contract for GmContract {
         let state = match GmState::load(context.clone()).await {
             Ok(state) => state,
             Err(_) => {
-                GmState {
-                    owner: RegisterView::new(context.clone()).expect("Failed to create owner register"),
-                    last_gm: MapView::new(context.clone()).expect("Failed to create last_gm map"),
-                    total_messages: RegisterView::new(context.clone()).expect("Failed to create total_messages register"),
-                    chain_messages: MapView::new(context.clone()).expect("Failed to create chain_messages map"),
-                    wallet_messages: MapView::new(context.clone()).expect("Failed to create wallet_messages map"),
-                    events: MapView::new(context.clone()).expect("Failed to create events map"),
-                    user_events: MapView::new(context.clone()).expect("Failed to create user_events map"),
-                    hourly_stats: MapView::new(context.clone()).expect("Failed to create hourly_stats map"),
-                    daily_stats: MapView::new(context.clone()).expect("Failed to create daily_stats map"),
-                    monthly_stats: MapView::new(context.clone()).expect("Failed to create monthly_stats map"),
-                    top_users_cache: RegisterView::new(context.clone()).expect("Failed to create top_users_cache register"),
-                    top_chains_cache: RegisterView::new(context.clone()).expect("Failed to create top_chains_cache register"),
-                    cache_timestamp: RegisterView::new(context.clone()).expect("Failed to create cache_timestamp register"),
-                    invitations: MapView::new(context.clone()).expect("Failed to create invitations map"),
-                    invitation_stats: MapView::new(context.clone()).expect("Failed to create invitation_stats map"),
-                    cooldown_enabled: RegisterView::new(context.clone()).expect("Failed to create cooldown_enabled register"),
-                    cooldown_whitelist: MapView::new(context.clone()).expect("Failed to create cooldown_whitelist map"),
-                    stream_events: MapView::new(context.clone()).expect("Failed to create stream_events map"),
-                }
+                GmState::create_empty(context)
             }
         };
         Self {
@@ -100,29 +81,48 @@ impl Contract for GmContract {
                 let _ = state.save().await;
             }
             GmOperation::Gm { sender: _, recipient, content, inviter } => {
-                let content_str = content.as_deref().unwrap_or("GMicrochains");
-                if !Self::is_message_content_valid(content_str) {
+                if !Self::is_message_content_valid(&content) {
+                    log::warn!("Invalid message content from sender: {}, type: {}", sender, content.message_type);
                     return;
                 }
                 
-                let (in_cooldown, _) = match state.is_in_cooldown(chain_id, &sender, timestamp.micros()).await {
+                let (in_cooldown, remaining_time) = match state.is_in_cooldown(chain_id, &sender, timestamp.micros()).await {
                     Ok(result) => result,
-                    Err(_e) => return,
+                    Err(e) => {
+                        log::error!("Failed to check cooldown for sender {}: {:?}", sender, e);
+                        return;
+                    }
                 };
                 if in_cooldown {
+                    log::info!("Sender {} is in cooldown, remaining time: {:?} seconds", sender, remaining_time);
                     return;
                 }
                 
-                let final_content = if content.is_none() { Some("GMicrochains".to_string()) } else { content.clone() };
-                let _ = state.record_gm(chain_id, sender, Some(recipient.clone()), timestamp, final_content.clone(), inviter).await;
+                if let Err(e) = state.record_gm(chain_id, sender, Some(recipient.clone()), timestamp, content.clone(), inviter).await {
+                    log::error!("Failed to record GM event from sender {}: {:?}", sender, e);
+                    return;
+                }
                 
-                self.runtime.emit(
+                let event_id = self.runtime.emit(
                     StreamName::from("gm_events"),
-                    &GmMessage::Gm { sender, recipient: Some(recipient), timestamp, content: final_content },
+                    &GmMessage::Gm { sender, recipient: Some(recipient), timestamp, content: content.clone() },
                 );
+                
+                log::info!("GM event emitted successfully for sender: {}, recipient: {}, event_id: {}", sender, recipient, event_id);
             }
-            GmOperation::ClaimInvitationRewards { sender: _ } => {
-                let _ = state.get_user_invitation_rewards(sender).await;
+            GmOperation::ClaimInvitationRewards { sender } => {
+                match state.get_user_invitation_rewards(sender.clone()).await {
+                    Ok(rewards) => {
+                        if rewards > 0 {
+                            log::info!("User {} successfully claimed {} invitation rewards", sender, rewards);
+                        } else {
+                            log::info!("User {} has no invitation rewards to claim", sender);
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("Failed to claim invitation rewards for user {}: {:?}", sender, e);
+                    }
+                }
             }
         }
     }
@@ -136,13 +136,24 @@ impl Contract for GmContract {
                 timestamp,
                 content,
             } => {
-                // 对于消息执行，不传递inviter参数
-                let _ = state.record_gm(self.runtime.chain_id(), sender, recipient, timestamp, content, None).await;
+                if !Self::is_message_content_valid(&content) {
+                    log::warn!("Invalid message content in execute_message from sender: {}, type: {}", sender, content.message_type);
+                    return;
+                }
+                
+                if let Err(e) = state.record_gm(self.runtime.chain_id(), sender, recipient, timestamp, content, None).await {
+                    log::error!("Failed to record GM event in execute_message from sender {}: {:?}", sender, e);
+                } else {
+                    log::info!("GM message executed successfully for sender: {}", sender);
+                }
             }
         }
     }
 
     async fn process_streams(&mut self, updates: Vec<StreamUpdate>) {
+        let mut processed_count = 0;
+        let error_count = 0;
+        
         for update in updates {
             let stream_name_str = update.stream_id.stream_name.to_string();
             
@@ -154,41 +165,77 @@ impl Contract for GmContract {
                         index
                     );
                     
+                    log::debug!("Read event from stream {} at index {}", stream_name_str, index);
+                    
                     self.store_gm_event_for_service(event_data).await;
+                    processed_count += 1;
                 }
             }
+        }
+        
+        if processed_count > 0 || error_count > 0 {
+            log::info!("Processed {} stream events with {} errors", processed_count, error_count);
         }
     }
 
     async fn store(self) {
         let mut state = self.state.lock().await;
-        let _ = state.save().await;
+        match state.save().await {
+            Ok(_) => {
+                log::debug!("State saved successfully");
+            }
+            Err(e) => {
+                log::error!("Failed to save state: {:?}", e);
+            }
+        }
     }
 }
 
 impl GmContract {
-    pub fn is_message_content_valid(content: &str) -> bool {
-        if content.len() > 280 {
+    pub fn is_message_content_valid(content: &MessageContent) -> bool {
+        if !content.is_valid_message_type() {
             return false;
         }
         
-        if content.contains("<script") || content.contains("</script>") || 
-           content.contains("<iframe") || content.contains("javascript:") {
-            return false;
-        }
-        
-        let sensitive_words = vec![
-            "spam", "abuse", "hate", "violence", "illegal", "scam", "fraud"
-        ];
-        
-        let content_lower = content.to_lowercase();
-        for word in sensitive_words {
-            if content_lower.contains(word) {
+        if content.is_text() {
+            if content.content.len() > 280 {
                 return false;
             }
+            
+            if content.content.contains("<script") || content.content.contains("</script>") || 
+               content.content.contains("<iframe") || content.content.contains("javascript:") {
+                return false;
+            }
+            
+            let sensitive_words = vec![
+                "spam", "abuse", "hate", "violence", "illegal", "scam", "fraud"
+            ];
+            
+            let content_lower = content.content.to_lowercase();
+            for word in sensitive_words {
+                if content_lower.contains(word) {
+                    return false;
+                }
+            }
+            
+            true
+        } else if content.is_gif() || content.is_voice() {
+            if content.content.len() > 500 {
+                return false;
+            }
+            
+            if !content.content.starts_with("http://") && !content.content.starts_with("https://") {
+                return false;
+            }
+
+            if content.content.contains("<script") || content.content.contains("javascript:") {
+                return false;
+            }
+            
+            true
+        } else {
+            false
         }
-        
-        true
     }
 
     async fn store_gm_event_for_service(&mut self, gm_message: GmMessage) {
@@ -197,12 +244,25 @@ impl GmContract {
         let chain_id = self.runtime.chain_id();
         
         match gm_message {
-            GmMessage::Gm { sender: _, recipient: _, timestamp: event_timestamp, content: _ } => {
+            GmMessage::Gm { sender, recipient, timestamp: event_timestamp, content: _ } => {
                 let key = (chain_id, event_timestamp.micros());
 
-                let message_json = serde_json::to_string(&gm_message).unwrap_or_default();
+                let message_json = match serde_json::to_string(&gm_message) {
+                    Ok(json) => json,
+                    Err(e) => {
+                        log::error!("Failed to serialize GM message for sender {}: {:?}", sender, e);
+                        return;
+                    }
+                };
                 
-                let _ = state.stream_events.insert(&key, message_json);
+                match state.stream_events.insert(&key, message_json) {
+                    Ok(_) => {
+                        log::debug!("Stored GM event for service: sender {}, recipient {:?}, timestamp {}", sender, recipient, event_timestamp.micros());
+                    }
+                    Err(e) => {
+                        log::error!("Failed to store GM event for service: sender {}, error: {:?}", sender, e);
+                    }
+                }
             }
         }
     }

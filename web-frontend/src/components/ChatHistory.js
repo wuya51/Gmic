@@ -412,7 +412,7 @@ const ChatHistory = ({ currentAccount, isMobile, gmOps, currentChatPartner = nul
                         {chat.partnerAddress.substring(0, 6)}...{chat.partnerAddress.substring(chat.partnerAddress.length - 4)}
                       </span>
                       <span className="message-count">
-                        {chat.messageCount} messages
+                        {chat.messageCount} 💬
                       </span>
                       <span className="chat-time">
                         {new Date(Number(latestMessage.timestamp)).toLocaleTimeString()}

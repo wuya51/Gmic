@@ -246,7 +246,6 @@ function App({ chainId, appId, ownerId, inviter, port }) {
   const [isMessageInputActive, setIsMessageInputActive] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [showContactList, setShowContactList] = useState(false);
-  const [showSetRecipientInput, setShowSetRecipientInput] = useState(false);
   const [newRecipientAddress, setNewRecipientAddress] = useState('');
   const [newRecipientValidationError, setNewRecipientValidationError] = useState('');
   const [recentContacts, setRecentContacts] = useState([
@@ -276,6 +275,20 @@ function App({ chainId, appId, ownerId, inviter, port }) {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
+  const resetRecordingState = useCallback(() => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    mediaRecorderRef.current = null;
+    audioChunksRef.current = [];
+    setIsRecording(false);
+    setRecordingTime(0);
+    setShowVoicePopup(false);
+  }, []);
   
   const addEmojiToMessage = (emoji) => {
     setCustomMessage(prev => prev + emoji);
@@ -298,6 +311,8 @@ function App({ chainId, appId, ownerId, inviter, port }) {
       setTimeout(() => setShowVoicePopup(false), 2000);
       return;
     }
+    
+    resetRecordingState();
 
     setShowVoicePopup(true);
     setVoicePopupText('Recording...');
@@ -381,8 +396,10 @@ function App({ chainId, appId, ownerId, inviter, port }) {
         setVoicePopupText('Recording too short (min 1s)');
         setVoicePopupType('error');
         setShowVoicePopup(true);
-        setTimeout(() => setShowVoicePopup(false), 1500);
-        audioChunksRef.current = [];
+        setTimeout(() => {
+          setShowVoicePopup(false);
+          resetRecordingState();
+        }, 1500);
       } else {
         const timestamp = performance.now();
         const microTimestamp = Math.floor(timestamp * 1000);
@@ -414,7 +431,10 @@ function App({ chainId, appId, ownerId, inviter, port }) {
         setVoicePopupText('Voice message sent!');
         setVoicePopupType('success');
         setShowVoicePopup(true);
-        setTimeout(() => setShowVoicePopup(false), 1500);
+        setTimeout(() => {
+          setShowVoicePopup(false);
+          resetRecordingState();
+        }, 1500);
       } else {
         throw new Error('Upload failed - no IPFS hash returned');
       }
@@ -425,11 +445,10 @@ function App({ chainId, appId, ownerId, inviter, port }) {
       setVoicePopupText('Failed to send voice message');
       setVoicePopupType('error');
       setShowVoicePopup(true);
-      setTimeout(() => setShowVoicePopup(false), 2000);
-      setVoicePopupText('Upload failed');
-      setVoicePopupType('error');
-      setShowVoicePopup(true);
-      setTimeout(() => setShowVoicePopup(false), 3000);
+      setTimeout(() => {
+        setShowVoicePopup(false);
+        resetRecordingState();
+      }, 2000);
     }
   };
 
@@ -2394,85 +2413,90 @@ function App({ chainId, appId, ownerId, inviter, port }) {
 
                                     }}
                                   >
-                                    <span className="contact-avatar-small">👤</span>
+                                    <span className="contact-avatar">👤</span>
                                     <span className="contact-name">wuya51</span>
                                     <span className="contact-address">0xfe60...f959</span>
                                   </div>
-                                  {showSetRecipientInput ? (
-                                    <div className="contact-item set-recipient-input">
-                                      <input
-                                        type="text"
-                                        className={`contact-address-input ${newRecipientValidationError ? 'error' : ''}`}
-                                        placeholder="Enter recipient address (0x...)"
-                                        value={newRecipientAddress}
-                                        onChange={(e) => {
-                                          setNewRecipientAddress(e.target.value);
-                                          if (newRecipientValidationError) {
+                                  <div 
+                                    className="contact-item"
+                                    onClick={() => {
+                                      const gmicAddress = import.meta.env.VITE_OWNER_ID;
+
+                                      if (currentAccount && currentAccount.toLowerCase() === gmicAddress.toLowerCase()) {
+                                        addNotification('Cannot send GMicrochains to yourself', 'error');
+                                        setShowContactList(false);
+                                        return;
+                                      }
+                                      setRecipientAddress(gmicAddress);
+                                      setCurrentChatPartner(gmicAddress);
+                                      setShowContactList(false);
+
+                                    }}
+                                  >
+                                    <span className="contact-avatar">🤖</span>
+                                    <span className="contact-name">GMIC</span>
+                                    <span className="contact-address">{import.meta.env.VITE_OWNER_ID.substring(0, 6)}...{import.meta.env.VITE_OWNER_ID.substring(import.meta.env.VITE_OWNER_ID.length - 4)}</span>
+                                  </div>
+                                  <div className="contact-item set-recipient-input">
+                                    <input
+                                      type="text"
+                                      className={`contact-address-input ${newRecipientValidationError ? 'error' : ''}`}
+                                      placeholder="Enter recipient address (0x...)"
+                                      value={newRecipientAddress}
+                                      onChange={(e) => {
+                                        setNewRecipientAddress(e.target.value);
+                                        if (newRecipientValidationError) {
+                                          setNewRecipientValidationError('');
+                                        }
+                                      }}
+                                      onBlur={() => {
+                                        if (gmOps && gmOps.validateRecipientAddress) {
+                                          const validation = gmOps.validateRecipientAddress(newRecipientAddress);
+                                          if (!validation.isValid) {
+                                            setNewRecipientValidationError(validation.error);
+                                          } else {
                                             setNewRecipientValidationError('');
                                           }
-                                        }}
-                                        onBlur={() => {
-                                          if (gmOps && gmOps.validateRecipientAddress) {
-                                            const validation = gmOps.validateRecipientAddress(newRecipientAddress);
-                                            if (!validation.isValid) {
-                                              setNewRecipientValidationError(validation.error);
-                                            } else {
-                                              setNewRecipientValidationError('');
-                                            }
-                                          }
-                                        }}
-                                        autoFocus
-                                      />
-                                      <button 
-                                        className={`confirm-contact-button ${newRecipientValidationError ? 'disabled' : ''}`}
-                                        onClick={() => {
-                                          if (gmOps && gmOps.validateRecipientAddress) {
-                                            const validation = gmOps.validateRecipientAddress(newRecipientAddress);
-                                            if (!validation.isValid) {
-                                              setNewRecipientValidationError(validation.error);
-                                              return;
-                                            }
-                                          }
-                                          
-                                          if (newRecipientAddress.trim()) {
-                                            setRecipientAddress(newRecipientAddress.trim());
-                                            setCurrentChatPartner(newRecipientAddress.trim());
-                                            setShowContactList(false);
-                                        setShowSetRecipientInput(false);
-                                        setNewRecipientAddress('');
-                                        setNewRecipientValidationError('');
-                                            
-                                            const newContact = {
-                                              address: newRecipientAddress.trim(),
-                                              name: '',
-                                              avatar: '👤'
-                                            };
-                                            setRecentContacts(prev => [newContact, ...prev.filter(c => c.address !== newRecipientAddress.trim())]);
-                                          }
-                                        }}
-                                        disabled={!!newRecipientValidationError}
-                                      >
-                                        Set Recipient
-                                      </button>
-                                      {newRecipientValidationError && (
-                                        <div className="address-validation-error">
-                                          {newRecipientValidationError}
-                                        </div>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <div 
-                                      className="contact-item set-recipient"
-                                      onClick={() => {
-                                        setShowSetRecipientInput(true);
-                                        setNewRecipientAddress('');
+                                        }
                                       }}
+                                      autoFocus
+                                    />
+                                    <button 
+                                      className={`confirm-contact-button ${newRecipientValidationError ? 'disabled' : ''}`}
+                                      onClick={() => {
+                                        if (gmOps && gmOps.validateRecipientAddress) {
+                                          const validation = gmOps.validateRecipientAddress(newRecipientAddress);
+                                          if (!validation.isValid) {
+                                            setNewRecipientValidationError(validation.error);
+                                            return;
+                                          }
+                                        }
+                                        
+                                        if (newRecipientAddress.trim()) {
+                                          setRecipientAddress(newRecipientAddress.trim());
+                                          setCurrentChatPartner(newRecipientAddress.trim());
+                                          setShowContactList(false);
+                                          setNewRecipientAddress('');
+                                          setNewRecipientValidationError('');
+                                          
+                                          const newContact = {
+                                            address: newRecipientAddress.trim(),
+                                            name: '',
+                                            avatar: '👤'
+                                          };
+                                          setRecentContacts(prev => [newContact, ...prev.filter(c => c.address !== newRecipientAddress.trim())]);
+                                        }
+                                      }}
+                                      disabled={!!newRecipientValidationError}
                                     >
-                                      <span className="contact-avatar-small">+</span>
-                                      <span className="contact-name">Set Recipient</span>
-                                      <span className="contact-description">Enter wallet address</span>
-                                    </div>
-                                  )}
+                                      Set Recipient
+                                    </button>
+                                    {newRecipientValidationError && (
+                                      <div className="address-validation-error">
+                                        {newRecipientValidationError}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             )}
@@ -2484,23 +2508,10 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                         <button 
                           className="emoji-picker-button"
                           onClick={() => {
-                            if (!currentIsConnected || !gmOps.isValidAccountOwner(currentAccount) || (localCooldownEnabled && cooldownRemaining > 0)) {
-                              return;
-                            }
                             setShowEmojiPicker(!showEmojiPicker);
                             setShowGifPicker(false);
                           }}
-                          disabled={!currentIsConnected || !gmOps.isValidAccountOwner(currentAccount) || (localCooldownEnabled && cooldownRemaining > 0)}
-                          title={
-                            !currentIsConnected ? "Please connect wallet" :
-                            !gmOps.isValidAccountOwner(currentAccount) ? "Invalid account" :
-                            (localCooldownEnabled && cooldownRemaining > 0) ? "24-hour cooldown active" :
-                            "Add emoji"
-                          }
-                          style={{
-                            opacity: (!currentIsConnected || !gmOps.isValidAccountOwner(currentAccount) || (localCooldownEnabled && cooldownRemaining > 0)) ? '0.5' : '1',
-                            cursor: (!currentIsConnected || !gmOps.isValidAccountOwner(currentAccount) || (localCooldownEnabled && cooldownRemaining > 0)) ? 'not-allowed' : 'pointer'
-                          }}
+                          title="Add emoji"
                         >
                           😊
                         </button>

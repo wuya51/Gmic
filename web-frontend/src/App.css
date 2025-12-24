@@ -289,10 +289,8 @@ body {
 .message-count {
   color: #6c757d;
   font-size: 0.8rem;
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
   flex-shrink: 0;
+  margin-right: 8px;
 }
 
 .chat-time {
@@ -714,16 +712,7 @@ body {
   opacity: 0.8;
 }
 
-.contact-avatar-small {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background-color: #07c160;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-}
+
 
 .contact-name {
   font-weight: 500;
@@ -3724,7 +3713,7 @@ body {
   transition: all 0.3s ease;
   width: 100%;
   min-height: 300px;
-  max-height: 400px;
+  max-height: 350px;
   overflow-y: auto;
 }
 

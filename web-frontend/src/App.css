@@ -213,6 +213,10 @@ body {
   border: none;
 }
 
+.chat-conversation.expanded .latest-message {
+  display: none;
+}
+
 .chat-conversation.expanded {
   background: linear-gradient(135deg, #fff8f5 0%, #ffece6 100%);
   border-radius: 12px;
@@ -771,6 +775,22 @@ body {
 
 .emoji-picker-button:active {
   transform: scale(0.95);
+}
+
+.emoji-picker-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #ccc;
+  transform: none;
+  box-shadow: none;
+}
+
+.emoji-picker-button:disabled:hover {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #ccc;
+  transform: none;
+  box-shadow: none;
 }
 
 .gif-picker-button {

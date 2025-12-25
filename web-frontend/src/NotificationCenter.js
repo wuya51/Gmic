@@ -11,11 +11,9 @@ const NotificationCenter = ({
   error = null 
 }) => {
   const prevGmRecordsRef = useRef([]);
-  const notificationTimersRef = useRef({});
   const isInitialLoadRef = useRef(true);
   
   const [activeBalls, setActiveBalls] = useState([]);
-  const [centerNotification, setCenterNotification] = useState(null);
   const [lastQueryTime, setLastQueryTime] = useState(0);
   const [queryInterval, setQueryInterval] = useState(null);
 
@@ -104,114 +102,15 @@ const NotificationCenter = ({
   );
 
 
-  const showNotification = useCallback((recipientRecord, notificationId) => {
-    const oldTimer = notificationTimersRef.current[notificationId];
-    if (oldTimer) {
-      clearTimeout(oldTimer.autoHideTimer);
-      clearInterval(oldTimer.countdownInterval);
-    }
-
-    const timerState = {
-      remainingTime: 8000,
-      startTime: Date.now(),
-      isPaused: false,
-      autoHideTimer: null,
-      countdownInterval: null
-    };
-    notificationTimersRef.current[notificationId] = timerState;
-
-    const executeCountdown = () => {
-      const timer = notificationTimersRef.current[notificationId];
-      if (!timer || timer.isPaused) return;
-
-      const elapsed = Date.now() - timer.startTime;
-      const remaining = Math.max(0, timer.remainingTime - elapsed);
-      timer.remainingTime = remaining;
-
-      setCenterNotification(prev => 
-        prev?.id === notificationId 
-          ? { ...prev, countdown: Math.ceil(remaining / 1000) } 
-          : prev
-      );
-
-      if (remaining <= 0) {
-        clearInterval(timer.countdownInterval);
-        delete notificationTimersRef.current[notificationId];
-        setCenterNotification(null);
-      }
-    };
-
-    const startAutoHideTimer = () => {
-      const timer = notificationTimersRef.current[notificationId];
-      if (!timer) return;
-
-      timer.isPaused = false;
-      const remaining = timer.remainingTime || 8000;
-      timer.startTime = Date.now();
-
-      clearTimeout(timer.autoHideTimer);
-      clearInterval(timer.countdownInterval);
-
-      executeCountdown();
-      timer.countdownInterval = setInterval(executeCountdown, 1000);
-
-      timer.autoHideTimer = setTimeout(() => {
-        const finalTimer = notificationTimersRef.current[notificationId];
-        if (!finalTimer || finalTimer.isPaused) return;
-
-        delete notificationTimersRef.current[notificationId];
-        setCenterNotification(null);
-      }, remaining);
-    };
-
-    const pauseAutoHide = () => {
-      const timer = notificationTimersRef.current[notificationId];
-      if (!timer) return;
-
-      timer.isPaused = true;
-      clearTimeout(timer.autoHideTimer);
-      clearInterval(timer.countdownInterval);
-
-      const elapsed = Date.now() - timer.startTime;
-      timer.remainingTime = Math.max(0, timer.remainingTime - elapsed);
-    };
 
 
 
-    setCenterNotification({
-      id: notificationId,
-      sender: recipientRecord.recipient,
-      timestamp: formatTimestamp(recipientRecord.timestamp),
-      content: recipientRecord.content || 'Gmicrochains',
-      countdown: 8,
-      visible: true,
-      startAutoHideTimer,
-      pauseAutoHide
-    });
-    startAutoHideTimer();
-  }, [gmOperations, chainId, formatShortAddress, formatTimestamp]);
-
-  const closeNotificationAndShowNext = useCallback(() => {
-    if (centerNotification?.id) {
-      const timer = notificationTimersRef.current[centerNotification.id];
-      if (timer) {
-        clearTimeout(timer.autoHideTimer);
-        clearInterval(timer.countdownInterval);
-        delete notificationTimersRef.current[centerNotification.id];
-      }
-    }
-    setCenterNotification(null);
-  }, [centerNotification?.id]);
 
 
   useEffect(() => {
     return () => {
       activeBalls.forEach(ball => clearTimeout(ball.removeTimer));
       if (queryInterval) clearInterval(queryInterval);
-      Object.values(notificationTimersRef.current).forEach(timer => {
-        clearTimeout(timer.autoHideTimer);
-        clearInterval(timer.countdownInterval);
-      });
     };
   }, [activeBalls, queryInterval]);
 
@@ -242,7 +141,7 @@ const NotificationCenter = ({
 
 
   useEffect(() => {
-    if (!gmRecords?.length) return;
+    if (!Array.isArray(gmRecords) || !gmRecords.length) return;
 
     if (isInitialLoadRef.current && gmRecords.length > 3) {
       isInitialLoadRef.current = false;
@@ -252,14 +151,22 @@ const NotificationCenter = ({
     
     isInitialLoadRef.current = false;
 
-    const prevIds = new Set(prevGmRecordsRef.current.map(r => `${r.sender}-${r.timestamp}`));
-    const newRecords = gmRecords.filter(r => !prevIds.has(`${r.sender}-${r.timestamp}`));
+    const prevRecords = Array.isArray(prevGmRecordsRef.current) ? prevGmRecordsRef.current : [];
+    const prevIds = new Set(prevRecords.map(r => `${r.sender || 'unknown'}-${r.timestamp || '0'}`));
+    
+    const newRecords = gmRecords.filter(r => {
+      if (!r || typeof r !== 'object') return false;
+      const recordId = `${r.sender || 'unknown'}-${r.timestamp || '0'}`;
+      return !prevIds.has(recordId);
+    });
     
     prevGmRecordsRef.current = [...gmRecords];
 
     newRecords.forEach(record => {
+      if (!record || !record.sender) return;
+      
       const position = getRandomPosition();
-      const recordId = `${record.sender}-${record.timestamp}`;
+      const recordId = `${record.sender}-${record.timestamp || Date.now()}`;
 
       setActiveBalls(prev => {
         if (prev.some(b => b.id === recordId)) return prev;
@@ -279,20 +186,8 @@ const NotificationCenter = ({
       });
     });
 
-    const recipientRecords = newRecords
-      .filter(r => r.recipient?.toLowerCase().trim() === currentAccount?.toLowerCase().trim())
-      .map(r => ({
-        sender: r.recipient,
-        recipient: r.sender,
-        timestamp: r.timestamp,
-        content: r.content || 'Gmicrochains'
-      }));
 
-    recipientRecords.forEach(r => {
-      const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      showNotification(r, id);
-    });
-  }, [gmRecords, currentAccount, getRandomPosition, showNotification]);
+  }, [gmRecords, currentAccount, getRandomPosition]);
 
   return (
     <>
@@ -311,7 +206,6 @@ const NotificationCenter = ({
         </div>
       )}
 
-      {/* Top-right notification list */}
       <div className="notifications-container">
         {memoizedNotifications.map(notification => (
           <div key={notification.id} className={`notification notification-${notification.type}`}>
@@ -334,7 +228,6 @@ const NotificationCenter = ({
         ))}
       </div>
 
-      {/* Floating bubble notifications */}
       <div className="gm-notification-container">
         {activeBalls.map(ball => (
           <div
@@ -351,51 +244,7 @@ const NotificationCenter = ({
         ))}
       </div>
 
-      {/* Center notification modal */}
-      {centerNotification && (
-        <div className="center-notification-overlay">
-          <div
-            className="center-notification"
-            onMouseEnter={() => centerNotification.pauseAutoHide?.()}
-            onMouseLeave={() => centerNotification.startAutoHideTimer?.()}
-          >
-            <div className="notification-header">
-              <div className="notification-icon">🎉</div>
-              <div className="notification-title">New GMIC Received!</div>
-              <button
-                className="notification-close"
-                onClick={closeNotificationAndShowNext}
-              >
-                ×
-              </button>
-            </div>
 
-            <div className="notification-content">
-              <div className="notification-message">
-                <span className="sender-label">From:</span>
-                <span className="sender-address">{formatShortAddress(centerNotification.sender)}</span>
-              </div>
-              <div className="notification-message-content">
-                <span className="message-label">Message:</span>
-                <span className="message-text">{centerNotification.content}</span>
-              </div>
-              <div className="notification-time">{centerNotification.timestamp}</div>
-              <div className="notification-countdown">
-                Auto-close countdown: {centerNotification.countdown || 8} seconds
-              </div>
-            </div>
-
-            <div className="notification-actions">
-              <button
-                className="action-btn dismiss-btn"
-                onClick={closeNotificationAndShowNext}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 };

@@ -95,7 +95,8 @@ const GMOperations = ({
   customMessageEnabled,
   cooldownStatus,
   inviter,
-  currentIsConnected
+  currentIsConnected,
+  currentChatPartner
 }) => {
   const queryChainId = getQueryChainId(currentChainId, chainId);
   const [subscriptionData, setSubscriptionData] = useState({
@@ -377,16 +378,34 @@ const GMOperations = ({
     skip: !currentAccount,
   });
 
-  const { data: gmEventsData, refetch: refetchGmEvents } = useQuery(GET_GM_EVENTS, {
+  const [chatPartner, setChatPartner] = useState(null);
+  
+  const { data: mySentEventsData, refetch: refetchMySentEvents } = useQuery(GET_GM_EVENTS, {
     variables: { sender: formatAccountOwner(currentAccount) },
     skip: !currentIsConnected || !currentAccount || !isValidAccountOwner(currentAccount),
     fetchPolicy: "no-cache",
   });
 
-  const { data: receivedGmEventsData, refetch: refetchReceivedGmEvents } = useQuery(GET_RECEIVED_GM_EVENTS, {
-    variables: { recipient: formatAccountOwner(currentAccount) },
-    skip: !currentAccount || !isValidAccountOwner(currentAccount),
+  const { data: partnerSentEventsData, refetch: refetchPartnerSentEvents } = useQuery(GET_GM_EVENTS, {
+    variables: { sender: currentChatPartner ? formatAccountOwner(currentChatPartner) : formatAccountOwner(currentAccount) },
+    skip: !currentIsConnected || !currentAccount || !isValidAccountOwner(currentAccount) || !currentChatPartner,
     fetchPolicy: "no-cache",
+  });
+
+  const { data: myReceivedEventsData, refetch: refetchMyReceivedEvents, error: myReceivedError, loading: myReceivedLoading } = useQuery(GET_RECEIVED_GM_EVENTS, {
+    variables: { recipient: formatAccountOwner(currentAccount) },
+    skip: !currentIsConnected || !currentAccount || !isValidAccountOwner(currentAccount),
+    fetchPolicy: "no-cache"
+  });
+
+  useEffect(() => {
+
+  }, [myReceivedLoading, myReceivedError, myReceivedEventsData, currentAccount]);
+
+  const { data: partnerReceivedEventsData, refetch: refetchPartnerReceivedEvents } = useQuery(GET_RECEIVED_GM_EVENTS, {
+    variables: { recipient: chatPartner ? formatAccountOwner(chatPartner) : formatAccountOwner(currentAccount) },
+    skip: !currentIsConnected || !currentAccount || !isValidAccountOwner(currentAccount) || !chatPartner,
+    fetchPolicy: "no-cache"
   });
 
   const { data: streamEventsData, refetch: refetchStreamEvents, error: streamEventsError } = useQuery(GET_STREAM_EVENTS, {
@@ -400,27 +419,48 @@ const GMOperations = ({
   });
 
   const filterNewEvents = useCallback((events) => {
-    if (!events || !Array.isArray(events) || pageLoadTime === 0) {
+    if (!events || !Array.isArray(events)) {
       return [];
     }
-    
+
     return events.filter(event => {
       if (!event || !event.timestamp) return false;
-      
-      const eventTime = event.timestamp > 1000000000000 ? event.timestamp : event.timestamp * 1000;
-      return eventTime > pageLoadTime;
+      return true;
     });
-  }, [pageLoadTime]);
-
-  const filteredGmEvents = useMemo(() => {
-    if (!gmEventsData?.getGmEvents) return [];
-    return filterNewEvents(gmEventsData.getGmEvents);
-  }, [gmEventsData, filterNewEvents]);
+  }, []);
 
   const filteredStreamEvents = useMemo(() => {
     if (!streamEventsData?.getStreamEvents) return [];
     return filterNewEvents(streamEventsData.getStreamEvents);
   }, [streamEventsData, filterNewEvents]);
+
+  useEffect(() => {
+  }, [myReceivedEventsData, partnerSentEventsData, partnerReceivedEventsData, currentAccount, chatPartner, currentIsConnected]);
+
+  const filteredMyReceivedEvents = useMemo(() => {
+    if (!partnerSentEventsData?.getGmEvents) return [];
+    const currentUser = formatAccountOwner(currentAccount);
+    return filterNewEvents(partnerSentEventsData.getGmEvents)
+      .filter(event => event.recipient === currentUser);
+  }, [partnerSentEventsData, filterNewEvents, currentAccount]);
+
+  const filteredMySentEvents = useMemo(() => {
+    if (!mySentEventsData?.getGmEvents) return [];
+    return filterNewEvents(mySentEventsData.getGmEvents);
+  }, [mySentEventsData, filterNewEvents]);
+
+  const filteredPartnerSentEvents = useMemo(() => {
+    if (!partnerSentEventsData?.getGmEvents) return [];
+    return filterNewEvents(partnerSentEventsData.getGmEvents);
+  }, [partnerSentEventsData, filterNewEvents]);
+
+  const filteredPartnerReceivedEvents = useMemo(() => {
+    if (!mySentEventsData?.getGmEvents) return [];
+    const partnerUser = chatPartner ? formatAccountOwner(chatPartner) : null;
+    if (!partnerUser) return [];
+    return filterNewEvents(mySentEventsData.getGmEvents)
+      .filter(event => event.recipient === partnerUser);
+  }, [mySentEventsData, filterNewEvents, chatPartner]);
 
   const [sendGm, { data: sendGmData, error: sendGmError }] = useMutation(SEND_GM, {
     update: () => {},
@@ -594,25 +634,37 @@ const GMOperations = ({
     };
   }, []);
 
+  const setChatPartnerAddress = useCallback((partnerAddress) => {
+    setChatPartner(partnerAddress);
+  }, []);
+
   return {
     data: data || {},
     walletMessagesData: currentIsConnected ? (walletMessagesData || {}) : { walletMessages: null },
-    gmEventsData: filteredGmEvents || [],
+    mySentEventsData: filteredMySentEvents || [],
+    partnerSentEventsData: filteredPartnerSentEvents || [],
+    myReceivedEventsData: filteredMyReceivedEvents || [],
+    partnerReceivedEventsData: filteredPartnerReceivedEvents || [],
+    gmEventsData: chatPartner ? filteredPartnerSentEvents : filteredMySentEvents,
+    receivedGmEventsData: chatPartner ? filteredPartnerReceivedEvents : filteredMyReceivedEvents,
     streamEventsData: filteredStreamEvents || [],
     loading,
     queryError,
     invitationStatsData: currentIsConnected ? (invitationStatsData || { totalInvited: 0, totalRewards: 0, lastRewardTime: null }) : { totalInvited: 0, totalRewards: 0, lastRewardTime: null },
     safeInvitationStats: currentIsConnected ? (safeInvitationStats || { totalInvited: 0, totalRewards: 0, lastRewardTime: null }) : { totalInvited: 0, totalRewards: 0, lastRewardTime: null },
     refetch,
-    refetchGmEvents,
+    refetchGmEvents: chatPartner ? refetchPartnerSentEvents : refetchMySentEvents,
     refetchStreamEvents,
+    refetchReceivedGmEvents: chatPartner ? refetchPartnerReceivedEvents : refetchMyReceivedEvents,
     refetchInvitationRewards,
     handleSendGM,
     handleSetCooldownEnabled,
     validateRecipientAddress,
     formatCooldown,
     isValidAccountOwner,
-    formatAccountOwner
+    formatAccountOwner,
+    setChatPartnerAddress,
+    currentChatPartner: chatPartner
   };
 };
 

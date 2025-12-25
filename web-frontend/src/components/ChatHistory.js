@@ -1,5 +1,28 @@
 import React, { useState, useEffect } from 'react';
 
+const normalizeTimestamp = (timestamp) => {
+  if (!timestamp) return Date.now();
+  
+  let num = Number(timestamp);
+  if (isNaN(num)) {
+    const date = new Date(timestamp);
+    if (!isNaN(date.getTime())) {
+      return date.getTime();
+    }
+    return Date.now();
+  }
+  
+  if (num > 1e15) {
+    return Math.floor(num / 1000);
+  } else if (num > 1e12) {
+    return num;
+  } else if (num > 1e9) {
+    return num * 1000;
+  }
+  
+  return num;
+};
+
 const ChatHistory = ({ currentAccount, isMobile, gmOps, currentChatPartner = null, onChatPartnerChange, currentIsConnected }) => {
   const [chatConversations, setChatConversations] = useState([]);
   const [expandedChats, setExpandedChats] = useState({});
@@ -97,8 +120,20 @@ const ChatHistory = ({ currentAccount, isMobile, gmOps, currentChatPartner = nul
 
     try {
       const streamEvents = Array.isArray(gmOps.streamEventsData) ? gmOps.streamEventsData : [];
-      const gmEvents = Array.isArray(gmOps.gmEventsData) ? gmOps.gmEventsData : [];
-      const receivedGmEvents = Array.isArray(gmOps.receivedGmEventsData) ? gmOps.receivedGmEventsData : [];
+      
+      let gmEvents, receivedGmEvents;
+      if (currentChatPartner) {
+        const mySentEvents = Array.isArray(gmOps.mySentEventsData) ? gmOps.mySentEventsData : [];
+        const partnerSentEvents = Array.isArray(gmOps.partnerSentEventsData) ? gmOps.partnerSentEventsData : [];
+        const myReceivedEvents = Array.isArray(gmOps.myReceivedEventsData) ? gmOps.myReceivedEventsData : [];
+        const partnerReceivedEvents = Array.isArray(gmOps.partnerReceivedEventsData) ? gmOps.partnerReceivedEventsData : [];
+        
+        gmEvents = [...mySentEvents, ...partnerReceivedEvents];
+        receivedGmEvents = [...partnerSentEvents, ...myReceivedEvents];
+      } else {
+        gmEvents = Array.isArray(gmOps.gmEventsData) ? gmOps.gmEventsData : [];
+        receivedGmEvents = Array.isArray(gmOps.receivedGmEventsData) ? gmOps.receivedGmEventsData : [];
+      }
       
       const allEvents = [...streamEvents, ...gmEvents, ...receivedGmEvents];
       
@@ -128,13 +163,13 @@ const ChatHistory = ({ currentAccount, isMobile, gmOps, currentChatPartner = nul
           chatGroups[chatPartner].push({
             ...event,
             isSent: event.sender === currentAccount,
-            timestamp: event.timestamp || Date.now().toString()
+            timestamp: normalizeTimestamp(event.timestamp || Date.now().toString())
           });
         }
       });
       
       Object.keys(chatGroups).forEach(partner => {
-        chatGroups[partner].sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
+        chatGroups[partner].sort((a, b) => normalizeTimestamp(b.timestamp) - normalizeTimestamp(a.timestamp));
       });
       
       const chatRecords = Object.keys(chatGroups).map(partner => {
@@ -148,13 +183,13 @@ const ChatHistory = ({ currentAccount, isMobile, gmOps, currentChatPartner = nul
         const sanitizedLatestMessage = {
           ...latestMessage,
           content: latestMessage.content || '',
-          timestamp: latestMessage.timestamp || Date.now().toString()
+          timestamp: normalizeTimestamp(latestMessage.timestamp || Date.now().toString())
         };
         
         const sanitizedMessages = messages.map(msg => ({
           ...msg,
           content: msg.content || '',
-          timestamp: msg.timestamp || Date.now().toString()
+          timestamp: normalizeTimestamp(msg.timestamp || Date.now().toString())
         }));
         
         const uniqueMessages = [];
@@ -415,7 +450,7 @@ const ChatHistory = ({ currentAccount, isMobile, gmOps, currentChatPartner = nul
                         {chat.messageCount} 💬
                       </span>
                       <span className="chat-time">
-                        {new Date(Number(latestMessage.timestamp)).toLocaleTimeString()}
+                        {new Date(normalizeTimestamp(latestMessage.timestamp)).toLocaleTimeString()}
                       </span>
                       <span className="expand-icon">
                         {isExpanded ? '▼' : '▶'}
@@ -453,9 +488,9 @@ const ChatHistory = ({ currentAccount, isMobile, gmOps, currentChatPartner = nul
                           
                           <div className="message-content-wrapper">
                             <div className={`message-info ${isSent ? 'sent' : 'received'}`}>
-                              <span className="message-sender">{senderLabel}</span>
+                              {isSent && <span className="message-sender">{senderLabel}</span>}
                               <span className="message-time">
-                                {new Date(Number(message.timestamp)).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                {new Date(normalizeTimestamp(message.timestamp)).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                               </span>
                             </div>                            
                             <div className={`message-bubble ${isSent ? 'sent' : 'received'}`}>

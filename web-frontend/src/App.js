@@ -98,13 +98,23 @@ class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <div className="error-boundary">
-          <h2>Something went wrong.</h2>
-          <details style={{ whiteSpace: 'pre-wrap' }}>
-            {this.state.error && this.state.error.toString()}
-            <br />
-            {this.state.errorInfo && this.state.errorInfo.componentStack}
+          <div className="error-icon">⚠️</div>
+          <h2>Oops! Something went wrong</h2>
+          <p className="error-message">We're sorry, but something unexpected happened.</p>
+          <details className="error-details">
+            <summary>Technical Details (for developers)</summary>
+            <div className="error-content">
+              {this.state.error && this.state.error.toString()}
+              <br />
+              {this.state.errorInfo && this.state.errorInfo.componentStack}
+            </div>
           </details>
-          <button onClick={() => this.setState({ hasError: false })}>Try Again</button>
+          <button 
+            className="retry-button"
+            onClick={() => this.setState({ hasError: false })}
+          >
+            Try Again
+          </button>
         </div>
       );
     }
@@ -1252,7 +1262,8 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     setQueryRetryCount,
     currentIsConnected,
     customMessage,
-    customMessageEnabled
+    customMessageEnabled,
+    currentChatPartner
   }) || {};
   const gmOps = {
     walletMessagesData: { walletMessages: null },
@@ -2293,6 +2304,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                       <button 
                         className={`voice-toggle ${isVoiceMode ? 'active' : ''}`}
                         onClick={() => setIsVoiceMode(!isVoiceMode)}
+                        disabled={isButtonDisabled(operationStatus, currentAccount, gmOps, cooldownRemaining, localCooldownEnabled, currentIsConnected)}
                         title={isVoiceMode ? "Switch to text mode" : "Switch to voice mode"}
                       >
                         <div className="icon-container">
@@ -2511,6 +2523,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
                             setShowEmojiPicker(!showEmojiPicker);
                             setShowGifPicker(false);
                           }}
+                          disabled={isButtonDisabled(operationStatus, currentAccount, gmOps, cooldownRemaining, localCooldownEnabled, currentIsConnected)}
                           title="Add emoji"
                         >
                           😊

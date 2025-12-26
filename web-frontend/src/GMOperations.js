@@ -225,14 +225,19 @@ const GMOperations = ({
           
           console.log('New subscription event:', eventId);
 
-          if (refetchGmEvents) refetchGmEvents();
-          if (refetchStreamEvents) refetchStreamEvents();
-          if (refetchWalletMessages) refetchWalletMessages();
-          if (refetch) refetch();
-          if (refetchGmRecord) refetchGmRecord({ fetchPolicy: 'network-only', nextFetchPolicy: 'cache-and-network' });
-          if (refetchCooldownStatus) refetchCooldownStatus({ fetchPolicy: 'network-only', nextFetchPolicy: 'cache-first' }); 
+          if (refetch) refetch({ fetchPolicy: 'network-only', nextFetchPolicy: 'cache-and-network' });
+          if (refetchWalletMessages) refetchWalletMessages({ fetchPolicy: 'network-only', nextFetchPolicy: 'cache-and-network' });
           
           setTimeout(() => {
+            const currentRefetchMySentEvents = chatPartner ? refetchPartnerSentEvents : refetchMySentEvents;
+            if (currentRefetchMySentEvents) currentRefetchMySentEvents({ fetchPolicy: 'network-only', nextFetchPolicy: 'cache-and-network' });
+            if (refetchStreamEvents) refetchStreamEvents({ fetchPolicy: 'network-only', nextFetchPolicy: 'cache-and-network' });
+          }, 100);
+          
+          setTimeout(() => {
+            if (refetchGmRecord) refetchGmRecord({ fetchPolicy: 'network-only', nextFetchPolicy: 'cache-and-network' });
+            if (refetchCooldownStatus) refetchCooldownStatus({ fetchPolicy: 'network-only', nextFetchPolicy: 'cache-and-network' });
+            
             setSubscriptionStatus(prev => ({
               ...prev,
               gmEvents: {
@@ -240,7 +245,7 @@ const GMOperations = ({
                 internalRefresh: false
               }
             }));
-          }, 100);
+          }, 500);
           
         } catch (error) {
 

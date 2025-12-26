@@ -65,28 +65,9 @@ body {
   text-align: left;
 }
 
-.error-text {
-  background-color: #f8f5ed;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-  font-family: monospace;
-  color: #d32f2f;
-  word-break: break-all;
-}
 
-.error-stack {
-  background-color: #f8f5ed;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 1rem;
-  font-family: monospace;
-  font-size: 0.85rem;
-  color: #555;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
+
+
 
 .error-stack summary {
   cursor: pointer;
@@ -129,15 +110,42 @@ body {
   to { opacity: 1; }
 }
 
-@keyframes slideIn {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
+@keyframes expandFade {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+    max-height: 0;
+    overflow: hidden;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1.02) translateY(0);
+    max-height: 600px;
+  }
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+@keyframes floatUp {
+  0% {
+    opacity: 0;
+    transform: translateY(100px) scale(0.5);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-20px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-60px) scale(0.9);
+  }
 }
+
+
+
+
 
 .App {
   max-width: 800px;
@@ -168,6 +176,7 @@ body {
   min-height: 300px;
   max-height: 400px;
   overflow-y: auto;
+  position: relative;
 }
 
 .chat-history {
@@ -196,8 +205,7 @@ body {
   background: transparent;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
-  padding: 0.8rem;
-  margin: 0.5rem 0;
+  padding: 0.5rem 0.8rem;
   transition: all 0.3s ease;
   opacity: 1;
   transform: scale(1);
@@ -217,37 +225,6 @@ body {
   display: none;
 }
 
-.chat-conversation.expanded {
-  background: linear-gradient(135deg, #fff8f5 0%, #ffece6 100%);
-  border-radius: 12px;
-  padding: 0.5rem;
-  box-shadow: 0 4px 16px rgba(255, 90, 0, 0.2);
-  position: relative;
-  transform: scale(1.02);
-  z-index: 10;
-}
-
-.chat-conversation.expanded::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, #ff2a00, #ff5a00, #ff8c00);
-  border-radius: 12px 12px 0 0;
-}
-
-.chat-item {
-  background: linear-gradient(135deg, #ffffff 0%, #fff5f2 100%);
-  border: 1px solid #ff9e7d;
-  box-shadow: 0 2px 6px rgba(255, 158, 125, 0.2);
-  border-radius: 12px;
-  padding: 0.8rem;
-  transition: all 0.2s ease;
-  margin-bottom: 0.5rem;
-}
-
 .chat-item:hover {
   background: linear-gradient(135deg, #ffffff 0%, #ffece6 100%);
   border-color: #ff7a55;
@@ -259,7 +236,6 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
   font-size: 0.85rem;
   position: relative;
 }
@@ -316,6 +292,9 @@ body {
   font-weight: 500;
 }
 
+.chat-conversation.expanded {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f5ed 100%);
+}
 .chat-conversation.expanded .chat-content {
   color: #bf360c;
   font-weight: 600;
@@ -326,6 +305,7 @@ body {
   padding-top: 1rem;
   border-top: 1px solid rgba(255, 90, 0, 0.3);
   animation: fadeIn 0.3s ease;
+  background: transparent;
 }
 
 .message-container {
@@ -385,7 +365,7 @@ body {
   background: #f5f5f5;
   border: 1px solid #e0e0e0;
   border-radius: 12px;
-  padding: 0.8rem 1rem;
+  padding: 0.5rem 0.8rem;
   word-wrap: break-word;
   position: relative;
 }
@@ -403,13 +383,13 @@ body {
 }
 
 .message-bubble.sent {
-  background: linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%);
-  color: white;
+  background: #95ec69;
+  color: #000;
   border-radius: 12px;
   padding: 0.5rem 0.8rem;
   word-wrap: break-word;
   position: relative;
-  box-shadow: 0 2px 4px rgba(255, 107, 53, 0.3);
+  box-shadow: 0 2px 4px rgba(149, 236, 105, 0.3);
 }
 
 .message-bubble.sent::before {
@@ -421,7 +401,7 @@ body {
   height: 0;
   border-style: solid;
   border-width: 6px 0 6px 8px;
-  border-color: transparent transparent transparent #ff6b35;
+  border-color: transparent transparent transparent #95ec69;
 }
 
 @keyframes fadeIn {
@@ -429,12 +409,7 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-.message-type {
-  margin-left: 0.5rem;
-  color: #6c757d;
-  font-size: 0.8rem;
-  font-style: italic;
-}
+
 
 .chat-empty {
   display: flex;
@@ -703,18 +678,7 @@ body {
   font-style: italic;
 }
 
-.contact-name {
-  font-weight: 500;
-  color: #333;
-  font-size: 0.9rem;
-}
 
-.contact-address {
-  font-family: monospace;
-  font-size: 0.8rem;
-  color: #666;
-  opacity: 0.8;
-}
 
 
 
@@ -949,9 +913,7 @@ body {
 }
 
 
-.invitation-leaderboard-tab {
-  margin-top: 20px;
-}
+
 
 .message-editor.visible {
   display: block;
@@ -1648,31 +1610,9 @@ body {
   animation: copySuccessSimple 0.6s ease;
 }
 
-@keyframes copySuccessSimple {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-    text-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
 
-@keyframes copySuccess {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-    box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
+
+
 
 .action-btn {
   padding: 0.6rem 1.2rem;
@@ -2230,65 +2170,6 @@ body {
   color: #ff2a00;
 }
 
-@keyframes floatUp {
-  0% {
-    opacity: 1;
-    box-shadow: 
-      0 4px 15px rgba(255, 42, 0, 0.3),
-      0 0 30px rgba(255, 42, 0, 0.4),
-      inset 0 0 20px rgba(255, 255, 255, 0.5);
-  }
-  30% {
-    opacity: 0.9;
-    box-shadow: 
-      0 6px 20px rgba(255, 42, 0, 0.4),
-      0 0 35px rgba(255, 42, 0, 0.5),
-      inset 0 0 25px rgba(255, 255, 255, 0.6);
-  }
-  60% {
-    opacity: 0.7;
-    transform: translateY(-80px) scale(1.02);
-    box-shadow: 
-      0 8px 25px rgba(255, 42, 0, 0.3),
-      0 0 25px rgba(255, 42, 0, 0.4),
-      inset 0 0 15px rgba(255, 255, 255, 0.4);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-150px) scale(0.8);
-    box-shadow: 
-      0 2px 8px rgba(255, 42, 0, 0.2),
-      0 0 15px rgba(255, 42, 0, 0.2),
-      inset 0 0 10px rgba(255, 255, 255, 0.3);
-  }
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-@keyframes pulse {
-  0%, 100% {
-    box-shadow: 0 4px 20px rgba(255, 42, 0, 0.4);
-  }
-  50% {
-    box-shadow: 0 6px 25px rgba(255, 42, 0, 0.6);
-  }
-}
-
-@keyframes pulsePlus {
-  0%, 100% {
-    opacity: 0.8;
-  }
-  50% {
-    opacity: 1;
-  }
-}
 
 .address-long {
   font-family: 'Courier New', monospace;
@@ -2459,7 +2340,7 @@ body {
 }
 
 .stat-label {
-  font-size: 0.6rem;
+  font-size: 0.5rem;
   color: #666;
   font-weight: 500;
   text-transform: uppercase;
@@ -3027,35 +2908,35 @@ body {
 
 .notifications-container {
   position: fixed;
-  bottom: 1rem;
-  right: 1rem;
+  bottom: 0.5rem;
+  right: 0.5rem;
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  gap: 0.8rem;
-  max-width: 400px;
+  gap: 0.4rem;
+  max-width: 320px;
 }
 
 .notification-loading {
   position: fixed;
-  bottom: 1rem;
-  right: 1rem;
+  bottom: 0.5rem;
+  right: 0.5rem;
   z-index: 1000;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 1rem 1.5rem;
+  gap: 0.3rem;
+  padding: 0.3rem 0.6rem 0.2rem 0.6rem;
   background-color: rgba(255, 255, 255, 0.95);
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 5px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
   color: #666;
-  font-size: 0.9rem;
+  font-size: 0.7rem;
   backdrop-filter: blur(10px);
 }
 
 .loading-spinner {
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   border: 2px solid #f3f3f3;
   border-top: 2px solid #ff2a00;
   border-radius: 50%;
@@ -3064,32 +2945,32 @@ body {
 
 .notification-error {
   position: fixed;
-  bottom: 1rem;
-  right: 1rem;
+  bottom: 0.5rem;
+  right: 0.5rem;
   z-index: 1000;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 1rem 1.5rem;
+  gap: 0.3rem;
+  padding: 0.3rem 0.6rem 0.2rem 0.6rem;
   background-color: rgba(231, 76, 60, 0.95);
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 5px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
   color: white;
-  font-size: 0.9rem;
+  font-size: 0.7rem;
   backdrop-filter: blur(10px);
 }
 
 .error-icon {
-  font-size: 1.2rem;
+  font-size: 0.9rem;
 }
 
 .retry-btn {
   background-color: rgba(255, 255, 255, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 6px;
-  padding: 0.3rem 0.8rem;
+  border-radius: 3px;
+  padding: 0.2rem 0.5rem;
   color: white;
-  font-size: 0.8rem;
+  font-size: 0.65rem;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -3099,34 +2980,35 @@ body {
 }
 
 .notification {
-  padding: 1.2rem 1.5rem;
-  border-radius: 12px;
-  border: 2px solid transparent;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
+  padding: 0.3rem 0.6rem 0.2rem 0.6rem;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
   cursor: pointer;
   transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  min-width: 320px;
+  align-items: flex-start;
+  min-width: 240px;
+  max-width: 320px;
   backdrop-filter: blur(10px);
   animation: slideInRight 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   transform-origin: center right;
   position: relative;
-  padding-right: 3rem; 
+  padding-right: 1.6rem;
 }
 
 .notification .notification-close {
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
+  top: 0.15rem;
+  right: 0.2rem;
   background: rgba(0, 0, 0, 0.2);
   border: none;
   color: #fff;
-  font-size: 1rem;
+  font-size: 0.7rem;
   cursor: pointer;
-  width: 24px;
-  height: 24px;
+  width: 14px;
+  height: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3173,17 +3055,32 @@ body {
   border-left: 6px solid #3498db;
 }
 
-.notification-message {
+.notification-content {
   flex: 1;
-  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  margin-right: 0.5rem;
+  min-width: 0;
+  padding-bottom: 0.1rem;
+}
+
+.notification-message {
+  font-size: 0.7rem;
   font-weight: 500;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .notification-timestamp {
-  font-size: 0.75rem;
-  opacity: 0.7;
-  margin-left: 0.5rem;
+  font-size: 0.55rem;
+  opacity: 0.5;
   white-space: nowrap;
+  align-self: flex-end;
+  line-height: 1;
+  margin-bottom: -0.1rem;
 }
 
 .gm-record-card {
@@ -4123,27 +4020,9 @@ body {
   opacity: 0.8;
 }
 
-@keyframes popupFadeIn {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.8);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
-}
 
-@keyframes recordingPulse {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 0.8;
-  }
-}
+
+
 
 @keyframes pulse {
   0%, 100% {
@@ -4248,10 +4127,7 @@ body {
   animation: spinRotate 1s linear infinite;
 }
 
-@keyframes spinRotate {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
+
 
 .send-actions {
   display: flex;
@@ -4389,23 +4265,7 @@ body {
   animation: plusOneBounce 0.8s ease-out forwards;
 }
 
-@keyframes plusOneBounce {
-  0% {
-    opacity: 0;
-  }
-  30% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 1;
-  }
-  70% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 1;
-  }
-}
+
 
 .stats-value {
   position: relative;
@@ -4536,14 +4396,7 @@ body {
   font-size: 0.9rem;
 }
 
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
+
 
 .App-content {
   margin: 0 1.2rem;
@@ -4948,14 +4801,10 @@ body {
   background-clip: text;
 }
 
-.notification-content {
-  margin-bottom: 1.5rem;
-}
-
 .notification-message {
   font-size: 1.1rem;
   line-height: 1.5;
-  margin-bottom: 0.8rem;
+  margin-bottom: 0.3rem;
   color: #e0e0e0;
 }
 
@@ -5040,15 +4889,15 @@ body {
 
 .notification-close {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
+  top: 0.4rem;
+  right: 0.4rem;
   background: rgba(255, 255, 255, 0.1);
   border: none;
   color: #e0e0e0;
-  font-size: 1.2rem;
+  font-size: 0.85rem;
   cursor: pointer;
-  width: 32px;
-  height: 32px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5062,14 +4911,7 @@ body {
   color: white;
 }
 
-@keyframes progressBar {
-  from {
-    width: 0%;
-  }
-  to {
-    width: 100%;
-  }
-}
+
 
 @keyframes fadeIn {
   from {

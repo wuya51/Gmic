@@ -209,12 +209,14 @@ const NotificationCenter = ({
       <div className="notifications-container">
         {memoizedNotifications.map(notification => (
           <div key={notification.id} className={`notification notification-${notification.type}`}>
-            <span className="notification-message">
-              {notification.type === 'success' ? '✓ ' : ''}{notification.message}
-            </span>
-            <span className="notification-timestamp">
-              {new Date(notification.timestamp).toLocaleTimeString()}
-            </span>
+            <div className="notification-content">
+              <span className="notification-message">
+                {notification.type === 'success' ? '✓ ' : ''}{notification.message}
+              </span>
+              <span className="notification-timestamp">
+                {new Date(notification.timestamp).toLocaleTimeString()}
+              </span>
+            </div>
             <button
               className="notification-close"
               onClick={(e) => {

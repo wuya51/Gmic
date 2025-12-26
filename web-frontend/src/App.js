@@ -628,7 +628,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
     
     setTimeout(() => {
       removeNotification(id);
-    }, 5000);
+    }, 2000);
   }, []);
   
   const removeNotification = useCallback((id) => {
@@ -813,6 +813,26 @@ function App({ chainId, appId, ownerId, inviter, port }) {
   
   const [isDynamicLoading, setIsDynamicLoading] = useState(false);
   
+  const prevWalletStateRef = useRef({ primaryWallet: null, walletType: null });
+  useEffect(() => {
+    const prevState = prevWalletStateRef.current;
+    const wasNotDynamic = prevState.walletType !== 'dynamic' || !prevState.primaryWallet?.address;
+    const isNowDynamicConnected = primaryWallet && primaryWallet.address && walletType === 'dynamic' && isConnected;
+
+    
+    if (wasNotDynamic && isNowDynamicConnected) {
+      addNotification('Dynamic wallet: connected', 'success');
+    }
+    
+    const switchedToDynamic = prevState.walletType !== 'dynamic' && walletType === 'dynamic' && isConnected && primaryWallet?.address;
+        
+    if (switchedToDynamic) {
+      addNotification('Dynamic wallet: connected', 'success');
+    }
+    
+    prevWalletStateRef.current = { primaryWallet, walletType };
+  }, [primaryWallet, walletType, isConnected, addNotification]);
+  
   useEffect(() => {
     if (primaryWallet && primaryWallet.address) {
       setIsDynamicLoading(false);
@@ -935,7 +955,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
         if (currentIsConnected && walletType) {
           if (walletType === 'dynamic') {
             await props.disconnectDynamicWallet();
-            addNotification('Dynamic wallet disconnected', 'info');
+            addNotification('Dynamic wallet: disconnected', 'info');
             await new Promise(resolve => setTimeout(resolve, 500));
           } else if (walletType === 'linera') {
             await props.disconnectWallet();
@@ -964,7 +984,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
       try {
         if (isDynamicConnected || isActiveDynamicWallet) {
           await props.disconnectDynamicWallet();
-          addNotification('Dynamic wallet disconnected', 'success');
+          addNotification('Dynamic wallet: disconnected', 'success');
           return;
         }
         if (isLineraConnected) {
@@ -974,6 +994,7 @@ function App({ chainId, appId, ownerId, inviter, port }) {
         }
         if (!isDynamicConnected && !isActiveDynamicWallet) {
           await props.connectWallet('dynamic');
+          addNotification('Dynamic wallet: connected', 'success');
         }
       } catch (error) {
         addNotification(`Failed to handle Dynamic wallet: ${error.message}`, 'error');
@@ -1185,6 +1206,8 @@ function App({ chainId, appId, ownerId, inviter, port }) {
         if (mutationType === 'sendGM') {
           previousEventCountRef.current = 0;
           gmOps.refetchStreamEvents && gmOps.refetchStreamEvents();
+          gmOps.refetch && gmOps.refetch({ fetchPolicy: 'network-only' });
+          gmOps.refetchWalletMessages && gmOps.refetchWalletMessages({ fetchPolicy: 'network-only' });
         }
       }
       
